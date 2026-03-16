@@ -2,7 +2,7 @@
 Extraction Service
 ==================
 Medische informatie-extractie via lokaal LLM (Ollama).
-Input: getranscribeerd consult → Output: gestructureerde medische data (JSON).
+Input: getranscribeerd consult -> Output: gestructureerde medische data (JSON).
 """
 
 import json
@@ -14,7 +14,7 @@ import structlog
 
 logger = structlog.get_logger()
 
-# Laad prompt templates
+# Lokale imports
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "shared"))
 from prompts.templates import (
@@ -44,12 +44,12 @@ class LLMClient:
     ) -> dict | str:
         """
         Genereer een response van het lokale LLM.
-        
+
         Args:
             system_prompt: Systeeminstructie
             user_prompt: Gebruikersprompt met data
             format_json: Als True, dwing JSON output af
-            
+
         Returns:
             Geparsed JSON dict of raw string
         """
@@ -116,7 +116,7 @@ class LLMClient:
 class ExtractionService:
     """
     Medische extractie uit consulttranscript.
-    
+
     Gebruik:
         service = ExtractionService(config)
         extraction = await service.extract(transcript_result)
@@ -135,10 +135,10 @@ class ExtractionService:
     async def extract(self, transcript_text: str) -> dict:
         """
         Extraheer gestructureerde medische informatie uit transcript.
-        
+
         Args:
             transcript_text: Gelabeld transcript (arts:/patient: prefixes)
-            
+
         Returns:
             dict conform medical_extraction.json schema
         """
@@ -162,10 +162,10 @@ class ExtractionService:
     async def generate_soep(self, extraction: dict) -> dict:
         """
         Genereer SOEP-concept uit medische extractie.
-        
+
         Args:
             extraction: dict conform medical_extraction schema
-            
+
         Returns:
             dict met S, O, E, P, icpc_code, icpc_titel
         """
@@ -194,11 +194,11 @@ class ExtractionService:
     async def detect_flags(self, extraction: dict, soep: dict) -> dict:
         """
         Detecteer rode vlaggen en ontbrekende informatie.
-        
+
         Args:
             extraction: Medische extractie
             soep: SOEP-concept
-            
+
         Returns:
             dict met rode_vlaggen en ontbrekende_info lijsten
         """
@@ -229,11 +229,11 @@ class ExtractionService:
 
     async def generate_patient_instruction(self, soep: dict) -> str:
         """
-        Genereer patiëntinstructie in gewone taal.
-        
+        Genereer patientinstructie in gewone taal.
+
         Args:
             soep: SOEP-concept
-            
+
         Returns:
             Instructietekst in eenvoudig Nederlands (B1 niveau)
         """
@@ -244,7 +244,7 @@ class ExtractionService:
         )
 
         result = await self.llm.generate(
-            system_prompt="Je schrijft patiëntinstructies in eenvoudig Nederlands.",
+            system_prompt="Je schrijft patientinstructies in eenvoudig Nederlands.",
             user_prompt=prompt,
             format_json=False,
         )
@@ -255,11 +255,11 @@ class ExtractionService:
 async def run_full_pipeline(config, transcript_text: str) -> dict:
     """
     Draai de volledige extractie-pipeline.
-    
+
     Args:
         config: AppConfig
         transcript_text: Gelabeld transcript
-        
+
     Returns:
         dict met extraction, soep, detection, patient_instruction
     """
@@ -274,7 +274,7 @@ async def run_full_pipeline(config, transcript_text: str) -> dict:
     # Stap 3: Rode vlaggen + missing info
     detection = await service.detect_flags(extraction, soep)
 
-    # Stap 4: Patiëntinstructie
+    # Stap 4: Patientinstructie
     instruction = await service.generate_patient_instruction(soep)
 
     return {

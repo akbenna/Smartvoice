@@ -17,33 +17,33 @@ Privacy-first AI-systeem dat consultaudio in een Nederlandse huisartsenpraktijk 
 ## Projectstructuur
 
 ```
-services/              → Python backend services
-  api/main.py          → FastAPI gateway (alle endpoints)
-  transcription/       → Whisper STT + PyAnnote diarisatie
-  extraction/          → LLM medische extractie + SOEP generatie
-  audit/               → NEN 7513 conforme audit logging
-frontend/review-app/   → Next.js review interface
+services/              -> Python backend services
+  api/main.py          -> FastAPI gateway (alle endpoints)
+  transcription/       -> Whisper STT + PyAnnote diarisatie
+  extraction/          -> LLM medische extractie + SOEP generatie
+  audit/               -> NEN 7513 conforme audit logging
+frontend/review-app/   -> Next.js review interface
 shared/
-  schemas/             → JSON schema's (medical_extraction, soep_concept, detection_result)
-  prompts/templates.py → Alle LLM prompt templates
-  config/settings.py   → Centrale configuratie (dataclasses, env vars)
-database/migrations/   → PostgreSQL schema (001_init.sql)
+  schemas/             -> JSON schema's (medical_extraction, soep_concept, detection_result)
+  prompts/templates.py -> Alle LLM prompt templates
+  config/settings.py   -> Centrale configuratie (dataclasses, env vars)
+database/migrations/   -> PostgreSQL schema (001_init.sql)
 ```
 
 ## Kernconcepten
 
 ### SOEP-structuur
 Nederlandse huisartsen documenteren in SOEP-formaat:
-- **S** (Subjectief): Klachtpresentatie vanuit patiëntperspectief
+- **S** (Subjectief): Klachtpresentatie vanuit patientperspectief
 - **O** (Objectief): Bevindingen bij onderzoek (ALLEEN wat verricht is)
 - **E** (Evaluatie): Werkdiagnose + differentiaaldiagnosen + ICPC-code
 - **P** (Plan): Medicatie, verwijzingen, onderzoek, controle
 
 ### Pipeline Flow
 ```
-Audio → Whisper STT → PyAnnote diarisatie → Gelabeld transcript
-    → LLM extractie (JSON) → SOEP generatie → Rode vlaggen detectie
-    → Review UI → Arts goedkeuring → HIS export
+Audio -> Whisper STT -> PyAnnote diarisatie -> Gelabeld transcript
+    -> LLM extractie (JSON) -> SOEP generatie -> Rode vlaggen detectie
+    -> Review UI -> Arts goedkeuring -> HIS export
 ```
 
 ### Privacy/Compliance Regels
@@ -80,39 +80,6 @@ Audio → Whisper STT → PyAnnote diarisatie → Gelabeld transcript
 - Tailwind CSS voor styling
 - shadcn/ui componenten waar mogelijk
 - API calls via typed fetch wrapper
-
-## MVP Status
-
-Het project bevindt zich in de startfase (Fase 1 - Proof of Concept).
-
-### Fase 1 Prioriteiten (6 weken)
-1. ✅ Database schema + migraties
-2. ✅ API endpoints (skeleton)
-3. ✅ Transcription service (Whisper + diarisatie)
-4. ✅ Extraction service (Ollama LLM client)
-5. ✅ Prompt templates
-6. ✅ JSON schema's
-7. 🔲 Pipeline orchestratie (verbind services)
-8. 🔲 Frontend review interface
-9. 🔲 Audio upload flow (end-to-end)
-10. 🔲 Database connectie pool + ORM models
-11. 🔲 Authenticatie (JWT + rollen)
-12. 🔲 End-to-end test met simulatieconsulten
-
-### Wat nog gebouwd moet worden
-- [ ] SQLAlchemy ORM models (mapping naar 001_init.sql schema)
-- [ ] Database connection pool (asyncpg)
-- [ ] Redis event bus integratie
-- [ ] Pipeline orchestrator (verbindt STT → extractie → SOEP → detectie)
-- [ ] Frontend: Next.js review app met SOEP editor
-- [ ] Frontend: audio upload component
-- [ ] Frontend: rode vlaggen / missing info weergave
-- [ ] JWT authenticatie + rolgebaseerde autorisatie
-- [ ] Audio encryptie + opslag service
-- [ ] HIS export (clipboard formaat)
-- [ ] Health check endpoints (DB, Redis, Ollama, GPU status)
-- [ ] Docker builds testen
-- [ ] Testconsulten (10 gesimuleerde cases)
 
 ## Commando's
 

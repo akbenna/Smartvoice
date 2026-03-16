@@ -2,7 +2,7 @@
 Audit Service
 =============
 Immutable audit logging conform NEN 7513.
-Elke toegang tot patiëntgegevens wordt gelogd met tijdstempel,
+Elke toegang tot patientgegevens wordt gelogd met tijdstempel,
 gebruiker, actie en resource.
 """
 
@@ -32,10 +32,10 @@ class AuditEvent:
 class AuditService:
     """
     Audit logging service.
-    
+
     Schrijft immutable log entries naar PostgreSQL.
     Elke entry bevat een checksum van de vorige entry (chain).
-    
+
     Gebruik:
         audit = AuditService(db_pool)
         await audit.log(AuditEvent(
@@ -69,7 +69,7 @@ class AuditService:
         # Detectie
         "detection.view",
         "detection.dismiss",
-        # Patiëntinstructie
+        # Patientinstructie
         "instruction.view",
         "instruction.generate",
         # Gebruikersbeheer
@@ -89,10 +89,10 @@ class AuditService:
     async def log(self, event: AuditEvent) -> int:
         """
         Schrijf een audit-event naar de database.
-        
+
         Args:
             event: AuditEvent met alle vereiste velden
-            
+
         Returns:
             ID van het aangemaakte log-entry
         """
@@ -147,7 +147,7 @@ class AuditService:
     async def verify_chain(self, limit: int = 1000) -> bool:
         """
         Verifieer de integriteit van de audit log chain.
-        
+
         Returns:
             True als de chain intact is, False bij manipulatie
         """

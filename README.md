@@ -1,278 +1,109 @@
-"""
-Transcription Service
-=====================
-Whisper Large v3 Turbo (Faster-Whisper) + PyAnnote diarisatie.
-Verwerkt audio lokaal op GPU, output: getimed en gediariseerd transcript.
-"""
+# AI-Consultassistent
 
-import json
-import logging
-from dataclasses import dataclass, field
-from pathlib import Path
+**Privacy-first AI-systeem voor Nederlandse huisartsenpraktijken.**
+Zet consultaudio om in gestructureerde SOEP-dossiervoering — volledig lokaal.
 
-import structlog
+## Architectuur
 
-logger = structlog.get_logger()
+```
+[Microfoon] -> [Audio Capture] -> [Whisper STT + Diarisatie] -> [Transcript Store]
+                                                                      |
+[HIS] <- [Export] <- [Review UI] <- [Detectie] <- [SOEP Generator] <- [LLM Extractie]
+```
 
+## Stack
 
-@dataclass
-class TranscriptSegment:
-    """Enkel segment uit het transcript."""
-    spreker: str           # "arts" of "patient"
-    start: float           # Starttijd in seconden
-    eind: float            # Eindtijd in seconden
-    tekst: str
-    confidence: float = 0.0
+| Component | Technologie |
+|-----------|------------|
+| Speech-to-Text | Whisper Large v3 Turbo (Faster-Whisper) |
+| Diarisatie | PyAnnote Audio 3.x |
+| LLM | Llama 3.3 8B Instruct via Ollama |
+| Backend | Python 3.12 + FastAPI |
+| Frontend | Next.js 14 + React + Tailwind CSS |
+| Database | PostgreSQL 16 + pgcrypto |
+| Message Queue | Redis Streams |
+| Containerisatie | Docker Compose |
 
+## Vereisten
 
-@dataclass
-class TranscriptResult:
-    """Volledig transcriptieresultaat."""
-    segments: list[TranscriptSegment] = field(default_factory=list)
-    raw_text: str = ""
-    model_version: str = ""
-    language: str = "nl"
-    confidence_avg: float = 0.0
-    duration_secs: float = 0.0
-    word_count: int = 0
+### Hardware (minimaal)
+- NVIDIA GPU met >=12 GB VRAM (RTX 4070 of hoger)
+- 32 GB RAM
+- 500 GB NVMe SSD
+- Ubuntu 24.04 LTS
 
-    def to_labeled_text(self) -> str:
-        """Genereer gelabeld transcript voor LLM input."""
-        lines = []
-        for seg in self.segments:
-            label = seg.spreker if seg.spreker in ("arts", "patient") else "onbekend"
-            lines.append(f"{label}: {seg.tekst}")
-        return "\n".join(lines)
+### Software
+- Docker + Docker Compose
+- NVIDIA Container Toolkit
+- Ollama (voor LLM)
 
-    def to_dict(self) -> dict:
-        return {
-            "raw_text": self.raw_text,
-            "segments": [
-                {
-                    "spreker": s.spreker,
-                    "start": s.start,
-                    "eind": s.eind,
-                    "tekst": s.tekst,
-                    "confidence": s.confidence,
-                }
-                for s in self.segments
-            ],
-            "model_version": self.model_version,
-            "language": self.language,
-            "confidence_avg": self.confidence_avg,
-            "duration_secs": self.duration_secs,
-            "word_count": self.word_count,
-        }
+## Snelstart
 
+```bash
+# 1. Clone repo
+git clone <repo-url>
+cd ai-consultassistent
 
-class TranscriptionService:
-    """
-    Lokale speech-to-text met Whisper + sprekerdiarisatie.
-    
-    Gebruik:
-        service = TranscriptionService(config)
-        await service.initialize()  # Laad modellen (eenmalig)
-        result = await service.transcribe("/pad/naar/audio.wav")
-    """
+# 2. Kopieer environment
+cp .env.example .env
+# -> Pas configuratie aan
 
-    def __init__(self, config):
-        self.config = config
-        self.whisper_model = None
-        self.diarizer = None
-        self._initialized = False
+# 3. Installeer Ollama en pull model
+curl -fsSL https://ollama.com/install.sh | sh
+ollama pull llama3.3:8b-instruct-q4_K_M
 
-    async def initialize(self):
-        """Laad Whisper en diarisatie modellen. Duurt ~30s bij eerste keer."""
-        if self._initialized:
-            return
+# 4. Start alle services
+docker compose up -d
 
-        logger.info("Whisper model laden...",
-                     model=self.config.whisper.model,
-                     device=self.config.whisper.device)
+# 5. Open review-interface
+open http://localhost:3000
+```
 
-        # --- Whisper laden ---
-        try:
-            from faster_whisper import WhisperModel
+## Projectstructuur
 
-            self.whisper_model = WhisperModel(
-                self.config.whisper.model,
-                device=self.config.whisper.device,
-                compute_type=self.config.whisper.compute_type,
-                download_root=self.config.whisper.model_path,
-            )
-            logger.info("Whisper model geladen")
-        except Exception as e:
-            logger.error("Whisper model laden mislukt", error=str(e))
-            raise
+```
+ai-consultassistent/
+├── services/
+│   ├── api/                 # FastAPI gateway (alle endpoints)
+│   ├── transcription/       # Whisper STT + diarisatie
+│   ├── extraction/          # LLM medische extractie + SOEP generatie
+│   ├── audit/               # NEN 7513 conforme audit logging
+│   ├── Dockerfile           # Backend Docker image
+│   └── requirements.txt     # Python dependencies
+├── frontend/
+│   └── review-app/          # Next.js review-interface
+│       ├── src/
+│       │   ├── app/         # Next.js app router
+│       │   ├── components/  # React componenten
+│       │   └── lib/         # API client + utilities
+│       ├── Dockerfile       # Frontend Docker image
+│       └── package.json
+├── shared/
+│   ├── schemas/             # JSON-schema's
+│   ├── prompts/             # LLM-prompttemplates
+│   └── config/              # Gedeelde configuratie
+├── database/
+│   └── migrations/          # PostgreSQL-migraties
+├── scripts/                 # Setup en validatie
+├── docs/                    # DPIA, privacy, beheer
+├── docker-compose.yml
+└── .env.example
+```
 
-        # --- Diarisatie laden (optioneel) ---
-        if self.config.diarization.enabled:
-            try:
-                from pyannote.audio import Pipeline
+## MVP Fasen
 
-                self.diarizer = Pipeline.from_pretrained(
-                    "pyannote/speaker-diarization-3.1",
-                    use_auth_token=self.config.diarization.hf_token,
-                )
-                # Verplaats naar GPU indien beschikbaar
-                import torch
-                if torch.cuda.is_available():
-                    self.diarizer.to(torch.device("cuda"))
-                logger.info("Diarisatie pipeline geladen")
-            except Exception as e:
-                logger.warning("Diarisatie laden mislukt, gaat verder zonder",
-                              error=str(e))
-                self.diarizer = None
+- **Fase 1 (6 weken):** Handmatige upload -> transcriptie -> SOEP-concept
+- **Fase 2 (3 maanden):** Real-time capture, review UI, rode vlaggen, audit
+- **Fase 3 (6 maanden):** HIS-integratie, feedbackloop, productie-hardening
 
-        self._initialized = True
+## Compliance
 
-    async def transcribe(self, audio_path: str) -> TranscriptResult:
-        """
-        Transcribeer een audiobestand.
-        
-        Args:
-            audio_path: Pad naar WAV/MP3/M4A bestand
-            
-        Returns:
-            TranscriptResult met segmenten, timestamps en confidence
-        """
-        if not self._initialized:
-            await self.initialize()
+- Volledig lokale verwerking (geen cloud vereist)
+- AVG-conform met DPIA-template
+- NEN 7510:2024 / NEN 7513 logging
+- Encryptie at-rest (AES-256) en in-transit (TLS 1.3)
+- Audit trail op alle patientdata-toegang
 
-        audio_path = Path(audio_path)
-        if not audio_path.exists():
-            raise FileNotFoundError(f"Audiobestand niet gevonden: {audio_path}")
+## Licentie
 
-        logger.info("Transcriptie gestart", audio_path=str(audio_path))
-
-        # --- Stap 1: Whisper transcriptie ---
-        segments_raw, info = self.whisper_model.transcribe(
-            str(audio_path),
-            language=self.config.whisper.language,
-            beam_size=self.config.whisper.beam_size,
-            word_timestamps=True,
-            vad_filter=True,
-        )
-
-        # Verzamel segmenten
-        whisper_segments = []
-        all_text_parts = []
-        total_confidence = 0.0
-
-        for segment in segments_raw:
-            whisper_segments.append({
-                "start": segment.start,
-                "end": segment.end,
-                "text": segment.text.strip(),
-                "avg_logprob": segment.avg_logprob,
-            })
-            all_text_parts.append(segment.text.strip())
-            total_confidence += segment.avg_logprob
-
-        raw_text = " ".join(all_text_parts)
-        avg_confidence = (
-            total_confidence / len(whisper_segments)
-            if whisper_segments else 0.0
-        )
-        # Converteer log-prob naar 0-1 schaal (benadering)
-        confidence_normalized = min(1.0, max(0.0, 1.0 + avg_confidence))
-
-        logger.info("Whisper transcriptie voltooid",
-                     segments=len(whisper_segments),
-                     duration=info.duration,
-                     confidence=round(confidence_normalized, 3))
-
-        # --- Stap 2: Diarisatie (optioneel) ---
-        if self.diarizer is not None:
-            try:
-                diarization = self.diarizer(str(audio_path))
-                transcript_segments = self._merge_with_diarization(
-                    whisper_segments, diarization
-                )
-            except Exception as e:
-                logger.warning("Diarisatie mislukt, gebruik transcript zonder sprekerinfo",
-                              error=str(e))
-                transcript_segments = [
-                    TranscriptSegment(
-                        spreker="onbekend",
-                        start=s["start"],
-                        eind=s["end"],
-                        tekst=s["text"],
-                        confidence=min(1.0, max(0.0, 1.0 + s["avg_logprob"])),
-                    )
-                    for s in whisper_segments
-                ]
-        else:
-            transcript_segments = [
-                TranscriptSegment(
-                    spreker="onbekend",
-                    start=s["start"],
-                    eind=s["end"],
-                    tekst=s["text"],
-                    confidence=min(1.0, max(0.0, 1.0 + s["avg_logprob"])),
-                )
-                for s in whisper_segments
-            ]
-
-        return TranscriptResult(
-            segments=transcript_segments,
-            raw_text=raw_text,
-            model_version=self.config.whisper.model,
-            language=info.language,
-            confidence_avg=confidence_normalized,
-            duration_secs=info.duration,
-            word_count=len(raw_text.split()),
-        )
-
-    def _merge_with_diarization(
-        self, whisper_segments: list[dict], diarization
-    ) -> list[TranscriptSegment]:
-        """
-        Combineer Whisper-segmenten met diarisatie-output.
-        Wijst elke Whisper-segment toe aan de spreker die het meeste overlapt.
-        
-        Aanname: eerste spreker = arts (start het consult), tweede = patiënt.
-        Dit kan verfijnd worden met een spraakregistratie-stap.
-        """
-        # Map diarisatie-sprekers naar arts/patiënt
-        speaker_map = {}
-        speaker_order = []
-
-        for turn, _, speaker in diarization.itertracks(yield_label=True):
-            if speaker not in speaker_order:
-                speaker_order.append(speaker)
-
-        # Eerste spreker = arts (heuristiek: arts opent het consult)
-        for i, spk in enumerate(speaker_order):
-            if i == 0:
-                speaker_map[spk] = "arts"
-            elif i == 1:
-                speaker_map[spk] = "patient"
-            else:
-                speaker_map[spk] = f"spreker_{i+1}"
-
-        # Wijs elk Whisper-segment toe aan een spreker
-        result = []
-        for seg in whisper_segments:
-            seg_mid = (seg["start"] + seg["end"]) / 2
-            best_speaker = "onbekend"
-            best_overlap = 0.0
-
-            for turn, _, speaker in diarization.itertracks(yield_label=True):
-                overlap_start = max(seg["start"], turn.start)
-                overlap_end = min(seg["end"], turn.end)
-                overlap = max(0.0, overlap_end - overlap_start)
-
-                if overlap > best_overlap:
-                    best_overlap = overlap
-                    best_speaker = speaker_map.get(speaker, "onbekend")
-
-            result.append(TranscriptSegment(
-                spreker=best_speaker,
-                start=seg["start"],
-                eind=seg["end"],
-                tekst=seg["text"],
-                confidence=min(1.0, max(0.0, 1.0 + seg["avg_logprob"])),
-            ))
-
-        return result
+Proprietary — Huisartsenpraktijk Het Roosendael

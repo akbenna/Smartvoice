@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DetectionResult",
+  "description": "Rode vlaggen en ontbrekende informatie detectie",
+  "type": "object",
+  "required": ["rode_vlaggen", "ontbrekende_info"],
+  "properties": {
+    "rode_vlaggen": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "ernst", "categorie", "beschrijving"],
+        "properties": {
+          "id": { "type": "string" },
+          "ernst": {
+            "type": "string",
+            "enum": ["laag", "middel", "hoog", "kritiek"]
+          },
+          "categorie": { "type": "string" },
+          "beschrijving": { "type": "string" },
+          "nhg_referentie": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "ontbrekende_info": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "veld", "beschrijving", "prioriteit"],
+        "properties": {
+          "id": { "type": "string" },
+          "veld": { "type": "string" },
+          "beschrijving": { "type": "string" },
+          "prioriteit": {
+            "type": "string",
+            "enum": ["laag", "middel", "hoog"]
+          }
+        }
+      }
+    }
+  }
+}
