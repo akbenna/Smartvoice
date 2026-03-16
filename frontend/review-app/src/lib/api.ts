@@ -3,7 +3,12 @@
  * Typed fetch wrapper met JWT authenticatie.
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// In productie (Vercel): lege string → relatieve URLs via rewrites proxy
+// In development: directe verbinding naar backend
+const API_BASE =
+  typeof window !== "undefined" && window.location.hostname !== "localhost"
+    ? "" // Vercel: relatieve URLs → /api/* wordt geproxied via rewrites
+    : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;

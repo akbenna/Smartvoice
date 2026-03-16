@@ -36,8 +36,12 @@ export default function Home() {
   if (!user) return <LoginPage />;
 
   const pollStatus = async (sid: string) => {
-    const wsUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000")
-      .replace("http", "ws");
+    // WebSocket URL: gebruik NEXT_PUBLIC_API_URL of leid af van huidige locatie
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const wsUrl =
+      typeof window !== "undefined" && window.location.hostname !== "localhost"
+        ? `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}`
+        : apiUrl.replace("http", "ws");
 
     // Probeer WebSocket, val terug op polling
     try {
