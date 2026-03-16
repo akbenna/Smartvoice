@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MedicalExtraction",
+  "description": "Gestructureerde medische extractie uit consulttranscript",
+  "type": "object",
+  "required": ["klachten"],
+  "properties": {
+    "klachten": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Lijst van hoofdklachten"
+    },
+    "anamnese": {
+      "type": "object",
+      "properties": {
+        "hoofdklacht_details": { "type": "string" },
+        "duur": { "type": "string" },
+        "ernst": { "type": "string" },
+        "beloop": { "type": "string" },
+        "uitlokkende_factoren": { "type": "string" },
+        "verlichtende_factoren": { "type": "string" },
+        "bijkomende_klachten": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "lichamelijk_onderzoek": {
+      "type": "object",
+      "properties": {
+        "bevindingen": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "vitale_parameters": {
+          "type": "object",
+          "properties": {
+            "bloeddruk": { "type": "string" },
+            "hartfrequentie": { "type": "string" },
+            "temperatuur": { "type": "string" },
+            "saturatie": { "type": "string" }
+          }
+        }
+      }
+    },
+    "medicatie": {
+      "type": "object",
+      "properties": {
+        "huidig": { "type": "array", "items": { "type": "string" } },
+        "voorgeschreven": { "type": "array", "items": { "type": "string" } },
+        "gestopt": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "allergieen": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "voorgeschiedenis": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "sociaal": {
+      "type": "object",
+      "properties": {
+        "roken": { "type": ["string", "null"] },
+        "alcohol": { "type": ["string", "null"] },
+        "werk": { "type": ["string", "null"] },
+        "woonsituatie": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

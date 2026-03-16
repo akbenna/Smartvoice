@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SOEPConcept",
+  "description": "SOEP-dossiervoering concept",
+  "type": "object",
+  "required": ["S", "O", "E", "P"],
+  "properties": {
+    "S": {
+      "type": "string",
+      "description": "Subjectief: klachtpresentatie vanuit patientperspectief"
+    },
+    "O": {
+      "type": "string",
+      "description": "Objectief: bevindingen bij onderzoek"
+    },
+    "E": {
+      "type": "string",
+      "description": "Evaluatie: werkdiagnose + differentiaaldiagnosen"
+    },
+    "P": {
+      "type": "string",
+      "description": "Plan: medicatie, verwijzingen, onderzoek, controle"
+    },
+    "icpc_code": {
+      "type": ["string", "null"],
+      "description": "ICPC-2 code"
+    },
+    "icpc_titel": {
+      "type": ["string", "null"],
+      "description": "ICPC-2 code titel"
+    }
+  }
+}

@@ -165,7 +165,7 @@ CREATE INDEX idx_corrections_soep ON corrections(soep_id);
 CREATE INDEX idx_corrections_field ON corrections(field);
 
 -- =============================================================================
--- Patiëntinstructies
+-- Patientinstructies
 -- =============================================================================
 CREATE TABLE patient_instructions (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -186,18 +186,11 @@ CREATE TABLE audit_logs (
     user_id         UUID REFERENCES users(id),
     user_role       user_role,
     action          VARCHAR(100) NOT NULL,
-    -- Mogelijke acties: consult.start, consult.stop, transcript.view,
-    -- soep.view, soep.edit, soep.approve, soep.export, audio.delete,
-    -- user.login, user.logout, system.config_change
-    resource_type   VARCHAR(50),           -- consult, transcript, soep, user, system
+    resource_type   VARCHAR(50),
     resource_id     VARCHAR(100),
     ip_address      INET,
     user_agent      VARCHAR(500),
     details         JSONB DEFAULT '{}',
-    -- Voorbeelden details:
-    -- soep.edit: { field: "P", chars_changed: 42 }
-    -- soep.export: { target: "clipboard", his_format: true }
-    -- audio.delete: { reason: "approved", retention_check: true }
     checksum        VARCHAR(64)            -- SHA-256 van vorige log entry (chain)
 );
 
@@ -242,8 +235,16 @@ CREATE TRIGGER set_updated_at_users
     BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 -- =============================================================================
--- Initiële beheerder (wachtwoord wijzigen bij eerste login!)
+-- Initiele beheerder (wachtwoord wijzigen bij eerste login!)
 -- =============================================================================
 INSERT INTO users (username, display_name, role, password_hash) VALUES
-    ('admin', 'Systeembeheerder', 'beheerder', 
+    ('admin', 'Systeembeheerder', 'beheerder',
      crypt('CHANGE_ME_ON_FIRST_LOGIN', gen_salt('bf', 12)));
+
+-- =============================================================================
+-- Placeholder user voor anonieme uploads (MVP)
+-- =============================================================================
+INSERT INTO users (id, username, display_name, role, password_hash) VALUES
+    ('00000000-0000-0000-0000-000000000000', 'system', 'Systeem', 'beheerder',
+     crypt('DISABLED', gen_salt('bf', 12)))
+ON CONFLICT DO NOTHING;

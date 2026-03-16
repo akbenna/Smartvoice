@@ -17,16 +17,16 @@ echo ""
 echo "[1/7] Systeemchecks..."
 
 if ! command -v docker &> /dev/null; then
-    echo "  ✗ Docker niet gevonden. Installeer: https://docs.docker.com/engine/install/"
+    echo "  X Docker niet gevonden. Installeer: https://docs.docker.com/engine/install/"
     exit 1
 fi
-echo "  ✓ Docker gevonden"
+echo "  V Docker gevonden"
 
 if ! command -v nvidia-smi &> /dev/null; then
-    echo "  ⚠ NVIDIA driver niet gevonden. GPU-verwerking niet beschikbaar."
+    echo "  ! NVIDIA driver niet gevonden. GPU-verwerking niet beschikbaar."
     echo "    Installeer: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html"
 else
-    echo "  ✓ NVIDIA GPU gevonden: $(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)"
+    echo "  V NVIDIA GPU gevonden: $(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)"
 fi
 
 # --- Environment ---
@@ -46,10 +46,10 @@ if [ ! -f .env ]; then
     sed -i "s/REDIS_PASSWORD=CHANGE_ME/REDIS_PASSWORD=$REDIS_PASS/" .env
     sed -i "s/POSTGRES_PASSWORD=CHANGE_ME/POSTGRES_PASSWORD=$DB_PASS/" .env
 
-    echo "  ✓ .env aangemaakt met gegenereerde sleutels"
-    echo "  ⚠ Controleer .env en pas HF_TOKEN aan voor diarisatie"
+    echo "  V .env aangemaakt met gegenereerde sleutels"
+    echo "  ! Controleer .env en pas HF_TOKEN aan voor diarisatie"
 else
-    echo "  ✓ .env bestaat al"
+    echo "  V .env bestaat al"
 fi
 
 # --- Ollama ---
@@ -59,14 +59,14 @@ echo "[3/7] Ollama installatie..."
 if ! command -v ollama &> /dev/null; then
     echo "  Installeer Ollama..."
     curl -fsSL https://ollama.com/install.sh | sh
-    echo "  ✓ Ollama geïnstalleerd"
+    echo "  V Ollama geinstalleerd"
 else
-    echo "  ✓ Ollama al aanwezig"
+    echo "  V Ollama al aanwezig"
 fi
 
 echo "  Model downloaden (dit kan even duren)..."
 ollama pull llama3.3:8b-instruct-q4_K_M || {
-    echo "  ⚠ Model pull mislukt. Probeer handmatig: ollama pull llama3.3:8b-instruct-q4_K_M"
+    echo "  ! Model pull mislukt. Probeer handmatig: ollama pull llama3.3:8b-instruct-q4_K_M"
 }
 
 # --- Data directories ---
@@ -75,14 +75,14 @@ echo "[4/7] Data directories aanmaken..."
 
 mkdir -p data/{audio,audit,models,backups}
 chmod 700 data/audio data/audit
-echo "  ✓ Directories aangemaakt"
+echo "  V Directories aangemaakt"
 
 # --- Docker build ---
 echo ""
 echo "[5/7] Docker images bouwen..."
 
 docker compose build
-echo "  ✓ Images gebouwd"
+echo "  V Images gebouwd"
 
 # --- Database ---
 echo ""
@@ -95,14 +95,14 @@ docker compose exec postgres pg_isready -U ca_app -d consultassistent || {
     echo "  Wacht nog even..."
     sleep 10
 }
-echo "  ✓ Database gereed (migratie wordt automatisch uitgevoerd)"
+echo "  V Database gereed (migratie wordt automatisch uitgevoerd)"
 
 # --- Start ---
 echo ""
 echo "[7/7] Services starten..."
 
 docker compose up -d
-echo "  ✓ Alle services gestart"
+echo "  V Alle services gestart"
 
 echo ""
 echo "============================================"

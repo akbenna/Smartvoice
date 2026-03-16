@@ -53,8 +53,8 @@ services:
   # ---------------------------------------------------------------------------
   api:
     build:
-      context: ./services
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/Dockerfile
     container_name: ca-api
     restart: unless-stopped
     env_file: .env
