@@ -10,14 +10,17 @@ import logging
 from pathlib import Path
 
 import httpx
+import jsonschema
 import structlog
 
 logger = structlog.get_logger()
 
 # Lokale imports
 import sys
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "shared"))
-from prompts.templates import (
+_project_root = str(Path(__file__).parent.parent.parent)
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+from shared.prompts.templates import (
     EXTRACTION_SYSTEM_PROMPT,
     EXTRACTION_USER_TEMPLATE,
     SOEP_SYSTEM_PROMPT,
@@ -26,6 +29,19 @@ from prompts.templates import (
     DETECTION_USER_TEMPLATE,
     PATIENT_INSTRUCTION_PROMPT,
 )
+
+# Laad JSON schema's voor validatie
+SCHEMA_DIR = Path(__file__).parent.parent.parent / "shared" / "schemas"
+
+def _load_schema(name: str) -> dict:
+    path = SCHEMA_DIR / f"{name}.json"
+    if path.exists():
+        return json.loads(path.read_text())
+    return {}
+
+EXTRACTION_SCHEMA = _load_schema("medical_extraction")
+SOEP_SCHEMA = _load_schema("soep_concept")
+DETECTION_SCHEMA = _load_schema("detection_result")
 
 
 class LLMClient:
@@ -154,7 +170,14 @@ class ExtractionService:
             format_json=True,
         )
 
-        # TODO: Valideer tegen JSON schema
+        # Valideer tegen JSON schema
+        if EXTRACTION_SCHEMA:
+            try:
+                jsonschema.validate(result, EXTRACTION_SCHEMA)
+            except jsonschema.ValidationError as e:
+                logger.warning("Extractie schema validatie mislukt",
+                              error=e.message, path=list(e.absolute_path))
+
         logger.info("Medische extractie voltooid",
                      klachten=len(result.get("klachten", [])))
         return result
@@ -185,6 +208,14 @@ class ExtractionService:
         for field in ("S", "O", "E", "P"):
             if field not in result:
                 result[field] = ""
+
+        # Valideer tegen JSON schema
+        if SOEP_SCHEMA:
+            try:
+                jsonschema.validate(result, SOEP_SCHEMA)
+            except jsonschema.ValidationError as e:
+                logger.warning("SOEP schema validatie mislukt",
+                              error=e.message, path=list(e.absolute_path))
 
         logger.info("SOEP-generatie voltooid",
                      s_length=len(result.get("S", "")),

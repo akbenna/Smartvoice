@@ -21,9 +21,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import structlog
 
-# Lokale imports — PYTHONPATH wijst naar project root
+# Lokale imports — sys.path nodig voor dev; in Docker werkt PYTHONPATH=/app
 import sys
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+_project_root = str(Path(__file__).parent.parent.parent)
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
 
 from shared.config.settings import config
 from shared.database import get_db, init_db, close_db, async_session
