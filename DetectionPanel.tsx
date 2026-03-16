@@ -1,0 +1,63 @@
+# =============================================================================
+# AI-Consultassistent — .gitignore
+# =============================================================================
+
+# Environment & secrets
+.env
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+env/
+
+# Node.js
+node_modules/
+.next/
+out/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# Data (NOOIT committen)
+/data/
+*.wav
+*.mp3
+*.m4a
+*.flac
+*.ogg
+
+# Models (te groot voor git)
+/models/
+*.bin
+*.gguf
+*.pt
+*.onnx
+
+# Logs
+*.log
+/logs/
+
+# Database dumps
+*.sql.gz
+*.dump
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
