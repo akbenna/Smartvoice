@@ -4,6 +4,8 @@ Laadt settings uit environment variabelen met sensible defaults.
 """
 
 import os
+import secrets
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -86,7 +88,21 @@ class AuditConfig:
 
 @dataclass
 class SecurityConfig:
-    secret_key: str = os.getenv("APP_SECRET_KEY", "CHANGE_ME")
+    secret_key: str = os.getenv("APP_SECRET_KEY", "")
+
+    def __post_init__(self):
+        if not self.secret_key:
+            if os.getenv("APP_ENV", "development") == "production":
+                raise ValueError(
+                    "APP_SECRET_KEY is verplicht in productie. "
+                    "Stel een veilige sleutel in via environment variabelen."
+                )
+            self.secret_key = secrets.token_urlsafe(32)
+            warnings.warn(
+                "APP_SECRET_KEY niet ingesteld — gegenereerde tijdelijke sleutel. "
+                "Stel een vaste sleutel in voor productie.",
+                stacklevel=2,
+            )
     cors_origins: list = field(default_factory=lambda: os.getenv(
         "CORS_ALLOWED_ORIGINS", "http://localhost:3000"
     ).split(","))

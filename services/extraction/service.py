@@ -249,14 +249,24 @@ class ExtractionService:
         rode_vlaggen = result.get("rode_vlaggen", [])
         ontbrekend = result.get("ontbrekende_info", result.get("ontbrekend", []))
 
+        detection_result = {
+            "rode_vlaggen": rode_vlaggen,
+            "ontbrekende_info": ontbrekend,
+        }
+
+        # Valideer tegen JSON schema
+        if DETECTION_SCHEMA:
+            try:
+                jsonschema.validate(detection_result, DETECTION_SCHEMA)
+            except jsonschema.ValidationError as e:
+                logger.warning("Detectie schema validatie mislukt",
+                              error=e.message, path=list(e.absolute_path))
+
         logger.info("Detectie voltooid",
                      red_flags=len(rode_vlaggen),
                      missing_info=len(ontbrekend))
 
-        return {
-            "rode_vlaggen": rode_vlaggen,
-            "ontbrekende_info": ontbrekend,
-        }
+        return detection_result
 
     async def generate_patient_instruction(self, soep: dict) -> str:
         """
