@@ -36,22 +36,62 @@ export default function Home() {
   if (!user) return <LoginPage />;
 
   const pollStatus = async (sid: string) => {
-    const maxAttempts = 60;
-    for (let i = 0; i < maxAttempts; i++) {
+    const wsUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000")
+      .replace("http", "ws");
+
+    // Probeer WebSocket, val terug op polling
+    try {
+      const ws = new WebSocket(`${wsUrl}/ws/consult/${sid}`);
+
+      ws.onmessage = async (event) => {
+        const data = JSON.parse(event.data);
+        if (data.status === "reviewing" || data.status === "approved") {
+          ws.close();
+          await loadResults(sid);
+        } else if (data.status === "failed") {
+          ws.close();
+          setError("Verwerking mislukt. Probeer het opnieuw.");
+          setState("upload");
+        }
+      };
+
+      ws.onerror = () => {
+        ws.close();
+        fallbackPolling(sid);
+      };
+
+      // Timeout na 5 minuten
+      setTimeout(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.close();
+          setError("Verwerking duurt te lang.");
+          setState("upload");
+        }
+      }, 300000);
+    } catch {
+      fallbackPolling(sid);
+    }
+  };
+
+  const loadResults = async (sid: string) => {
+    const [soepData, detectionData, transcriptData] = await Promise.all([
+      api.getSOEP(sid),
+      api.getDetection(sid),
+      api.getTranscript(sid).catch(() => ({ segments: [], raw_text: "" })),
+    ]);
+    setSoep(soepData);
+    setDetection(detectionData);
+    setTranscript(transcriptData.segments || []);
+    setState("review");
+  };
+
+  const fallbackPolling = async (sid: string) => {
+    for (let i = 0; i < 60; i++) {
       await new Promise((r) => setTimeout(r, 3000));
       try {
         const status = await api.getStatus(sid);
         if (status.status === "reviewing" || status.status === "approved") {
-          // Haal alle resultaten op
-          const [soepData, detectionData, transcriptData] = await Promise.all([
-            api.getSOEP(sid),
-            api.getDetection(sid),
-            api.getTranscript(sid).catch(() => ({ segments: [] })),
-          ]);
-          setSoep(soepData);
-          setDetection(detectionData);
-          setTranscript(transcriptData.segments || []);
-          setState("review");
+          await loadResults(sid);
           return;
         }
         if (status.status === "failed") {
@@ -59,11 +99,9 @@ export default function Home() {
           setState("upload");
           return;
         }
-      } catch {
-        // Negeer polling fouten, probeer opnieuw
-      }
+      } catch { /* retry */ }
     }
-    setError("Verwerking duurt te lang. Probeer het opnieuw.");
+    setError("Verwerking duurt te lang.");
     setState("upload");
   };
 

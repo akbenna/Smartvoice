@@ -10,8 +10,10 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
+import asyncio
+
 import aiofiles
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func
@@ -19,12 +21,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import structlog
 
-# Lokale imports
+# Lokale imports — PYTHONPATH wijst naar project root
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from shared.config.settings import config
-from shared.database import get_db, init_db, close_db
+from shared.database import get_db, init_db, close_db, async_session
 from shared.models.consult import Consult, ConsultStatus
 from shared.models.transcript import Transcript
 from shared.models.soep_concept import SoepConcept as SoepConceptModel
@@ -536,3 +538,43 @@ async def list_consults(
         "limit": limit,
         "offset": offset,
     }
+
+
+# ---------------------------------------------------------------------------
+# WebSocket — Real-time pipeline status
+# ---------------------------------------------------------------------------
+
+@app.websocket("/ws/consult/{session_id}")
+async def websocket_status(websocket: WebSocket, session_id: str):
+    """
+    WebSocket voor real-time pipeline status updates.
+    Client ontvangt JSON messages: {"status": "transcribing", "step": "..."}
+    """
+    await websocket.accept()
+    logger.info("WebSocket verbonden", session_id=session_id)
+
+    try:
+        while True:
+            # Poll database status
+            async with async_session() as db:
+                consult = await db.get(Consult, uuid.UUID(session_id))
+                if not consult:
+                    await websocket.send_json({"error": "Consult niet gevonden"})
+                    break
+
+                status = consult.status.value
+                await websocket.send_json({
+                    "session_id": session_id,
+                    "status": status,
+                })
+
+                # Stop als pipeline klaar of mislukt is
+                if status in ("reviewing", "approved", "exported", "failed"):
+                    break
+
+            await asyncio.sleep(2)
+
+    except WebSocketDisconnect:
+        logger.info("WebSocket verbroken", session_id=session_id)
+    except Exception as e:
+        logger.error("WebSocket fout", session_id=session_id, error=str(e))
