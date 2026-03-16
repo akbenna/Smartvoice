@@ -1,22 +1,39 @@
 /**
  * API Client — AI-Consultassistent
- * Typed fetch wrapper voor communicatie met de FastAPI backend.
+ * Typed fetch wrapper met JWT authenticatie.
  */
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+function getToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("ca_token");
+}
 
 async function fetchAPI<T>(
   endpoint: string,
   options?: RequestInit
 ): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
-  const response = await fetch(url, {
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
-    ...options,
-  });
+  const token = getToken();
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options?.headers as Record<string, string>),
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(url, { ...options, headers });
+
+  if (response.status === 401) {
+    // Token verlopen: uitloggen
+    localStorage.removeItem("ca_token");
+    localStorage.removeItem("ca_user");
+    window.location.reload();
+    throw new Error("Sessie verlopen");
+  }
 
   if (!response.ok) {
     const error = await response.text();
@@ -82,6 +99,13 @@ export interface TranscriptSegment {
   confidence: number;
 }
 
+export interface ConsultListItem {
+  id: string;
+  status: string;
+  started_at: string | null;
+  patient_hash: string;
+}
+
 // --- API Calls ---
 
 export const api = {
@@ -104,8 +128,13 @@ export const api = {
     formData.append("file", file);
     formData.append("patient_hash", patientHash);
 
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
     const response = await fetch(`${API_BASE}/api/consult/upload`, {
       method: "POST",
+      headers,
       body: formData,
     });
 
@@ -117,7 +146,7 @@ export const api = {
     fetchAPI<ConsultStatus>(`/api/consult/${sessionId}/status`),
 
   getTranscript: (sessionId: string) =>
-    fetchAPI<{ session_id: string; segments: TranscriptSegment[] }>(
+    fetchAPI<{ session_id: string; segments: TranscriptSegment[]; raw_text: string }>(
       `/api/consult/${sessionId}/transcript`
     ),
 
@@ -140,7 +169,7 @@ export const api = {
     }),
 
   listConsults: (limit = 20, offset = 0) =>
-    fetchAPI<{ consults: object[]; total: number }>(
+    fetchAPI<{ consults: ConsultListItem[]; total: number }>(
       `/api/consults?limit=${limit}&offset=${offset}`
     ),
 };

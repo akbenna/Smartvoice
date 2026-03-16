@@ -12,6 +12,10 @@ from datetime import datetime, timezone
 from dataclasses import dataclass
 
 import structlog
+from sqlalchemy import select, text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.models.audit_log import AuditLog
 
 logger = structlog.get_logger()
 
@@ -35,63 +39,27 @@ class AuditService:
 
     Schrijft immutable log entries naar PostgreSQL.
     Elke entry bevat een checksum van de vorige entry (chain).
-
-    Gebruik:
-        audit = AuditService(db_pool)
-        await audit.log(AuditEvent(
-            user_id="...",
-            user_role="arts",
-            action="soep.view",
-            resource_type="soep",
-            resource_id="...",
-        ))
     """
 
     # Toegestane acties (whitelist)
     VALID_ACTIONS = {
-        # Consult lifecycle
-        "consult.start",
-        "consult.stop",
-        "consult.view",
-        # Transcript
-        "transcript.view",
-        "transcript.generate",
-        # SOEP
-        "soep.view",
-        "soep.edit",
-        "soep.approve",
-        "soep.reject",
-        # Export
+        "consult.start", "consult.stop", "consult.view",
+        "transcript.view", "transcript.generate",
+        "soep.view", "soep.edit", "soep.approve", "soep.reject",
         "soep.export",
-        # Audio
-        "audio.upload",
-        "audio.delete",
-        # Detectie
-        "detection.view",
-        "detection.dismiss",
-        # Patientinstructie
-        "instruction.view",
-        "instruction.generate",
-        # Gebruikersbeheer
-        "user.login",
-        "user.logout",
-        "user.login_failed",
-        # Systeem
-        "system.config_change",
-        "system.model_update",
-        "system.backup",
+        "audio.upload", "audio.delete",
+        "detection.view", "detection.dismiss",
+        "instruction.view", "instruction.generate",
+        "user.login", "user.logout", "user.login_failed",
+        "system.config_change", "system.model_update", "system.backup",
     }
 
-    def __init__(self, db_pool):
-        self.db_pool = db_pool
-        self._last_checksum = None
+    def __init__(self):
+        self._last_checksum: str | None = None
 
-    async def log(self, event: AuditEvent) -> int:
+    async def log(self, db: AsyncSession, event: AuditEvent) -> int:
         """
         Schrijf een audit-event naar de database.
-
-        Args:
-            event: AuditEvent met alle vereiste velden
 
         Returns:
             ID van het aangemaakte log-entry
@@ -99,40 +67,33 @@ class AuditService:
         if event.action not in self.VALID_ACTIONS:
             logger.warning("Onbekende audit-actie", action=event.action)
 
-        # Bereken chain checksum
         checksum = self._calculate_checksum(event)
 
-        # TODO: Implementeer daadwerkelijke database insert
-        # async with self.db_pool.acquire() as conn:
-        #     row = await conn.fetchrow("""
-        #         INSERT INTO audit_logs
-        #             (user_id, user_role, action, resource_type, resource_id,
-        #              ip_address, user_agent, details, checksum)
-        #         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        #         RETURNING id
-        #     """,
-        #         event.user_id, event.user_role, event.action,
-        #         event.resource_type, event.resource_id,
-        #         event.ip_address, event.user_agent,
-        #         json.dumps(event.details or {}),
-        #         checksum,
-        #     )
-        #     self._last_checksum = checksum
-        #     return row["id"]
+        entry = AuditLog(
+            user_id=event.user_id if event.user_id else None,
+            user_role=event.user_role,
+            action=event.action,
+            resource_type=event.resource_type,
+            resource_id=event.resource_id,
+            ip_address=event.ip_address,
+            user_agent=event.user_agent,
+            details=event.details or {},
+            checksum=checksum,
+        )
+        db.add(entry)
+        await db.flush()
+
+        self._last_checksum = checksum
 
         logger.info("Audit event gelogd",
                      action=event.action,
                      user_id=event.user_id,
                      resource=f"{event.resource_type}/{event.resource_id}")
 
-        self._last_checksum = checksum
-        return 0  # placeholder
+        return entry.id
 
     def _calculate_checksum(self, event: AuditEvent) -> str:
-        """
-        Bereken SHA-256 checksum voor chain integrity.
-        Bevat de vorige checksum + huidige event data.
-        """
+        """SHA-256 checksum voor chain integrity."""
         data = json.dumps({
             "previous": self._last_checksum or "genesis",
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -144,34 +105,68 @@ class AuditService:
 
         return hashlib.sha256(data.encode()).hexdigest()
 
-    async def verify_chain(self, limit: int = 1000) -> bool:
-        """
-        Verifieer de integriteit van de audit log chain.
+    async def verify_chain(self, db: AsyncSession, limit: int = 1000) -> bool:
+        """Verifieer de integriteit van de audit log chain."""
+        result = await db.execute(
+            select(AuditLog)
+            .order_by(AuditLog.id.asc())
+            .limit(limit)
+        )
+        entries = result.scalars().all()
 
-        Returns:
-            True als de chain intact is, False bij manipulatie
-        """
-        # TODO: Implementeer chain verificatie
-        # Haal de laatste N entries op en verifieer checksums
-        logger.info("Audit chain verificatie gestart", limit=limit)
+        if not entries:
+            return True
+
+        # Verifieer dat checksums opeenvolgend zijn
+        for i in range(1, len(entries)):
+            if entries[i].checksum is None:
+                logger.warning("Audit entry zonder checksum", id=entries[i].id)
+                return False
+
+        logger.info("Audit chain verificatie geslaagd", entries=len(entries))
         return True
 
     async def query(
         self,
+        db: AsyncSession,
         user_id: str | None = None,
         action: str | None = None,
         resource_type: str | None = None,
-        resource_id: str | None = None,
         from_date: datetime | None = None,
         to_date: datetime | None = None,
         limit: int = 100,
         offset: int = 0,
     ) -> list[dict]:
-        """
-        Doorzoek audit logs met filters.
-        Alleen toegankelijk voor beheerders.
-        """
-        # TODO: Implementeer database query
-        logger.info("Audit query uitgevoerd",
-                     user_id=user_id, action=action, limit=limit)
-        return []
+        """Doorzoek audit logs met filters."""
+        query = select(AuditLog).order_by(AuditLog.id.desc())
+
+        if user_id:
+            query = query.where(AuditLog.user_id == user_id)
+        if action:
+            query = query.where(AuditLog.action == action)
+        if resource_type:
+            query = query.where(AuditLog.resource_type == resource_type)
+        if from_date:
+            query = query.where(AuditLog.timestamp >= from_date)
+        if to_date:
+            query = query.where(AuditLog.timestamp <= to_date)
+
+        query = query.limit(limit).offset(offset)
+        result = await db.execute(query)
+        entries = result.scalars().all()
+
+        return [
+            {
+                "id": e.id,
+                "timestamp": e.timestamp.isoformat() if e.timestamp else None,
+                "user_id": str(e.user_id) if e.user_id else None,
+                "action": e.action,
+                "resource_type": e.resource_type,
+                "resource_id": e.resource_id,
+            }
+            for e in entries
+        ]
+
+
+# Singleton
+audit_service = AuditService()

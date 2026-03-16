@@ -240,3 +240,11 @@ CREATE TRIGGER set_updated_at_users
 INSERT INTO users (username, display_name, role, password_hash) VALUES
     ('admin', 'Systeembeheerder', 'beheerder',
      crypt('CHANGE_ME_ON_FIRST_LOGIN', gen_salt('bf', 12)));
+
+-- =============================================================================
+-- Placeholder user voor anonieme uploads (MVP)
+-- =============================================================================
+INSERT INTO users (id, username, display_name, role, password_hash) VALUES
+    ('00000000-0000-0000-0000-000000000000', 'system', 'Systeem', 'beheerder',
+     crypt('DISABLED', gen_salt('bf', 12)))
+ON CONFLICT DO NOTHING;
