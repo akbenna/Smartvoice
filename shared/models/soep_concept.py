@@ -2,24 +2,26 @@
 SoepConcept model — SOEP-dossiervoering concept.
 """
 
+from __future__ import annotations
+
 from datetime import datetime
 
 from sqlalchemy import String, Float, Boolean, Text, ForeignKey, DateTime
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from shared.models.base import Base, UUIDMixin, TimestampMixin
+from shared.models.types import UUIDType
 
 
 class SoepConcept(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "soep_concepts"
 
     consult_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("consults.id", ondelete="CASCADE"),
+        UUIDType, ForeignKey("consults.id", ondelete="CASCADE"),
         nullable=False, unique=True,
     )
     extraction_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("extractions.id", ondelete="CASCADE"),
+        UUIDType, ForeignKey("extractions.id", ondelete="CASCADE"),
         nullable=False,
     )
     s_text: Mapped[str] = mapped_column(Text, default="")
@@ -32,7 +34,7 @@ class SoepConcept(Base, UUIDMixin, TimestampMixin):
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     is_approved: Mapped[bool] = mapped_column(Boolean, default=False)
     approved_by: Mapped[str | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+        UUIDType, ForeignKey("users.id"), nullable=True
     )
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

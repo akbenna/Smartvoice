@@ -63,8 +63,49 @@ async def lifespan(app: FastAPI):
     logger.info("Starting AI-Consultassistent API", env=config.env)
     await init_db()
     logger.info("Database connectie OK")
+    # Redis (optional)
+    try:
+        from shared.redis_client import redis_client
+        await redis_client.connect()
+        logger.info("Redis connectie OK")
+    except Exception as e:
+        logger.warning("Redis niet beschikbaar — fallback naar DB polling", error=str(e))
+
+    # Pipeline initialiseren: Whisper + PyAnnote modellen laden (kan ~30s duren)
+    try:
+        from services.pipeline.orchestrator import pipeline
+        await pipeline.initialize()
+        logger.info("Pipeline modellen geladen (Whisper + diarisatie)")
+    except Exception as e:
+        logger.warning(
+            "Pipeline modellen niet geladen bij startup — worden geladen bij eerste consult",
+            error=str(e),
+        )
+
+    # Ollama connectie testen
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(f"{config.ollama.host}/api/tags")
+            if resp.status_code == 200:
+                models = [m["name"] for m in resp.json().get("models", [])]
+                logger.info("Ollama connectie OK", beschikbare_modellen=models)
+                if config.ollama.model not in " ".join(models):
+                    logger.warning(
+                        "Geconfigureerd model niet gevonden in Ollama",
+                        verwacht=config.ollama.model,
+                        beschikbaar=models,
+                    )
+    except Exception as e:
+        logger.warning("Ollama niet bereikbaar bij startup", host=config.ollama.host, error=str(e))
+
     yield
     logger.info("Shutting down AI-Consultassistent API")
+    try:
+        from shared.redis_client import redis_client
+        await redis_client.disconnect()
+    except Exception:
+        pass
     await close_db()
 
 
@@ -86,9 +127,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Audio opslag pad
+# Audio opslag pad — fallback naar lokale directory als /data niet beschikbaar is
 AUDIO_DIR = Path(config.audio.storage_path)
-AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+try:
+    AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+except PermissionError:
+    AUDIO_DIR = Path("./data/audio")
+    AUDIO_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # ---------------------------------------------------------------------------
@@ -215,14 +260,68 @@ async def health_check():
     except Exception:
         db_status = "error"
 
+    redis_status = "unchecked"
+    try:
+        from shared.redis_client import redis_client
+        await redis_client.client.ping()
+        redis_status = "ok"
+    except Exception:
+        redis_status = "unavailable"
+
+    # Ollama check
+    ollama_status = "unchecked"
+    ollama_model = None
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.get(f"{config.ollama.host}/api/tags")
+            if resp.status_code == 200:
+                models = [m["name"] for m in resp.json().get("models", [])]
+                ollama_status = "ok"
+                ollama_model = config.ollama.model
+                if config.ollama.model not in " ".join(models):
+                    ollama_status = "model_missing"
+            else:
+                ollama_status = "error"
+    except Exception:
+        ollama_status = "unavailable"
+
+    # Whisper check
+    whisper_status = "not_loaded"
+    try:
+        from services.pipeline.orchestrator import pipeline
+        if pipeline.transcription_service._initialized:
+            whisper_status = "ready"
+    except Exception:
+        whisper_status = "error"
+
+    overall = "ok"
+    if db_status != "ok":
+        overall = "degraded"
+    if ollama_status not in ("ok", "unchecked"):
+        overall = "degraded"
+
     return HealthResponse(
-        status="ok" if db_status == "ok" else "degraded",
+        status=overall,
         version="0.1.0",
         services={
             "database": db_status,
-            "whisper": "ready",
-            "ollama": "unchecked",
+            "redis": redis_status,
+            "whisper": whisper_status,
+            "ollama": ollama_status,
+            "ollama_model": ollama_model or config.ollama.model,
         },
+    )
+
+
+@app.get("/metrics")
+async def prometheus_metrics():
+    """Prometheus metrics endpoint."""
+    from shared.metrics import metrics
+    from fastapi.responses import Response
+    return Response(
+        content=metrics.get_metrics(),
+        media_type=metrics.get_content_type(),
     )
 
 
@@ -465,6 +564,14 @@ async def approve_soep(
     }
 
 
+
+@app.get("/api/export/targets")
+async def get_export_targets():
+    """Beschikbare HIS export opties."""
+    from services.his_export.service import his_export_service
+    return {"targets": his_export_service.get_available_targets()}
+
+
 @app.post("/api/consult/{session_id}/export")
 async def export_to_his(
     session_id: str,
@@ -473,6 +580,8 @@ async def export_to_his(
     current_user: CurrentUser = Depends(get_current_user),
 ):
     """Exporteer goedgekeurd SOEP naar HIS."""
+    from services.his_export.service import his_export_service, SOEPExportData
+
     result = await db.execute(
         select(SoepConceptModel).where(SoepConceptModel.consult_id == uuid.UUID(session_id))
     )
@@ -483,25 +592,39 @@ async def export_to_his(
     if not soep.is_approved:
         raise HTTPException(400, "SOEP moet eerst goedgekeurd worden")
 
-    # Genereer export tekst
-    export_text = f"S: {soep.s_text}\nO: {soep.o_text}\nE: {soep.e_text}\nP: {soep.p_text}"
-    if soep.icpc_code:
-        export_text += f"\n\nICPC: {soep.icpc_code} — {soep.icpc_titel}"
-
-    # Update status
     consult = await db.get(Consult, uuid.UUID(session_id))
-    if consult:
+
+    export_data = SOEPExportData(
+        consult_id=session_id,
+        patient_hash=consult.patient_hash if consult else "",
+        practitioner_name=current_user.display_name,
+        practitioner_id=current_user.id,
+        timestamp=consult.started_at if consult else datetime.now(timezone.utc),
+        s_text=soep.s_text,
+        o_text=soep.o_text,
+        e_text=soep.e_text,
+        p_text=soep.p_text,
+        icpc_code=soep.icpc_code,
+        icpc_titel=soep.icpc_titel,
+    )
+
+    export_result = await his_export_service.export_soep(export_data, target=request.target)
+
+    if consult and export_result.success:
         consult.status = ConsultStatus.exported
 
-    logger.info("Export naar HIS", session_id=session_id, target=request.target)
+    logger.info("Export naar HIS", session_id=session_id, target=request.target,
+                 success=export_result.success)
 
     return {
         "session_id": session_id,
-        "status": "exported",
+        "status": "exported" if export_result.success else "export_failed",
         "target": request.target,
-        "export_text": export_text,
+        "export_text": export_result.export_text,
+        "export_id": export_result.export_id,
+        "message": export_result.message,
+        "available_targets": his_export_service.get_available_targets(),
     }
-
 
 @app.get("/api/consults")
 async def list_consults(
@@ -550,31 +673,69 @@ async def list_consults(
 async def websocket_status(websocket: WebSocket, session_id: str):
     """
     WebSocket voor real-time pipeline status updates.
+    Probeert eerst Redis Pub/Sub, valt terug op database polling.
     Client ontvangt JSON messages: {"status": "transcribing", "step": "..."}
     """
     await websocket.accept()
     logger.info("WebSocket verbonden", session_id=session_id)
 
     try:
-        while True:
-            # Poll database status
-            async with async_session() as db:
-                consult = await db.get(Consult, uuid.UUID(session_id))
-                if not consult:
-                    await websocket.send_json({"error": "Consult niet gevonden"})
-                    break
+        # Try Redis Pub/Sub first
+        redis_available = False
+        try:
+            from shared.redis_client import redis_client
+            pubsub = redis_client.client.pubsub()
+            await pubsub.subscribe("pipeline:status")
+            redis_available = True
+            logger.info("Redis Pub/Sub geabonneerd", session_id=session_id)
 
-                status = consult.status.value
-                await websocket.send_json({
-                    "session_id": session_id,
-                    "status": status,
-                })
+            while True:
+                message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=2.0)
+                if message and message["type"] == "message":
+                    import json
+                    data = json.loads(message["data"])
+                    if data.get("consult_id") == session_id:
+                        await websocket.send_json(data)
+                        if data.get("status") in ("reviewing", "approved", "exported", "failed"):
+                            break
+                else:
+                    # Send heartbeat/current status from DB
+                    async with async_session() as db:
+                        consult = await db.get(Consult, uuid.UUID(session_id))
+                        if consult:
+                            status = consult.status.value
+                            await websocket.send_json({
+                                "session_id": session_id,
+                                "status": status,
+                            })
+                            if status in ("reviewing", "approved", "exported", "failed"):
+                                break
 
-                # Stop als pipeline klaar of mislukt is
-                if status in ("reviewing", "approved", "exported", "failed"):
-                    break
+            await pubsub.unsubscribe("pipeline:status")
 
-            await asyncio.sleep(2)
+        except Exception as redis_err:
+            redis_available = False
+            logger.warning("Redis Pub/Sub niet beschikbaar, val terug op DB polling", error=str(redis_err))
+
+        # Fallback: database polling (alleen als Redis niet beschikbaar was)
+        if not redis_available:
+            while True:
+                async with async_session() as db:
+                    consult = await db.get(Consult, uuid.UUID(session_id))
+                    if not consult:
+                        await websocket.send_json({"error": "Consult niet gevonden"})
+                        break
+
+                    status = consult.status.value
+                    await websocket.send_json({
+                        "session_id": session_id,
+                        "status": status,
+                    })
+
+                    if status in ("reviewing", "approved", "exported", "failed"):
+                        break
+
+                await asyncio.sleep(2)
 
     except WebSocketDisconnect:
         logger.info("WebSocket verbroken", session_id=session_id)

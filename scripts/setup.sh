@@ -65,8 +65,8 @@ else
 fi
 
 echo "  Model downloaden (dit kan even duren)..."
-ollama pull llama3.3:8b-instruct-q4_K_M || {
-    echo "  ! Model pull mislukt. Probeer handmatig: ollama pull llama3.3:8b-instruct-q4_K_M"
+ollama pull llama3.1:8b || {
+    echo "  ! Model pull mislukt. Probeer handmatig: ollama pull llama3.1:8b"
 }
 
 # --- Data directories ---

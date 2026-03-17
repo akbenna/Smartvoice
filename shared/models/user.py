@@ -2,6 +2,8 @@
 User model — Gebruikers (arts, poh, beheerder).
 """
 
+from __future__ import annotations
+
 import enum
 
 from sqlalchemy import String, Boolean, Enum

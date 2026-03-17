@@ -19,6 +19,7 @@ from shared.models.extraction import Extraction
 from shared.models.soep_concept import SoepConcept
 from shared.models.detection_result import DetectionResult
 from shared.models.patient_instruction import PatientInstruction
+from shared.redis_client import redis_client
 
 from services.transcription.service import TranscriptionService
 from services.extraction.service import ExtractionService
@@ -87,6 +88,18 @@ class PipelineOrchestrator:
                         consult_id=str(consult_id),
                         word_count=transcript_result.word_count)
 
+            # Publiceer Redis event
+            try:
+                await redis_client.add_to_stream("pipeline:events", {
+                    "consult_id": str(consult_id),
+                    "event": "transcription_complete",
+                    "word_count": transcript_result.word_count,
+                    "duration_secs": transcript_result.duration_secs,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                })
+            except Exception as e:
+                logger.warning("Redis stream event mislukt", event="transcription_complete", error=str(e))
+
             # === Stap 2: Medische extractie ===
             await self._update_status(db, consult_id, ConsultStatus.extracting)
 
@@ -111,6 +124,16 @@ class PipelineOrchestrator:
 
             logger.info("Extractie voltooid", consult_id=str(consult_id))
 
+            # Publiceer Redis event
+            try:
+                await redis_client.add_to_stream("pipeline:events", {
+                    "consult_id": str(consult_id),
+                    "event": "extraction_complete",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                })
+            except Exception as e:
+                logger.warning("Redis stream event mislukt", event="extraction_complete", error=str(e))
+
             # === Stap 3: SOEP generatie ===
             soep_data = await self.extraction_service.generate_soep(extraction_data)
 
@@ -130,6 +153,17 @@ class PipelineOrchestrator:
 
             logger.info("SOEP gegenereerd", consult_id=str(consult_id))
 
+            # Publiceer Redis event
+            try:
+                await redis_client.add_to_stream("pipeline:events", {
+                    "consult_id": str(consult_id),
+                    "event": "soep_complete",
+                    "icpc_code": soep_data.get("icpc_code"),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                })
+            except Exception as e:
+                logger.warning("Redis stream event mislukt", event="soep_complete", error=str(e))
+
             # === Stap 4: Detectie ===
             detection_data = await self.extraction_service.detect_flags(
                 extraction_data, soep_data
@@ -147,6 +181,17 @@ class PipelineOrchestrator:
                         consult_id=str(consult_id),
                         red_flags=len(detection_data.get("rode_vlaggen", [])))
 
+            # Publiceer Redis event
+            try:
+                await redis_client.add_to_stream("pipeline:events", {
+                    "consult_id": str(consult_id),
+                    "event": "detection_complete",
+                    "red_flags_count": len(detection_data.get("rode_vlaggen", [])),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                })
+            except Exception as e:
+                logger.warning("Redis stream event mislukt", event="detection_complete", error=str(e))
+
             # === Stap 5: Patientinstructie ===
             instruction_text = await self.extraction_service.generate_patient_instruction(
                 soep_data
@@ -157,12 +202,34 @@ class PipelineOrchestrator:
                 instruction_text=instruction_text,
             )
             db.add(instruction)
+            await db.flush()
+
+            # Publiceer Redis event
+            try:
+                await redis_client.add_to_stream("pipeline:events", {
+                    "consult_id": str(consult_id),
+                    "event": "instruction_complete",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                })
+            except Exception as e:
+                logger.warning("Redis stream event mislukt", event="instruction_complete", error=str(e))
 
             # === Status: klaar voor review ===
             await self._update_status(db, consult_id, ConsultStatus.reviewing)
             await db.commit()
 
             logger.info("Pipeline voltooid", consult_id=str(consult_id))
+
+            # Publiceer final Redis event
+            try:
+                await redis_client.add_to_stream("pipeline:events", {
+                    "consult_id": str(consult_id),
+                    "event": "pipeline_complete",
+                    "status": "reviewing",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                })
+            except Exception as e:
+                logger.warning("Redis stream event mislukt", event="pipeline_complete", error=str(e))
 
             return {
                 "consult_id": str(consult_id),
@@ -178,6 +245,16 @@ class PipelineOrchestrator:
                         consult_id=str(consult_id), error=str(e))
             await self._update_status(db, consult_id, ConsultStatus.failed)
             await db.commit()
+            # Publiceer failure event
+            try:
+                await redis_client.add_to_stream("pipeline:events", {
+                    "consult_id": str(consult_id),
+                    "event": "pipeline_failed",
+                    "error": str(e),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                })
+            except Exception as redis_err:
+                logger.warning("Redis stream event mislukt", event="pipeline_failed", error=str(redis_err))
             raise
 
     async def _update_status(
@@ -190,6 +267,11 @@ class PipelineOrchestrator:
             .where(Consult.id == consult_id)
             .values(status=status)
         )
+        # Publiceer status change via Redis Pub/Sub
+        try:
+            await redis_client.publish_status(str(consult_id), status.value, step=status.value)
+        except Exception as e:
+            logger.warning("Redis status publish mislukt", error=str(e))
 
 
 # Singleton

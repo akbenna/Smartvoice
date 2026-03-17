@@ -1,10 +1,14 @@
-version: "3.9"
-
 # =============================================================================
-# AI-Consultassistent — Docker Compose
+# AI-Consultassistent — Docker Compose (Productie — Lokale GPU Server)
 # =============================================================================
 # Gebruik: docker compose up -d
 # Vereist: NVIDIA Container Toolkit voor GPU-services
+#
+# Eerste keer:
+#   1. cp .env.example .env && pas waarden aan
+#   2. docker compose up -d postgres redis ollama
+#   3. docker compose exec ollama ollama pull llama3.1:8b
+#   4. docker compose up -d
 # =============================================================================
 
 services:
@@ -49,7 +53,38 @@ services:
       retries: 5
 
   # ---------------------------------------------------------------------------
-  # API Gateway (FastAPI)
+  # Ollama — Lokale LLM runtime (GPU)
+  # ---------------------------------------------------------------------------
+  # Draait Llama 3.3 8B lokaal voor medische extractie, SOEP en detectie.
+  # Model wordt eenmalig gepulled: docker compose exec ollama ollama pull llama3.1:8b
+  # ---------------------------------------------------------------------------
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ca-ollama
+    restart: unless-stopped
+    volumes:
+      - ollama_models:/root/.ollama
+    ports:
+      - "11434:11434"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # API Gateway (FastAPI + Whisper STT + PyAnnote)
+  # ---------------------------------------------------------------------------
+  # Bevat de volledige pipeline: Audio -> Whisper -> LLM extractie -> SOEP
+  # Whisper en PyAnnote draaien in-process (GPU gedeeld met Ollama).
   # ---------------------------------------------------------------------------
   api:
     build:
@@ -58,6 +93,9 @@ services:
     container_name: ca-api
     restart: unless-stopped
     env_file: .env
+    environment:
+      # Ollama draait als Docker service, niet op host
+      OLLAMA_HOST: http://ollama:11434
     ports:
       - "8000:8000"
     volumes:
@@ -68,6 +106,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      ollama:
         condition: service_healthy
     deploy:
       resources:
@@ -81,6 +121,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
 
   # ---------------------------------------------------------------------------
   # Frontend (Next.js)
@@ -103,6 +144,8 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
+    driver: local
+  ollama_models:
     driver: local
   audio_data:
     driver: local

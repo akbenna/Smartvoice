@@ -2,12 +2,15 @@
 SQLAlchemy Base — Gedeelde basis voor alle ORM models.
 """
 
+from __future__ import annotations
+
 import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import DateTime, func
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from shared.models.types import UUIDType
 
 
 class Base(DeclarativeBase):
@@ -32,7 +35,7 @@ class TimestampMixin:
 class UUIDMixin:
     """Mixin voor UUID primary key."""
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        UUIDType,
         primary_key=True,
         default=uuid.uuid4,
     )

@@ -96,7 +96,7 @@ docker compose up postgres -d
 psql -h localhost -U ca_app -d consultassistent -f database/migrations/001_init.sql
 
 # Ollama model pull
-ollama pull llama3.3:8b-instruct-q4_K_M
+ollama pull llama3.1:8b
 
 # Volledig systeem
 docker compose up -d

@@ -68,7 +68,7 @@ INSERT INTO extractions (
     '{"huidig": [], "voorgeschreven": [{"naam": "ibuprofen", "dosering": "400mg", "frequentie": "3dd zo nodig"}]}',
     '[]',
     '[]',
-    'llama3.3:8b-instruct-q4_K_M',
+    'llama3.1:8b',
     0.89,
     NULL
 ) ON CONFLICT DO NOTHING;
@@ -87,7 +87,7 @@ INSERT INTO soep_concepts (
     'Medicamenteus: Ibuprofen 400mg 3dd zo nodig. Niet-medicamenteus: advies ontspanning, voldoende slaap, adequate vochtinname. Controle: bij aanhouden klachten >1 week terugkomen.',
     'N02',
     'Spanningshoofdpijn',
-    'llama3.3:8b-instruct-q4_K_M',
+    'llama3.1:8b',
     0.87
 ) ON CONFLICT DO NOTHING;
 

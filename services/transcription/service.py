@@ -94,13 +94,34 @@ class TranscriptionService:
         try:
             from faster_whisper import WhisperModel
 
+            device = self.config.whisper.device
+            compute_type = self.config.whisper.compute_type
+
+            # Automatische device detectie: CUDA > MPS (Apple Silicon) > CPU
+            try:
+                import torch
+                if device == "cuda" and not torch.cuda.is_available():
+                    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+                        # Apple Silicon — faster-whisper ondersteunt geen MPS, gebruik CPU
+                        device = "cpu"
+                        compute_type = "int8"
+                        logger.info("CUDA niet beschikbaar, Apple Silicon gedetecteerd — CPU mode met int8")
+                    else:
+                        device = "cpu"
+                        compute_type = "int8"
+                        logger.info("CUDA niet beschikbaar — CPU mode met int8")
+            except ImportError:
+                device = "cpu"
+                compute_type = "int8"
+                logger.info("PyTorch niet beschikbaar — CPU mode met int8")
+
             self.whisper_model = WhisperModel(
                 self.config.whisper.model,
-                device=self.config.whisper.device,
-                compute_type=self.config.whisper.compute_type,
+                device=device,
+                compute_type=compute_type,
                 download_root=self.config.whisper.model_path,
             )
-            logger.info("Whisper model geladen")
+            logger.info("Whisper model geladen", device=device, compute_type=compute_type)
         except Exception as e:
             logger.error("Whisper model laden mislukt", error=str(e))
             raise

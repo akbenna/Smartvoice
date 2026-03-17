@@ -50,7 +50,7 @@ cp .env.example .env
 
 # 3. Installeer Ollama en pull model
 curl -fsSL https://ollama.com/install.sh | sh
-ollama pull llama3.3:8b-instruct-q4_K_M
+ollama pull llama3.1:8b
 
 # 4. Start alle services
 docker compose up -d

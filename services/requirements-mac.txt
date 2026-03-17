@@ -1,5 +1,8 @@
 # =============================================================================
-# AI-Consultassistent — Python Dependencies
+# AI-Consultassistent — macOS Development Dependencies
+# =============================================================================
+# Geen CUDA, geen PyAnnote (diarisatie uit voor dev).
+# Whisper draait op CPU via faster-whisper.
 # =============================================================================
 
 # --- Web Framework ---
@@ -11,27 +14,16 @@ python-multipart==0.0.18
 asyncpg==0.30.0
 sqlalchemy[asyncio]==2.0.36
 alembic==1.14.1
+aiosqlite==0.20.0
 
 # --- Redis ---
 redis[hiredis]==5.2.1
 
-# --- PyTorch (GPU — vereist voor Whisper + PyAnnote) ---
-# Installeer via: pip install torch --index-url https://download.pytorch.org/whl/cu124
-torch>=2.4.0
-
-# --- Speech-to-Text ---
+# --- Speech-to-Text (CPU) ---
 faster-whisper==1.1.0
 
-# --- Diarisatie ---
-pyannote.audio==3.3.2
-
-# --- LLM Client ---
+# --- LLM Client (Ollama via HTTP) ---
 httpx==0.28.1
-ollama==0.4.4
-
-# --- Audio Processing ---
-soundfile==0.12.1
-librosa==0.10.2.post1
 
 # --- Security ---
 python-jose[cryptography]==3.3.0
@@ -53,4 +45,3 @@ aiofiles==24.1.0
 # --- Testing ---
 pytest==8.3.4
 pytest-asyncio==0.24.0
-aiosqlite==0.20.0

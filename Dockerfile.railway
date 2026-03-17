@@ -1,0 +1,38 @@
+# =============================================================================
+# AI-Consultassistent — Railway Deployment (CPU-only API)
+# =============================================================================
+# Voor Railway/Fly.io: API server zonder GPU-afhankelijkheden.
+# Whisper en Ollama draaien extern (GPU-server of cloud API).
+# =============================================================================
+
+FROM python:3.12-slim AS base
+
+# Systeemafhankelijkheden
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Dependencies — alleen wat de API server nodig heeft (geen torch/whisper/pyannote)
+COPY services/requirements-railway.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+# Applicatie code
+COPY services/ /app/services/
+COPY shared/ /app/shared/
+COPY database/ /app/database/
+COPY scripts/ /app/scripts/
+
+ENV PYTHONPATH="/app"
+ENV APP_ENV="production"
+
+RUN chmod +x /app/scripts/railway_start.sh
+
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
+
+EXPOSE ${PORT:-8000}
+
+CMD ["/app/scripts/railway_start.sh"]

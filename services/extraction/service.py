@@ -7,11 +7,15 @@ Input: getranscribeerd consult -> Output: gestructureerde medische data (JSON).
 
 import json
 import logging
+import time
 from pathlib import Path
 
 import httpx
 import jsonschema
 import structlog
+
+from shared.resilience import CircuitBreaker, CircuitBreakerConfig, RetryConfig, retry_async
+from shared.metrics import metrics
 
 logger = structlog.get_logger()
 
@@ -51,6 +55,15 @@ class LLMClient:
         self.host = host.rstrip("/")
         self.model = model
         self.timeout = timeout
+        self.circuit_breaker = CircuitBreaker(
+            "ollama",
+            CircuitBreakerConfig(failure_threshold=5, recovery_timeout=60.0)
+        )
+        self.retry_config = RetryConfig(
+            max_retries=2,
+            base_delay=2.0,
+            retryable_exceptions=(httpx.TimeoutException, httpx.ConnectError, ConnectionError, OSError),
+        )
 
     async def generate(
         self,
@@ -86,29 +99,42 @@ class LLMClient:
         if format_json:
             payload["format"] = "json"
 
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            try:
+        async def _do_request():
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(
                     f"{self.host}/api/chat",
                     json=payload,
                 )
                 response.raise_for_status()
-                result = response.json()
-                content = result.get("message", {}).get("content", "")
+                return response.json()
 
-                if format_json:
-                    return self._parse_json(content)
-                return content
+        start_time = time.monotonic()
+        try:
+            result = await retry_async(
+                _do_request,
+                config=self.retry_config,
+                circuit_breaker=self.circuit_breaker,
+            )
+            duration = time.monotonic() - start_time
+            metrics.record_llm_request("generate", self.model, duration)
 
-            except httpx.TimeoutException:
-                logger.error("Ollama timeout", model=self.model, timeout=self.timeout)
-                raise
-            except httpx.HTTPStatusError as e:
-                logger.error("Ollama HTTP error", status=e.response.status_code)
-                raise
-            except Exception as e:
-                logger.error("Ollama request mislukt", error=str(e))
-                raise
+            content = result.get("message", {}).get("content", "")
+            if format_json:
+                return self._parse_json(content)
+            return content
+
+        except httpx.TimeoutException:
+            metrics.record_llm_error("generate", "timeout")
+            logger.error("Ollama timeout", model=self.model, timeout=self.timeout)
+            raise
+        except httpx.HTTPStatusError as e:
+            metrics.record_llm_error("generate", f"http_{e.response.status_code}")
+            logger.error("Ollama HTTP error", status=e.response.status_code)
+            raise
+        except Exception as e:
+            metrics.record_llm_error("generate", type(e).__name__)
+            logger.error("Ollama request mislukt", error=str(e))
+            raise
 
     def _parse_json(self, content: str) -> dict:
         """Parse JSON uit LLM response, met fallback voor common issues."""

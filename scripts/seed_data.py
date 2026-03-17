@@ -116,7 +116,7 @@ async def seed():
             medicatie={"voorgeschreven": [{"naam": "ibuprofen", "dosering": "400mg"}]},
             allergieen=[],
             voorgeschiedenis=[],
-            model_version="llama3.3:8b-instruct-q4_K_M",
+            model_version="llama3.1:8b",
             confidence=0.89,
         )
         db.add(extraction)
@@ -132,7 +132,7 @@ async def seed():
             p_text="Ibuprofen 400mg 3dd zo nodig. Advies: ontspanning, voldoende slaap. Controle bij aanhouden >1 week.",
             icpc_code="N02",
             icpc_titel="Spanningshoofdpijn",
-            model_version="llama3.3:8b-instruct-q4_K_M",
+            model_version="llama3.1:8b",
             confidence=0.87,
         )
         db.add(soep)

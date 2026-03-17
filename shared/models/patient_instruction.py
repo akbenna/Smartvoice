@@ -2,20 +2,22 @@
 PatientInstruction model — Patientinstructie in eenvoudig Nederlands.
 """
 
+from __future__ import annotations
+
 from datetime import datetime
 
 from sqlalchemy import String, Text, ForeignKey, DateTime, func
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from shared.models.base import Base, UUIDMixin
+from shared.models.types import UUIDType
 
 
 class PatientInstruction(Base, UUIDMixin):
     __tablename__ = "patient_instructions"
 
     consult_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("consults.id", ondelete="CASCADE"),
+        UUIDType, ForeignKey("consults.id", ondelete="CASCADE"),
         nullable=False,
     )
     instruction_text: Mapped[str] = mapped_column(Text, nullable=False)

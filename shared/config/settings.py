@@ -9,6 +9,15 @@ import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 
+# Laad .env bestand als het bestaat (development)
+try:
+    from dotenv import load_dotenv
+    _env_path = Path(__file__).parent.parent.parent / ".env"
+    if _env_path.exists():
+        load_dotenv(_env_path)
+except ImportError:
+    pass
+
 
 @dataclass
 class DatabaseConfig:
@@ -58,7 +67,7 @@ class DiarizationConfig:
 @dataclass
 class OllamaConfig:
     host: str = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-    model: str = os.getenv("OLLAMA_MODEL", "llama3.3:8b-instruct-q4_K_M")
+    model: str = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
     fallback_model: str = os.getenv("OLLAMA_FALLBACK_MODEL", "")
     timeout: int = int(os.getenv("OLLAMA_TIMEOUT", "120"))
 
@@ -70,6 +79,17 @@ class CloudFallbackConfig:
     api_key: str = os.getenv("CLOUD_FALLBACK_API_KEY", "")
     api_url: str = os.getenv("CLOUD_FALLBACK_API_URL", "")
     confidence_threshold: float = float(os.getenv("CLOUD_FALLBACK_CONFIDENCE_THRESHOLD", "0.6"))
+
+
+@dataclass
+class HISExportConfig:
+    default_target: str = os.getenv("HIS_DEFAULT_TARGET", "clipboard")
+    cgm_api_url: str = os.getenv("CGM_API_URL", "")
+    cgm_api_key: str = os.getenv("CGM_API_KEY", "")
+    medicom_api_url: str = os.getenv("MEDICOM_API_URL", "")
+    medicom_api_key: str = os.getenv("MEDICOM_API_KEY", "")
+    fhir_base_url: str = os.getenv("FHIR_BASE_URL", "")
+    export_timeout: int = int(os.getenv("HIS_EXPORT_TIMEOUT", "30"))
 
 
 @dataclass
@@ -123,6 +143,7 @@ class AppConfig:
     audio: AudioConfig = field(default_factory=AudioConfig)
     audit: AuditConfig = field(default_factory=AuditConfig)
     security: SecurityConfig = field(default_factory=SecurityConfig)
+    his_export: HISExportConfig = field(default_factory=HISExportConfig)
 
     @property
     def is_development(self) -> bool:

@@ -2,13 +2,15 @@
 Consult model — Een consult met status-tracking.
 """
 
+from __future__ import annotations
+
 import enum
 
 from sqlalchemy import String, Boolean, ForeignKey, Enum, DateTime
-from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from shared.models.base import Base, UUIDMixin, TimestampMixin
+from shared.models.types import UUIDType, JSONType
 
 
 class ConsultStatus(str, enum.Enum):
@@ -26,7 +28,7 @@ class Consult(Base, UUIDMixin, TimestampMixin):
 
     patient_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     practitioner_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+        UUIDType, ForeignKey("users.id"), nullable=False
     )
     status: Mapped[ConsultStatus] = mapped_column(
         Enum(ConsultStatus, name="consult_status"),
@@ -37,7 +39,7 @@ class Consult(Base, UUIDMixin, TimestampMixin):
     ended_at: Mapped[str | None] = mapped_column(DateTime(timezone=True), nullable=True)
     audio_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     audio_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
-    metadata: Mapped[dict] = mapped_column(JSONB, default=dict)
+    consult_metadata: Mapped[dict] = mapped_column("metadata", JSONType, default=dict)
 
     # Relaties
     practitioner = relationship("User", back_populates="consults")
