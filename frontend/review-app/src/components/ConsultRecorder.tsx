@@ -1,15 +1,28 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useAudioRecorder, RecorderState } from "@/lib/useAudioRecorder";
+import { useAudioRecorder } from "@/lib/useAudioRecorder";
 
 interface ConsultRecorderProps {
   onComplete: (sessionId: string) => void;
 }
 
+/** Lijst met lokaal opgeslagen opnames (in-memory + bestandsnaam). */
+interface SavedRecording {
+  id: string;
+  filename: string;
+  blob: Blob;
+  timestamp: Date;
+  duration: number;
+  uploaded: boolean;
+}
+
 /**
- * Spreekkamer-recorder: opnemen → automatisch uploaden → SOEP pipeline.
+ * Spreekkamer-recorder: opnemen → lokaal opslaan → uploaden → SOEP pipeline.
  * Vergelijkbaar met Juvely/Dragon Medical workflow.
+ *
+ * Opnames worden altijd eerst lokaal bewaard (download-optie),
+ * zodat ze nooit verloren gaan als de backend offline is.
  */
 export default function ConsultRecorder({ onComplete }: ConsultRecorderProps) {
   const {
@@ -28,8 +41,41 @@ export default function ConsultRecorder({ onComplete }: ConsultRecorderProps) {
 
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [savedRecordings, setSavedRecordings] = useState<SavedRecording[]>([]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameRef = useRef<number>(0);
+
+  // ---------------------------------------------------------------------------
+  // Auto-save: zodra opname stopt, sla lokaal op
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (state === "stopped" && audioBlob && !saved) {
+      const timestamp = new Date();
+      const ext = audioBlob.type.includes("webm") ? "webm" : "m4a";
+      const filename = `consult-${timestamp.toISOString().replace(/[:.]/g, "-")}.${ext}`;
+
+      const recording: SavedRecording = {
+        id: crypto.randomUUID(),
+        filename,
+        blob: audioBlob,
+        timestamp,
+        duration,
+        uploaded: false,
+      };
+
+      setSavedRecordings((prev) => [recording, ...prev]);
+      setSaved(true);
+    }
+  }, [state, audioBlob, saved, duration]);
+
+  // Reset saved flag wanneer nieuwe opname start
+  useEffect(() => {
+    if (state === "recording") {
+      setSaved(false);
+      setUploadError(null);
+    }
+  }, [state]);
 
   // ---------------------------------------------------------------------------
   // Waveform visualisatie
@@ -54,7 +100,7 @@ export default function ConsultRecorder({ onComplete }: ConsultRecorderProps) {
       ctx.fillRect(0, 0, width, height);
 
       ctx.lineWidth = 2;
-      ctx.strokeStyle = "#dc2626"; // Rood = opname actief
+      ctx.strokeStyle = "#dc2626";
       ctx.beginPath();
 
       const sliceWidth = width / bufferLength;
@@ -63,10 +109,8 @@ export default function ConsultRecorder({ onComplete }: ConsultRecorderProps) {
       for (let i = 0; i < bufferLength; i++) {
         const v = dataArray[i] / 128.0;
         const y = (v * height) / 2;
-
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
-
         x += sliceWidth;
       }
 
@@ -87,19 +131,42 @@ export default function ConsultRecorder({ onComplete }: ConsultRecorderProps) {
   }, [state, analyserNode, drawWaveform]);
 
   // ---------------------------------------------------------------------------
+  // Download opname lokaal (fallback / backup)
+  // ---------------------------------------------------------------------------
+  const handleDownload = (blob?: Blob, filename?: string) => {
+    const targetBlob = blob || audioBlob;
+    if (!targetBlob) return;
+
+    const ext = targetBlob.type.includes("webm") ? "webm" : "m4a";
+    const name =
+      filename ||
+      `consult-${new Date().toISOString().replace(/[:.]/g, "-")}.${ext}`;
+
+    const url = URL.createObjectURL(targetBlob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // ---------------------------------------------------------------------------
   // Upload naar backend
   // ---------------------------------------------------------------------------
-  const handleUpload = async () => {
-    if (!audioBlob) return;
+  const handleUpload = async (blob?: Blob) => {
+    const targetBlob = blob || audioBlob;
+    if (!targetBlob) return;
+
     setUploading(true);
     setUploadError(null);
 
     try {
-      // Converteer blob naar File object met timestamp als naam
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-      const ext = audioBlob.type.includes("webm") ? "webm" : "m4a";
-      const file = new File([audioBlob], `consult-${timestamp}.${ext}`, {
-        type: audioBlob.type,
+      const ext = targetBlob.type.includes("webm") ? "webm" : "m4a";
+      const file = new File([targetBlob], `consult-${timestamp}.${ext}`, {
+        type: targetBlob.type,
       });
 
       const formData = new FormData();
@@ -108,7 +175,6 @@ export default function ConsultRecorder({ onComplete }: ConsultRecorderProps) {
       const apiUrl =
         process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-      // JWT token meesturen
       const token =
         typeof window !== "undefined"
           ? localStorage.getItem("ca_token")
@@ -123,15 +189,35 @@ export default function ConsultRecorder({ onComplete }: ConsultRecorderProps) {
       });
 
       if (!response.ok) {
-        throw new Error(`Upload mislukt: ${response.status}`);
+        throw new Error(`Upload mislukt (${response.status})`);
       }
 
       const data = await response.json();
+
+      // Markeer opname als geüpload
+      setSavedRecordings((prev) =>
+        prev.map((r) =>
+          r.blob === targetBlob ? { ...r, uploaded: true } : r
+        )
+      );
+
       onComplete(data.session_id);
     } catch (err) {
-      setUploadError(
-        err instanceof Error ? err.message : "Upload mislukt"
-      );
+      const message =
+        err instanceof Error ? err.message : "Upload mislukt";
+
+      // Geef duidelijke melding bij connection refused
+      if (
+        message.includes("ERR_CONNECTION_REFUSED") ||
+        message.includes("Failed to fetch") ||
+        message.includes("NetworkError")
+      ) {
+        setUploadError(
+          "Backend niet bereikbaar. De opname is lokaal opgeslagen — je kunt het bestand downloaden of later opnieuw proberen."
+        );
+      } else {
+        setUploadError(message);
+      }
     } finally {
       setUploading(false);
     }
@@ -148,190 +234,292 @@ export default function ConsultRecorder({ onComplete }: ConsultRecorderProps) {
     return `${m}:${s}`;
   };
 
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   const error = recorderError || uploadError;
 
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900">
-            Consult opnemen
-          </h2>
-          <p className="text-sm text-gray-500">
-            Neem het gesprek op en ontvang automatisch een SOEP-concept.
-          </p>
+    <div className="space-y-4">
+      {/* Hoofdkaart: Recorder */}
+      <div className="bg-white rounded-lg shadow p-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">
+              Consult opnemen
+            </h2>
+            <p className="text-sm text-gray-500">
+              Neem het gesprek op en ontvang automatisch een SOEP-concept.
+            </p>
+          </div>
+          {state !== "idle" && (
+            <div className="flex items-center gap-2">
+              {state === "recording" && (
+                <span className="flex items-center gap-1.5 text-sm font-medium text-red-600">
+                  <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+                  Opname
+                </span>
+              )}
+              {state === "paused" && (
+                <span className="text-sm font-medium text-amber-600">
+                  Gepauzeerd
+                </span>
+              )}
+              {state === "stopped" && (
+                <span className="flex items-center gap-1.5 text-sm font-medium text-green-600">
+                  <CheckIcon />
+                  Lokaal opgeslagen
+                </span>
+              )}
+            </div>
+          )}
         </div>
-        {state !== "idle" && (
-          <div className="flex items-center gap-2">
-            {state === "recording" && (
-              <span className="flex items-center gap-1.5 text-sm font-medium text-red-600">
-                <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
-                Opname
-              </span>
-            )}
-            {state === "paused" && (
-              <span className="text-sm font-medium text-amber-600">
-                Gepauzeerd
-              </span>
-            )}
-            {state === "stopped" && (
-              <span className="text-sm font-medium text-gray-600">
-                Gestopt
-              </span>
+
+        {/* Timer */}
+        <div className="text-center my-6">
+          <div
+            className={`text-5xl font-mono font-light tracking-wider ${
+              state === "recording"
+                ? "text-red-600"
+                : state === "paused"
+                ? "text-amber-600"
+                : "text-gray-700"
+            }`}
+          >
+            {formatTime(duration)}
+          </div>
+          {duration > 0 && state !== "idle" && (
+            <p className="text-xs text-gray-400 mt-1">
+              {state === "recording" && "Spreek duidelijk in de microfoon"}
+              {state === "paused" && "Opname gepauzeerd — druk op hervat"}
+              {state === "stopped" &&
+                "Opname voltooid — klaar voor verwerking"}
+            </p>
+          )}
+        </div>
+
+        {/* Waveform */}
+        {(state === "recording" || state === "paused") && (
+          <div className="mb-6 bg-gray-50 rounded-lg p-2">
+            <canvas
+              ref={canvasRef}
+              width={600}
+              height={80}
+              className="w-full h-20 rounded"
+            />
+          </div>
+        )}
+
+        {/* Audio preview na stop */}
+        {state === "stopped" && audioUrl && (
+          <div className="mb-6 bg-gray-50 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm text-gray-600">Beluister de opname:</p>
+              {audioBlob && (
+                <span className="text-xs text-gray-400">
+                  {formatFileSize(audioBlob.size)}
+                </span>
+              )}
+            </div>
+            <audio src={audioUrl} controls className="w-full" />
+          </div>
+        )}
+
+        {/* Controls */}
+        <div className="flex items-center justify-center gap-3">
+          {/* IDLE: Start knop */}
+          {state === "idle" && (
+            <button
+              onClick={start}
+              className="flex items-center gap-2 px-8 py-4 bg-red-600 text-white rounded-full font-medium text-lg hover:bg-red-700 transition-colors shadow-lg hover:shadow-xl"
+            >
+              <MicIcon />
+              Start opname
+            </button>
+          )}
+
+          {/* RECORDING: Pauze + Stop */}
+          {state === "recording" && (
+            <>
+              <button
+                onClick={pause}
+                className="flex items-center gap-2 px-5 py-3 bg-amber-100 text-amber-700 rounded-full font-medium hover:bg-amber-200 transition-colors"
+              >
+                <PauseIcon />
+                Pauzeer
+              </button>
+              <button
+                onClick={stop}
+                className="flex items-center gap-2 px-5 py-3 bg-gray-800 text-white rounded-full font-medium hover:bg-gray-900 transition-colors"
+              >
+                <StopIcon />
+                Stop opname
+              </button>
+            </>
+          )}
+
+          {/* PAUSED: Hervat + Stop */}
+          {state === "paused" && (
+            <>
+              <button
+                onClick={resume}
+                className="flex items-center gap-2 px-5 py-3 bg-red-600 text-white rounded-full font-medium hover:bg-red-700 transition-colors"
+              >
+                <MicIcon />
+                Hervat
+              </button>
+              <button
+                onClick={stop}
+                className="flex items-center gap-2 px-5 py-3 bg-gray-800 text-white rounded-full font-medium hover:bg-gray-900 transition-colors"
+              >
+                <StopIcon />
+                Stop opname
+              </button>
+            </>
+          )}
+
+          {/* STOPPED: Verwerk + Download + Opnieuw */}
+          {state === "stopped" && (
+            <>
+              <button
+                onClick={() => handleUpload()}
+                disabled={uploading || !audioBlob}
+                className="flex items-center gap-2 px-8 py-4 bg-primary-600 text-white rounded-full font-medium text-lg hover:bg-primary-700 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {uploading ? (
+                  <>
+                    <span className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
+                    Uploaden...
+                  </>
+                ) : (
+                  <>
+                    <SendIcon />
+                    Start SOEP-verwerking
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => handleDownload()}
+                disabled={!audioBlob}
+                className="flex items-center gap-2 px-5 py-3 bg-blue-50 text-blue-700 rounded-full font-medium hover:bg-blue-100 transition-colors"
+                title="Sla opname op als bestand"
+              >
+                <DownloadIcon />
+                Download
+              </button>
+              <button
+                onClick={reset}
+                disabled={uploading}
+                className="flex items-center gap-2 px-5 py-3 bg-gray-100 text-gray-700 rounded-full font-medium hover:bg-gray-200 transition-colors disabled:opacity-50"
+              >
+                <RetryIcon />
+                Opnieuw
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Error met fallback-acties */}
+        {error && (
+          <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-sm text-red-700">{error}</p>
+            {uploadError && audioBlob && (
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={() => handleDownload()}
+                  className="text-sm px-3 py-1.5 bg-white border border-red-200 text-red-700 rounded-md hover:bg-red-50 transition-colors"
+                >
+                  Download opname
+                </button>
+                <button
+                  onClick={() => handleUpload()}
+                  className="text-sm px-3 py-1.5 bg-white border border-red-200 text-red-700 rounded-md hover:bg-red-50 transition-colors"
+                >
+                  Opnieuw proberen
+                </button>
+              </div>
             )}
           </div>
         )}
+
+        {/* Privacy notice */}
+        <p className="mt-6 text-xs text-gray-400 text-center">
+          Audio wordt volledig lokaal verwerkt en automatisch verwijderd na
+          goedkeuring van het transcript.
+        </p>
       </div>
 
-      {/* Timer */}
-      <div className="text-center my-6">
-        <div
-          className={`text-5xl font-mono font-light tracking-wider ${
-            state === "recording"
-              ? "text-red-600"
-              : state === "paused"
-              ? "text-amber-600"
-              : "text-gray-700"
-          }`}
-        >
-          {formatTime(duration)}
-        </div>
-        {duration > 0 && state !== "idle" && (
-          <p className="text-xs text-gray-400 mt-1">
-            {state === "recording" && "Spreek duidelijk in de microfoon"}
-            {state === "paused" && "Opname gepauzeerd — druk op hervat"}
-            {state === "stopped" && "Opname voltooid — klaar voor verwerking"}
-          </p>
-        )}
-      </div>
-
-      {/* Waveform */}
-      {(state === "recording" || state === "paused") && (
-        <div className="mb-6 bg-gray-50 rounded-lg p-2">
-          <canvas
-            ref={canvasRef}
-            width={600}
-            height={80}
-            className="w-full h-20 rounded"
-          />
-        </div>
-      )}
-
-      {/* Audio preview na stop */}
-      {state === "stopped" && audioUrl && (
-        <div className="mb-6 bg-gray-50 rounded-lg p-4">
-          <p className="text-sm text-gray-600 mb-2">Beluister de opname:</p>
-          <audio src={audioUrl} controls className="w-full" />
-        </div>
-      )}
-
-      {/* Controls */}
-      <div className="flex items-center justify-center gap-3">
-        {/* IDLE: Start knop */}
-        {state === "idle" && (
-          <button
-            onClick={start}
-            className="flex items-center gap-2 px-8 py-4 bg-red-600 text-white rounded-full font-medium text-lg hover:bg-red-700 transition-colors shadow-lg hover:shadow-xl"
-          >
-            <MicIcon />
-            Start opname
-          </button>
-        )}
-
-        {/* RECORDING: Pauze + Stop */}
-        {state === "recording" && (
-          <>
-            <button
-              onClick={pause}
-              className="flex items-center gap-2 px-5 py-3 bg-amber-100 text-amber-700 rounded-full font-medium hover:bg-amber-200 transition-colors"
-            >
-              <PauseIcon />
-              Pauzeer
-            </button>
-            <button
-              onClick={stop}
-              className="flex items-center gap-2 px-5 py-3 bg-gray-800 text-white rounded-full font-medium hover:bg-gray-900 transition-colors"
-            >
-              <StopIcon />
-              Stop opname
-            </button>
-          </>
-        )}
-
-        {/* PAUSED: Hervat + Stop */}
-        {state === "paused" && (
-          <>
-            <button
-              onClick={resume}
-              className="flex items-center gap-2 px-5 py-3 bg-red-600 text-white rounded-full font-medium hover:bg-red-700 transition-colors"
-            >
-              <MicIcon />
-              Hervat
-            </button>
-            <button
-              onClick={stop}
-              className="flex items-center gap-2 px-5 py-3 bg-gray-800 text-white rounded-full font-medium hover:bg-gray-900 transition-colors"
-            >
-              <StopIcon />
-              Stop opname
-            </button>
-          </>
-        )}
-
-        {/* STOPPED: Verwerk + Opnieuw */}
-        {state === "stopped" && (
-          <>
-            <button
-              onClick={handleUpload}
-              disabled={uploading || !audioBlob}
-              className="flex items-center gap-2 px-8 py-4 bg-primary-600 text-white rounded-full font-medium text-lg hover:bg-primary-700 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {uploading ? (
-                <>
-                  <span className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
-                  Verwerken...
-                </>
-              ) : (
-                <>
-                  <SendIcon />
-                  Start SOEP-verwerking
-                </>
-              )}
-            </button>
-            <button
-              onClick={reset}
-              disabled={uploading}
-              className="flex items-center gap-2 px-5 py-3 bg-gray-100 text-gray-700 rounded-full font-medium hover:bg-gray-200 transition-colors disabled:opacity-50"
-            >
-              <RetryIcon />
-              Opnieuw
-            </button>
-          </>
-        )}
-      </div>
-
-      {/* Error */}
-      {error && (
-        <div className="mt-4 p-3 bg-danger-50 text-danger-600 text-sm rounded-lg">
-          {error}
+      {/* Eerdere opnames (sessie) */}
+      {savedRecordings.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-4">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">
+            Opnames deze sessie
+          </h3>
+          <div className="space-y-2">
+            {savedRecordings.map((rec) => (
+              <div
+                key={rec.id}
+                className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg"
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-2 h-2 rounded-full ${
+                      rec.uploaded ? "bg-green-500" : "bg-amber-400"
+                    }`}
+                  />
+                  <div>
+                    <p className="text-sm text-gray-700">{rec.filename}</p>
+                    <p className="text-xs text-gray-400">
+                      {formatTime(rec.duration)} &middot;{" "}
+                      {formatFileSize(rec.blob.size)} &middot;{" "}
+                      {rec.timestamp.toLocaleTimeString("nl-NL", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                      {rec.uploaded && (
+                        <span className="text-green-600 ml-1">
+                          &middot; geüpload
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  {!rec.uploaded && (
+                    <button
+                      onClick={() => handleUpload(rec.blob)}
+                      disabled={uploading}
+                      className="p-1.5 text-gray-400 hover:text-primary-600 rounded transition-colors"
+                      title="Upload naar server"
+                    >
+                      <SendIcon />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleDownload(rec.blob, rec.filename)}
+                    className="p-1.5 text-gray-400 hover:text-blue-600 rounded transition-colors"
+                    title="Download bestand"
+                  >
+                    <DownloadIcon />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
-
-      {/* Privacy notice */}
-      <p className="mt-6 text-xs text-gray-400 text-center">
-        Audio wordt volledig lokaal verwerkt en automatisch verwijderd na
-        goedkeuring van het transcript.
-      </p>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Icons (inline SVG — geen externe dependency)
+// Icons (inline SVG)
 // ---------------------------------------------------------------------------
 function MicIcon() {
   return (
@@ -369,10 +557,28 @@ function SendIcon() {
   );
 }
 
+function DownloadIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  );
+}
+
 function RetryIcon() {
   return (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
     </svg>
   );
 }

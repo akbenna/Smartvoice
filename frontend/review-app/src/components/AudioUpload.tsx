@@ -21,13 +21,14 @@ export default function AudioUpload({ onComplete }: AudioUploadProps) {
     "audio/x-m4a",
     "audio/ogg",
     "audio/flac",
+    "audio/webm",
   ];
-  const ALLOWED_EXTENSIONS = [".wav", ".mp3", ".m4a", ".ogg", ".flac"];
+  const ALLOWED_EXTENSIONS = [".wav", ".mp3", ".m4a", ".ogg", ".flac", ".webm"];
 
   const validateFile = (f: File): boolean => {
     const ext = f.name.substring(f.name.lastIndexOf(".")).toLowerCase();
     if (!ALLOWED_EXTENSIONS.includes(ext)) {
-      setError(`Ongeldig formaat: ${ext}. Gebruik WAV, MP3, M4A, OGG of FLAC.`);
+      setError(`Ongeldig formaat: ${ext}. Gebruik WAV, MP3, M4A, OGG, FLAC of WebM.`);
       return false;
     }
     // Max 1 uur audio ~ max 500MB
@@ -95,7 +96,7 @@ export default function AudioUpload({ onComplete }: AudioUploadProps) {
       </h2>
       <p className="text-sm text-gray-500 mb-6">
         Upload een audio-opname van het consult. Ondersteunde formaten: WAV,
-        MP3, M4A, OGG, FLAC.
+        MP3, M4A, OGG, FLAC, WebM.
       </p>
 
       {/* Drop zone */}

@@ -376,8 +376,8 @@ async def upload_audio(
 ):
     """Upload een audiobestand voor verwerking (MVP Fase 1)."""
     # Validatie
-    if not file.filename or not file.filename.endswith((".wav", ".mp3", ".m4a", ".ogg", ".flac")):
-        raise HTTPException(400, "Ongeldig audioformaat. Gebruik WAV, MP3, M4A, OGG of FLAC.")
+    if not file.filename or not file.filename.endswith((".wav", ".mp3", ".m4a", ".ogg", ".flac", ".webm")):
+        raise HTTPException(400, "Ongeldig audioformaat. Gebruik WAV, MP3, M4A, OGG, FLAC of WebM.")
 
     # Maak consult aan
     consult_id = uuid.uuid4()
