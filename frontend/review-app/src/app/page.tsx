@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import LoginPage from "@/components/LoginPage";
 import AudioUpload from "@/components/AudioUpload";
+import ConsultRecorder from "@/components/ConsultRecorder";
 import SOEPEditor from "@/components/SOEPEditor";
 import DetectionPanel from "@/components/DetectionPanel";
 import TranscriptViewer from "@/components/TranscriptViewer";
@@ -11,11 +12,13 @@ import PatientInstruction from "@/components/PatientInstruction";
 import { api } from "@/lib/api";
 import type { SOEPConcept, DetectionResult, TranscriptSegment } from "@/lib/api";
 
-type AppState = "upload" | "processing" | "review" | "approved";
+type AppState = "input" | "processing" | "review" | "approved";
+type InputMode = "record" | "upload";
 
 export default function Home() {
   const { user, isLoading, logout } = useAuth();
-  const [state, setState] = useState<AppState>("upload");
+  const [state, setState] = useState<AppState>("input");
+  const [inputMode, setInputMode] = useState<InputMode>("record");
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [soep, setSoep] = useState<SOEPConcept | null>(null);
   const [detection, setDetection] = useState<DetectionResult | null>(null);
@@ -51,7 +54,7 @@ export default function Home() {
         } else if (data.status === "failed") {
           ws.close();
           setError("Verwerking mislukt. Probeer het opnieuw.");
-          setState("upload");
+          setState("input");
         }
       };
 
@@ -65,7 +68,7 @@ export default function Home() {
         if (ws.readyState === WebSocket.OPEN) {
           ws.close();
           setError("Verwerking duurt te lang.");
-          setState("upload");
+          setState("input");
         }
       }, 300000);
     } catch {
@@ -96,13 +99,13 @@ export default function Home() {
         }
         if (status.status === "failed") {
           setError("Verwerking mislukt. Probeer het opnieuw.");
-          setState("upload");
+          setState("input");
           return;
         }
       } catch { /* retry */ }
     }
     setError("Verwerking duurt te lang.");
-    setState("upload");
+    setState("input");
   };
 
   const handleUploadComplete = (newSessionId: string) => {
@@ -135,7 +138,7 @@ export default function Home() {
   };
 
   const handleReset = () => {
-    setState("upload");
+    setState("input");
     setSessionId(null);
     setSoep(null);
     setDetection(null);
@@ -189,7 +192,7 @@ export default function Home() {
 
         {/* Status bar */}
         <div className="flex items-center gap-2 text-sm">
-          <Step label="1. Upload" active={state === "upload"} done={state !== "upload"} />
+          <Step label="1. Invoer" active={state === "input"} done={state !== "input"} />
           <Connector />
           <Step label="2. Verwerking" active={state === "processing"} done={state === "review" || state === "approved"} />
           <Connector />
@@ -198,8 +201,50 @@ export default function Home() {
           <Step label="4. Goedgekeurd" active={state === "approved"} done={false} />
         </div>
 
-        {/* Upload */}
-        {state === "upload" && <AudioUpload onComplete={handleUploadComplete} />}
+        {/* Input: Opnemen of Uploaden */}
+        {state === "input" && (
+          <div>
+            {/* Mode toggle */}
+            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 w-fit mb-4">
+              <button
+                onClick={() => setInputMode("record")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  inputMode === "record"
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 10v2a7 7 0 01-14 0v-2" />
+                  <line x1="12" y1="19" x2="12" y2="23" />
+                  <line x1="8" y1="23" x2="16" y2="23" />
+                </svg>
+                Opnemen
+              </button>
+              <button
+                onClick={() => setInputMode("upload")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  inputMode === "upload"
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                Bestand uploaden
+              </button>
+            </div>
+
+            {/* Recorder of Upload component */}
+            {inputMode === "record" ? (
+              <ConsultRecorder onComplete={handleUploadComplete} />
+            ) : (
+              <AudioUpload onComplete={handleUploadComplete} />
+            )}
+          </div>
+        )}
 
         {/* Processing */}
         {state === "processing" && (
