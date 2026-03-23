@@ -65,7 +65,7 @@ export default function AudioUpload({ onComplete }: AudioUploadProps) {
       const formData = new FormData();
       formData.append("file", file);
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
       const response = await fetch(`${apiUrl}/api/consult/upload`, {
         method: "POST",
         body: formData,

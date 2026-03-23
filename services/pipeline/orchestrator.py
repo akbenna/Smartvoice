@@ -22,6 +22,7 @@ from shared.models.patient_instruction import PatientInstruction
 from shared.redis_client import redis_client
 
 from services.transcription.service import TranscriptionService
+from services.transcription.audio_preprocessor import AudioPreprocessor, AudioPreprocessingError
 from services.extraction.service import ExtractionService
 
 logger = structlog.get_logger()
@@ -42,6 +43,9 @@ class PipelineOrchestrator:
     def __init__(self):
         self.transcription_service = TranscriptionService(config)
         self.extraction_service = ExtractionService(config)
+        self.audio_preprocessor = AudioPreprocessor(
+            max_duration=config.audio.max_duration_seconds
+        )
 
     async def initialize(self):
         """Laad ML-modellen (eenmalig bij startup)."""
@@ -65,10 +69,29 @@ class PipelineOrchestrator:
         logger.info("Pipeline gestart", consult_id=str(consult_id))
 
         try:
+            # === Stap 0: Audio pre-processing ===
+            # Valideer en converteer audio naar 16kHz mono WAV (optimaal voor Whisper)
+            try:
+                processed_path, audio_info = await self.audio_preprocessor.process(audio_path)
+                logger.info(
+                    "Audio pre-processing voltooid",
+                    consult_id=str(consult_id),
+                    original=str(audio_path),
+                    processed=str(processed_path),
+                    duration=round(audio_info.duration_secs, 1),
+                    converted=audio_info.needs_conversion,
+                )
+            except AudioPreprocessingError as e:
+                logger.error("Audio pre-processing mislukt",
+                            consult_id=str(consult_id), error=str(e))
+                raise
+
             # === Stap 1: Transcriptie ===
             await self._update_status(db, consult_id, ConsultStatus.transcribing)
 
-            transcript_result = await self.transcription_service.transcribe(audio_path)
+            transcript_result = await self.transcription_service.transcribe(
+                str(processed_path)
+            )
 
             # Sla transcript op in database
             transcript = Transcript(

@@ -173,7 +173,7 @@ export default function ConsultRecorder({ onComplete }: ConsultRecorderProps) {
       formData.append("file", file);
 
       const apiUrl =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
 
       const token =
         typeof window !== "undefined"

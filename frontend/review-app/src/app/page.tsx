@@ -39,7 +39,7 @@ export default function Home() {
   if (!user) return <LoginPage />;
 
   const pollStatus = async (sid: string) => {
-    const wsUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000")
+    const wsUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001")
       .replace("http", "ws");
 
     // Probeer WebSocket, val terug op polling

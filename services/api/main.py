@@ -196,17 +196,31 @@ class HealthResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Background pipeline task
 # ---------------------------------------------------------------------------
-async def run_pipeline_background(consult_id: uuid.UUID, audio_path: str):
-    """Draai de pipeline op de achtergrond."""
-    from shared.database import async_session
-    from services.pipeline.orchestrator import pipeline
+async def enqueue_pipeline_job(consult_id: uuid.UUID, audio_path: str):
+    """Plaats een verwerkingsjob in de Redis Stream voor de worker pool."""
+    try:
+        from shared.redis_client import redis_client
+        await redis_client.client.xadd("jobs:pipeline", {
+            "consult_id": str(consult_id),
+            "audio_path": audio_path,
+            "retry_count": "0",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+        logger.info("Pipeline job in queue geplaatst",
+                    consult_id=str(consult_id))
+    except Exception as e:
+        # Fallback: draai pipeline direct als Redis niet beschikbaar is
+        logger.warning("Redis queue niet beschikbaar — fallback naar directe verwerking",
+                       consult_id=str(consult_id), error=str(e))
+        from shared.database import async_session
+        from services.pipeline.orchestrator import pipeline
 
-    async with async_session() as db:
-        try:
-            await pipeline.process_consult(db, consult_id, audio_path)
-        except Exception as e:
-            logger.error("Background pipeline mislukt",
-                        consult_id=str(consult_id), error=str(e))
+        async with async_session() as db:
+            try:
+                await pipeline.process_consult(db, consult_id, audio_path)
+            except Exception as pipe_err:
+                logger.error("Directe pipeline verwerking mislukt",
+                            consult_id=str(consult_id), error=str(pipe_err))
 
 
 # ---------------------------------------------------------------------------
@@ -374,7 +388,7 @@ async def upload_audio(
     patient_hash: str = "",
     db: AsyncSession = Depends(get_db),
 ):
-    """Upload een audiobestand voor verwerking (MVP Fase 1)."""
+    """Upload een audiobestand voor verwerking. Job gaat naar de worker queue."""
     # Validatie
     if not file.filename or not file.filename.endswith((".wav", ".mp3", ".m4a", ".ogg", ".flac", ".webm")):
         raise HTTPException(400, "Ongeldig audioformaat. Gebruik WAV, MP3, M4A, OGG, FLAC of WebM.")
@@ -389,7 +403,7 @@ async def upload_audio(
         content = await file.read()
         await f.write(content)
 
-    # Maak consult record (zonder auth voor MVP upload flow)
+    # Maak consult record
     consult = Consult(
         id=consult_id,
         patient_hash=patient_hash or "anonymous",
@@ -401,8 +415,8 @@ async def upload_audio(
     db.add(consult)
     await db.commit()
 
-    # Start pipeline op achtergrond
-    background_tasks.add_task(run_pipeline_background, consult_id, str(audio_path))
+    # Plaats job in Redis queue → worker pool verwerkt async
+    background_tasks.add_task(enqueue_pipeline_job, consult_id, str(audio_path))
 
     logger.info("Audio geupload, pipeline gestart",
                 session_id=str(consult_id), filename=file.filename)

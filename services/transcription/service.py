@@ -152,7 +152,7 @@ class TranscriptionService:
         Transcribeer een audiobestand.
 
         Args:
-            audio_path: Pad naar WAV/MP3/M4A bestand
+            audio_path: Pad naar audiobestand (WAV/MP3/M4A/OGG/FLAC/WebM)
 
         Returns:
             TranscriptResult met segmenten, timestamps en confidence
