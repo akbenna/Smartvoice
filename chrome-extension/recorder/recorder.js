@@ -64,16 +64,57 @@ btnStart.addEventListener('click', async function() {
     mediaRecorder = new MediaRecorder(audioStream, { mimeType: mimeType, audioBitsPerSecond: 128000 });
 
     mediaRecorder.ondataavailable = function(e) {
-      if (e.data.size > 0) audioChunks.push(e.data);
+      if (e.data && e.data.size > 0) {
+        audioChunks.push(e.data);
+        document.getElementById('status').textContent = 'Chunks: ' + audioChunks.length + ' (' + Math.round(e.data.size/1024) + ' KB)';
+      }
     };
 
-    mediaRecorder.start(5000);
+    // Set onstop handler BEFORE starting (avoids race condition)
+    mediaRecorder.onstop = function() {
+      var mimeType = mediaRecorder ? mediaRecorder.mimeType : 'audio/webm';
+      var blob = new Blob(audioChunks, { type: mimeType });
+
+      document.getElementById('processing-step').textContent =
+        'Audio: ' + Math.round(blob.size / 1024) + ' KB, ' + audioChunks.length + ' chunks. Verzenden...';
+
+      if (blob.size < 1000) {
+        showState('idle');
+        showError('Opname te kort of leeg (' + blob.size + ' bytes). Probeer langer op te nemen.');
+        return;
+      }
+
+      // Convert to base64
+      var reader = new FileReader();
+      reader.onloadend = function() {
+        var base64 = reader.result.split(',')[1];
+
+        chrome.runtime.sendMessage({
+          action: 'RECORDER_AUDIO',
+          audio: base64,
+          mimeType: mimeType,
+          size: blob.size,
+        });
+
+        document.getElementById('processing-step').textContent =
+          'Audio verzonden (' + Math.round(blob.size / 1024) + ' KB). Wachten op API...';
+      };
+      reader.readAsDataURL(blob);
+
+      // Clean up mic
+      if (audioStream) {
+        audioStream.getTracks().forEach(function(t) { t.stop(); });
+        audioStream = null;
+      }
+    };
+
+    // Start without timeslice — one big chunk on stop (most reliable)
+    mediaRecorder.start();
     startTime = Date.now();
     timerInterval = setInterval(updateTimer, 1000);
     showState('recording');
     startWaveform();
 
-    // Tell service worker we're recording
     chrome.runtime.sendMessage({ action: 'RECORDER_STARTED' });
 
   } catch (err) {
@@ -85,38 +126,14 @@ btnStop.addEventListener('click', function() {
   if (timerInterval) clearInterval(timerInterval);
   if (waveformId) cancelAnimationFrame(waveformId);
   showState('processing');
+  document.getElementById('processing-step').textContent = 'Audio wordt samengevoegd...';
 
-  mediaRecorder.onstop = async function() {
-    var mimeType = mediaRecorder.mimeType;
-    var blob = new Blob(audioChunks, { type: mimeType });
-
-    // Convert to base64
-    var reader = new FileReader();
-    reader.onloadend = function() {
-      var base64 = reader.result.split(',')[1];
-
-      // Send to service worker for processing
-      chrome.runtime.sendMessage({
-        action: 'RECORDER_AUDIO',
-        audio: base64,
-        mimeType: mimeType,
-        size: blob.size,
-      });
-
-      document.getElementById('processing-step').textContent = 'Audio verzonden naar API...';
-    };
-    reader.readAsDataURL(blob);
-
-    // Clean up
-    if (audioStream) {
-      audioStream.getTracks().forEach(function(t) { t.stop(); });
-      audioStream = null;
-    }
-    mediaRecorder = null;
-    audioChunks = [];
-  };
-
-  mediaRecorder.stop();
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop();
+  } else {
+    showState('idle');
+    showError('Geen actieve opname gevonden.');
+  }
 });
 
 // Listen for updates from service worker
