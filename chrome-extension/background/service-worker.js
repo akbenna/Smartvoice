@@ -1,199 +1,231 @@
 /**
- * SmartVoice — Service Worker (Background)
- * Beheert opname-lifecycle, API-communicatie, en Bricks-push.
+ * SmartVoice - Service Worker
+ *
+ * Coordinates between popup, offscreen document, content scripts, and cloud API.
+ * Manages recording state, API calls, and Bricks integration.
  */
 
-// ─── State ───────────────────────────────────────────────────────────────────
+// ── State ──
 
-let state = {
-  isRecording: false,
-  isProcessing: false,
-  startTime: 0,
-  result: null,
-  audioBlob: null,
+const state = {
+  status: 'idle', // idle | recording | processing | results | error
+  startTime: null,
+  data: null,
+  percent: 0,
+  step: '',
 };
 
-// ─── Settings helpers ────────────────────────────────────────────────────────
+// ── Offscreen document management ──
 
-async function getSettings() {
-  const defaults = {
-    apiUrl: "http://localhost:8002",
-    apiKey: "",
-    sttProvider: "groq",
-    llmProvider: "mistral",
-  };
-  const stored = await chrome.storage.sync.get(defaults);
-  return { ...defaults, ...stored };
-}
+let offscreenCreated = false;
 
-// ─── Message handler ─────────────────────────────────────────────────────────
-
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  handleMessage(msg, sender).then(sendResponse).catch((err) => {
-    console.error("Service worker message error:", err);
-    sendResponse({ error: err.message });
-  });
-  return true; // keep channel open for async response
-});
-
-async function handleMessage(msg, sender) {
-  switch (msg.type) {
-    case "GET_STATE":
-      return { ...state, audioBlob: undefined };
-
-    case "START_RECORDING":
-      return await startRecording();
-
-    case "STOP_RECORDING":
-      return await stopRecording();
-
-    case "RECORDING_DATA":
-      // Received audio blob from offscreen document
-      state.audioBlob = msg.blob;
-      return await processAudio();
-
-    case "PUSH_TO_BRICKS":
-      return await pushToBricks(msg.data);
-
-    case "RESET":
-      state = { isRecording: false, isProcessing: false, startTime: 0, result: null, audioBlob: null };
-      return { ok: true };
-
-    default:
-      return { error: "Unknown message type" };
-  }
-}
-
-// ─── Recording via Offscreen Document ────────────────────────────────────────
-
-async function startRecording() {
-  // Create offscreen document for audio recording
-  const existingContexts = await chrome.runtime.getContexts({
-    contextTypes: ["OFFSCREEN_DOCUMENT"],
-  });
-
-  if (existingContexts.length === 0) {
+async function ensureOffscreen() {
+  if (offscreenCreated) return;
+  try {
     await chrome.offscreen.createDocument({
-      url: "offscreen/offscreen.html",
-      reasons: ["USER_MEDIA"],
-      justification: "Audio opname voor consultatie-transcriptie",
+      url: 'offscreen/offscreen.html',
+      reasons: ['USER_MEDIA'],
+      justification: 'Microphone recording for medical consultation capture',
     });
+    offscreenCreated = true;
+  } catch (e) {
+    if (!e.message.includes('already exists')) throw e;
+    offscreenCreated = true;
   }
-
-  // Tell offscreen doc to start recording
-  await chrome.runtime.sendMessage({ type: "OFFSCREEN_START_RECORDING" });
-
-  state.isRecording = true;
-  state.startTime = Date.now();
-  state.result = null;
-  state.audioBlob = null;
-
-  return { ok: true, startTime: state.startTime };
 }
 
-async function stopRecording() {
-  state.isRecording = false;
-  state.isProcessing = true;
-
-  // Tell offscreen doc to stop — it will send RECORDING_DATA back
-  await chrome.runtime.sendMessage({ type: "OFFSCREEN_STOP_RECORDING" });
-
-  return { ok: true };
+async function closeOffscreen() {
+  try {
+    await chrome.offscreen.closeDocument();
+    offscreenCreated = false;
+  } catch {
+    // Already closed
+  }
 }
 
-// ─── API Communication ──────────────────────────────────────────────────────
+// ── API communication ──
 
-async function processAudio() {
-  if (!state.audioBlob) {
-    broadcastError("Geen audio-data ontvangen");
-    return;
-  }
+async function getConfig() {
+  return chrome.storage.sync.get([
+    'apiUrl', 'apiKey', 'sttProvider', 'llmProvider',
+  ]);
+}
 
-  state.isProcessing = true;
-  broadcastUpdate("Audio uploaden naar API...");
+// ── Processing pipeline ──
+
+async function processAudio(audioBase64, mimeType) {
+  state.status = 'processing';
+  state.percent = 10;
+  state.step = 'Audio wordt verzonden...';
+  broadcastUpdate();
 
   try {
-    const settings = await getSettings();
-    const formData = new FormData();
+    const config = await getConfig();
+    const apiUrl = (config.apiUrl || 'http://localhost:8002').replace(/\/$/, '');
 
-    // Convert base64 back to blob if needed
-    let blob = state.audioBlob;
-    if (typeof blob === "string") {
-      const response = await fetch(blob);
-      blob = await response.blob();
+    // Convert base64 to blob
+    const byteChars = atob(audioBase64);
+    const byteArray = new Uint8Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) {
+      byteArray[i] = byteChars.charCodeAt(i);
+    }
+    const ext = mimeType.includes('webm') ? 'webm' : mimeType.includes('mp4') ? 'mp4' : 'wav';
+    const blob = new Blob([byteArray], { type: mimeType });
+
+    const formData = new FormData();
+    formData.append('audio', blob, `consult.${ext}`);
+    if (config.sttProvider) formData.append('stt_provider', config.sttProvider);
+    if (config.llmProvider) formData.append('llm_provider', config.llmProvider);
+
+    state.percent = 30;
+    state.step = 'Audio wordt getranscribeerd...';
+    broadcastUpdate();
+
+    const headers = {};
+    if (config.apiKey) {
+      headers['X-API-Key'] = config.apiKey;
     }
 
-    formData.append("audio", blob, "consult.webm");
-    formData.append("stt_provider", settings.sttProvider);
-    formData.append("llm_provider", settings.llmProvider);
-
-    broadcastUpdate("Audio wordt getranscribeerd...");
-
-    const apiUrl = settings.apiUrl.replace(/\/$/, "");
-    const resp = await fetch(`${apiUrl}/api/v1/consult/process`, {
-      method: "POST",
-      headers: {
-        "X-API-Key": settings.apiKey,
-      },
+    const response = await fetch(`${apiUrl}/api/v1/consult/process`, {
+      method: 'POST',
+      headers,
       body: formData,
     });
 
-    if (!resp.ok) {
-      const errBody = await resp.text();
-      throw new Error(`API fout (${resp.status}): ${errBody}`);
+    if (!response.ok) {
+      const errBody = await response.text();
+      throw new Error(`API fout (${response.status}): ${errBody}`);
     }
 
-    const data = await resp.json();
+    const result = await response.json();
 
-    state.isProcessing = false;
-    state.result = data;
-
-    // Notify popup
-    chrome.runtime.sendMessage({ type: "RESULT", data });
-
-    // Clean up offscreen document
-    try {
-      await chrome.offscreen.closeDocument();
-    } catch (_) {
-      // already closed
-    }
-
-    return data;
+    state.percent = 100;
+    state.step = 'Verwerking voltooid!';
+    state.status = 'results';
+    state.data = result;
+    broadcastComplete(result);
   } catch (err) {
-    state.isProcessing = false;
+    state.status = 'error';
     broadcastError(err.message);
-    throw err;
   }
 }
 
-// ─── Bricks Push ─────────────────────────────────────────────────────────────
+// ── Broadcast messages to popup ──
 
-async function pushToBricks(data) {
-  // Find the active Bricks tab
+function broadcastUpdate() {
+  chrome.runtime.sendMessage({
+    action: 'PROCESSING_UPDATE',
+    percent: state.percent,
+    step: state.step,
+  }).catch(() => {});
+}
+
+function broadcastComplete(data) {
+  chrome.runtime.sendMessage({
+    action: 'PROCESSING_COMPLETE',
+    data,
+  }).catch(() => {});
+}
+
+function broadcastError(error) {
+  chrome.runtime.sendMessage({
+    action: 'PROCESSING_ERROR',
+    error,
+  }).catch(() => {});
+}
+
+// ── Push to Bricks ──
+
+async function pushToBricks() {
+  if (!state.data) {
+    return { error: 'Geen resultaten om te pushen.' };
+  }
+
   const tabs = await chrome.tabs.query({
-    url: ["https://*.bfrcloud.com/*", "https://*.bfrnet.nl/*", "https://*.bricks-huisarts.nl/*"],
+    url: [
+      'https://*.bfrcloud.com/*',
+      'https://*.bfrnet.nl/*',
+      'https://*.bricks-huisarts.nl/*',
+      'https://*.bfrw.nl/*',
+      'https://*.bfrw.cloud/*',
+      'https://*.brickshuisarts.nl/*',
+      'https://*.bfrw-online.nl/*',
+    ],
   });
 
   if (tabs.length === 0) {
-    broadcastError("Geen Bricks-tab gevonden. Open Bricks eerst.");
-    return { ok: false, error: "Geen Bricks-tab" };
+    return { error: 'Geen Bricks-tab gevonden. Open Bricks in een tab.' };
   }
 
-  // Send data to the content script in the Bricks tab
-  const result = await chrome.tabs.sendMessage(tabs[0].id, {
-    type: "INJECT_SOEP",
-    data: data,
-  });
-
-  return result;
+  try {
+    const response = await chrome.tabs.sendMessage(tabs[0].id, {
+      action: 'INJECT_SOEP',
+      data: state.data,
+    });
+    return response || { success: true };
+  } catch (err) {
+    return { error: `Kon niet injecteren in Bricks: ${err.message}` };
+  }
 }
 
-// ─── Broadcast helpers ───────────────────────────────────────────────────────
+// ── Message handler ──
 
-function broadcastUpdate(step) {
-  chrome.runtime.sendMessage({ type: "PROCESSING_UPDATE", step }).catch(() => {});
-}
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  switch (msg.action) {
+    case 'GET_STATE':
+      sendResponse({
+        state: state.status,
+        startTime: state.startTime,
+        data: state.data,
+        percent: state.percent,
+        step: state.step,
+      });
+      return false;
 
-function broadcastError(message) {
-  chrome.runtime.sendMessage({ type: "ERROR", message }).catch(() => {});
-}
+    case 'START_RECORDING':
+      (async () => {
+        try {
+          await ensureOffscreen();
+          const result = await chrome.runtime.sendMessage({
+            action: 'OFFSCREEN_START_RECORDING',
+          });
+          if (result?.error) {
+            sendResponse({ error: result.error });
+            return;
+          }
+          state.status = 'recording';
+          state.startTime = Date.now();
+          state.data = null;
+          sendResponse({ success: true });
+        } catch (err) {
+          sendResponse({ error: `Kon microfoon niet starten: ${err.message}` });
+        }
+      })();
+      return true;
+
+    case 'STOP_RECORDING':
+      (async () => {
+        try {
+          const result = await chrome.runtime.sendMessage({
+            action: 'OFFSCREEN_STOP_RECORDING',
+          });
+          await closeOffscreen();
+
+          if (result?.error) {
+            sendResponse({ error: result.error });
+            return;
+          }
+
+          sendResponse({ success: true });
+          processAudio(result.audio, result.mimeType);
+        } catch (err) {
+          sendResponse({ error: `Fout bij stoppen opname: ${err.message}` });
+        }
+      })();
+      return true;
+
+    case 'PUSH_TO_BRICKS':
+      pushToBricks().then(sendResponse);
+      return true;
+  }
+});

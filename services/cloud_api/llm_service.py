@@ -1,206 +1,156 @@
 """
-SmartVoice Cloud API — LLM Service
-====================================
-Pluggable LLM met Mistral (EU, AVG-veilig), Anthropic Claude Haiku,
-en Google Gemini Flash. Elke provider: generate(system, user) -> str.
+SmartVoice Cloud API - LLM Service
+
+Pluggable LLM with support for:
+  - Mistral Small (EU-based, AVG-friendly, default)
+  - Anthropic Claude Haiku (best quality)
+  - Google Gemini Flash (cheapest)
+
+Compatible with Python 3.9+.
 """
 
-import json
-import logging
-from abc import ABC, abstractmethod
+from __future__ import annotations
 
 import httpx
+import structlog
 
-from services.cloud_api.config import config
+from .config import get_config
 
-logger = logging.getLogger("smartvoice.llm")
-
-
-class LLMProvider(ABC):
-    """Basis-interface voor alle LLM providers."""
-
-    @abstractmethod
-    async def generate(self, system_prompt: str, user_prompt: str) -> str:
-        """Genereer tekst op basis van system + user prompt."""
-        ...
+logger = structlog.get_logger()
 
 
-class MistralLLM(LLMProvider):
-    """
-    Mistral Small — EU-gevestigd (Parijs), beste keuze voor AVG.
-    ~€0,001 per 1K tokens. Goede Nederlandse taalvaardigheid.
-    """
+async def complete(
+    system_prompt: str,
+    user_prompt: str,
+    provider: str = None,
+    json_mode: bool = False,
+) -> str:
+    """Send a prompt to the LLM and return the response text."""
+    config = get_config()
+    provider = provider or config.llm.default_provider
 
-    API_URL = "https://api.mistral.ai/v1/chat/completions"
+    logger.info("llm.complete", provider=provider, json_mode=json_mode)
 
-    async def generate(self, system_prompt: str, user_prompt: str) -> str:
-        api_key = config.llm.mistral_api_key
-        if not api_key:
-            raise ValueError("MISTRAL_API_KEY niet geconfigureerd")
-
-        payload = {
-            "model": config.llm.mistral_model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            "temperature": 0.15,
-            "max_tokens": 2048,
-        }
-
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.post(
-                self.API_URL,
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                },
-                json=payload,
-            )
-
-        if resp.status_code != 200:
-            logger.error("Mistral fout %d: %s", resp.status_code, resp.text)
-            raise RuntimeError(f"Mistral fout: {resp.status_code} — {resp.text}")
-
-        data = resp.json()
-        content = data["choices"][0]["message"]["content"]
-        logger.info(
-            "Mistral generatie voltooid: model=%s, tokens=%s",
-            config.llm.mistral_model,
-            data.get("usage", {}).get("total_tokens", "?"),
-        )
-        return content
+    if provider == "mistral":
+        return await _complete_mistral(system_prompt, user_prompt, json_mode)
+    elif provider == "anthropic":
+        return await _complete_anthropic(system_prompt, user_prompt, json_mode)
+    elif provider == "gemini":
+        return await _complete_gemini(system_prompt, user_prompt, json_mode)
+    else:
+        raise ValueError(f"Onbekende LLM provider: {provider}")
 
 
-class AnthropicLLM(LLMProvider):
-    """
-    Claude Haiku — snelste Anthropic model (~€0,00025 per 1K input).
-    Zeer sterke instructie-opvolging, ideaal voor gestructureerde output.
-    """
+async def _complete_mistral(
+    system_prompt: str, user_prompt: str, json_mode: bool,
+) -> str:
+    """Complete using Mistral API (EU-based)."""
+    config = get_config()
+    api_key = config.llm.mistral_api_key
+    if not api_key:
+        raise ValueError("MISTRAL_API_KEY niet geconfigureerd.")
 
-    API_URL = "https://api.anthropic.com/v1/messages"
+    body = {
+        "model": config.llm.mistral_model,
+        "temperature": config.llm.temperature,
+        "max_tokens": config.llm.max_tokens,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+    }
+    if json_mode:
+        body["response_format"] = {"type": "json_object"}
 
-    async def generate(self, system_prompt: str, user_prompt: str) -> str:
-        api_key = config.llm.anthropic_api_key
-        if not api_key:
-            raise ValueError("ANTHROPIC_API_KEY niet geconfigureerd")
-
-        payload = {
-            "model": config.llm.anthropic_model,
-            "max_tokens": 2048,
-            "system": system_prompt,
-            "messages": [
-                {"role": "user", "content": user_prompt},
-            ],
-            "temperature": 0.15,
-        }
-
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.post(
-                self.API_URL,
-                headers={
-                    "x-api-key": api_key,
-                    "anthropic-version": "2023-06-01",
-                    "Content-Type": "application/json",
-                },
-                json=payload,
-            )
-
-        if resp.status_code != 200:
-            logger.error("Anthropic fout %d: %s", resp.status_code, resp.text)
-            raise RuntimeError(f"Anthropic fout: {resp.status_code} — {resp.text}")
-
-        data = resp.json()
-        content = data["content"][0]["text"]
-        logger.info(
-            "Anthropic generatie voltooid: model=%s, input=%s output=%s tokens",
-            config.llm.anthropic_model,
-            data.get("usage", {}).get("input_tokens", "?"),
-            data.get("usage", {}).get("output_tokens", "?"),
-        )
-        return content
-
-
-class GeminiLLM(LLMProvider):
-    """
-    Google Gemini 2.0 Flash — goedkoopste optie (~€0,000075 per 1K tokens).
-    Extreem snel, goed voor hoge volumes.
-    """
-
-    API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
-
-    async def generate(self, system_prompt: str, user_prompt: str) -> str:
-        api_key = config.llm.gemini_api_key
-        if not api_key:
-            raise ValueError("GEMINI_API_KEY niet geconfigureerd")
-
-        model = config.llm.gemini_model
-        url = f"{self.API_BASE}/{model}:generateContent?key={api_key}"
-
-        payload = {
-            "system_instruction": {
-                "parts": [{"text": system_prompt}],
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        response = await client.post(
+            "https://api.mistral.ai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
             },
-            "contents": [
-                {
-                    "role": "user",
-                    "parts": [{"text": user_prompt}],
-                }
-            ],
-            "generationConfig": {
-                "temperature": 0.15,
-                "maxOutputTokens": 2048,
+            json=body,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+    return data["choices"][0]["message"]["content"]
+
+
+async def _complete_anthropic(
+    system_prompt: str, user_prompt: str, json_mode: bool,
+) -> str:
+    """Complete using Anthropic Claude API."""
+    config = get_config()
+    api_key = config.llm.anthropic_api_key
+    if not api_key:
+        raise ValueError("ANTHROPIC_API_KEY niet geconfigureerd.")
+
+    effective_system = system_prompt
+    if json_mode:
+        effective_system += "\n\nJe MOET antwoorden in valide JSON formaat."
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        response = await client.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "Content-Type": "application/json",
             },
-        }
-
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.post(
-                url,
-                headers={"Content-Type": "application/json"},
-                json=payload,
-            )
-
-        if resp.status_code != 200:
-            logger.error("Gemini fout %d: %s", resp.status_code, resp.text)
-            raise RuntimeError(f"Gemini fout: {resp.status_code} — {resp.text}")
-
-        data = resp.json()
-        content = (
-            data.get("candidates", [{}])[0]
-            .get("content", {})
-            .get("parts", [{}])[0]
-            .get("text", "")
+            json={
+                "model": config.llm.anthropic_model,
+                "max_tokens": config.llm.max_tokens,
+                "temperature": config.llm.temperature,
+                "system": effective_system,
+                "messages": [
+                    {"role": "user", "content": user_prompt},
+                ],
+            },
         )
+        response.raise_for_status()
+        data = response.json()
 
-        usage = data.get("usageMetadata", {})
-        logger.info(
-            "Gemini generatie voltooid: model=%s, prompt=%s output=%s tokens",
-            model,
-            usage.get("promptTokenCount", "?"),
-            usage.get("candidatesTokenCount", "?"),
-        )
-        return content
+    return data["content"][0]["text"]
 
 
-# ── Provider registry ──────────────────────────────────────────────
+async def _complete_gemini(
+    system_prompt: str, user_prompt: str, json_mode: bool,
+) -> str:
+    """Complete using Google Gemini API."""
+    config = get_config()
+    api_key = config.llm.gemini_api_key
+    if not api_key:
+        raise ValueError("GEMINI_API_KEY niet geconfigureerd.")
 
-_PROVIDERS: dict[str, type[LLMProvider]] = {
-    "mistral": MistralLLM,
-    "anthropic": AnthropicLLM,
-    "gemini": GeminiLLM,
-}
+    url = (
+        f"https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{config.llm.gemini_model}:generateContent?key={api_key}"
+    )
 
+    body = {
+        "system_instruction": {
+            "parts": [{"text": system_prompt}],
+        },
+        "contents": [
+            {"role": "user", "parts": [{"text": user_prompt}]},
+        ],
+        "generationConfig": {
+            "temperature": config.llm.temperature,
+            "maxOutputTokens": config.llm.max_tokens,
+        },
+    }
+    if json_mode:
+        body["generationConfig"]["responseMimeType"] = "application/json"
 
-def get_llm_provider(name: str | None = None) -> LLMProvider:
-    """
-    Haal een LLM provider op basis van naam.
-    Zonder naam: gebruik de geconfigureerde default.
-    """
-    provider_name = (name or config.llm.default_provider).lower()
-    cls = _PROVIDERS.get(provider_name)
-    if cls is None:
-        raise ValueError(
-            f"Onbekende LLM provider: '{provider_name}'. "
-            f"Kies uit: {', '.join(_PROVIDERS.keys())}"
-        )
-    return cls()
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        response = await client.post(url, json=body)
+        response.raise_for_status()
+        data = response.json()
+
+    candidates = data.get("candidates", [])
+    if not candidates:
+        raise ValueError("Geen antwoord van Gemini.")
+
+    parts = candidates[0].get("content", {}).get("parts", [])
+    return parts[0].get("text", "") if parts else ""

@@ -1,196 +1,180 @@
 """
-SmartVoice Cloud API — FastAPI Application
-=============================================
-Lichtgewicht API die de Chrome Extension bedient.
-Endpoint: POST /api/v1/consult/process
-  - Ontvangt audio (multipart/form-data)
-  - Draait pipeline: STT → SOEP → decisief → rode vlaggen
-  - Retourneert JSON met transcript, SOEP, decisief regel
+SmartVoice Cloud API - Main Application
+
+Lightweight FastAPI service for the Chrome extension.
+Processes consultation audio -> SOEP + decisief regel.
+Compatible with Python 3.9+.
 """
 
-import logging
-import sys
+from __future__ import annotations
 
-from fastapi import Depends, FastAPI, File, Form, UploadFile
+import os
+import tempfile
+import time
+from pathlib import Path
+
+import structlog
+import uvicorn
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
-from services.cloud_api.auth import verify_api_key
-from services.cloud_api.config import config
-from services.cloud_api.pipeline import process_consultation
+from .auth import verify_api_key
+from .config import get_config
+from .pipeline import process_consultation
 
-# ── Logging ────────────────────────────────────────────────────────
-
-logging.basicConfig(
-    level=getattr(logging, config.api.log_level.upper(), logging.INFO),
-    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-    stream=sys.stdout,
-)
-logger = logging.getLogger("smartvoice.api")
-
-# ── FastAPI app ────────────────────────────────────────────────────
+logger = structlog.get_logger()
 
 app = FastAPI(
     title="SmartVoice Cloud API",
-    version="0.1.0",
-    description=(
-        "AI Consultassistent voor de huisartsenpraktijk. "
-        "Zet consultatie-audio om naar SOEP-documentatie en een decisiefe journaalregel."
-    ),
+    description="Consult audio → SOEP + decisief regel voor Bricks Huisarts",
+    version="1.0.0",
 )
 
-# CORS — Chrome Extension heeft dit nodig
+# ── CORS ──
+
+config = get_config()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=config.api.cors_origins,
+    allow_origins=config.cors_origins.split(","),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# ── Ensure temp directory exists ──
 
-# ── Health check ───────────────────────────────────────────────────
+os.makedirs(config.temp_dir, exist_ok=True)
+
+
+# ── Health check (no auth required) ──
 
 @app.get("/health")
+@app.get("/api/v1/health")
 async def health():
-    """Eenvoudige health check voor monitoring."""
+    """Health check endpoint."""
     return {
-        "status": "ok",
+        "status": "healthy",
         "service": "smartvoice-cloud-api",
-        "version": "0.1.0",
+        "version": "1.0.0",
+        "stt_provider": config.stt.default_provider,
+        "llm_provider": config.llm.default_provider,
     }
 
 
-# ── Providers info ─────────────────────────────────────────────────
-
-@app.get("/api/v1/providers")
-async def list_providers(api_key: str = Depends(verify_api_key)):
-    """Beschikbare STT en LLM providers."""
-    return {
-        "stt": {
-            "default": config.stt.default_provider,
-            "available": ["groq", "deepgram", "openai"],
-        },
-        "llm": {
-            "default": config.llm.default_provider,
-            "available": ["mistral", "anthropic", "gemini"],
-        },
-    }
-
-
-# ── Hoofdendpoint: consult verwerken ───────────────────────────────
+# ── Main processing endpoint ──
 
 @app.post("/api/v1/consult/process")
 async def process_consult(
-    audio: UploadFile = File(..., description="Audio-opname van het consult (webm/wav/mp3)"),
-    stt_provider: str = Form(default="", description="STT provider (groq/deepgram/openai)"),
-    llm_provider: str = Form(default="", description="LLM provider (mistral/anthropic/gemini)"),
-    skip_red_flags: bool = Form(default=False, description="Sla rode vlaggen detectie over"),
-    api_key: str = Depends(verify_api_key),
+    audio: UploadFile = File(..., description="Audio bestand (webm, mp3, wav, m4a)"),
+    stt_provider: str = Form(default=None, description="STT provider override"),
+    llm_provider: str = Form(default=None, description="LLM provider override"),
+    _api_key: str = Depends(verify_api_key),
 ):
-    """
-    Verwerk een consultatie-opname.
+    """Process a consultation audio recording through the full pipeline."""
+    start_time = time.time()
 
-    Accepteert audio als multipart upload. Retourneert:
-    - transcript: ruwe transcriptie
-    - soep: gestructureerd SOEP-verslag (S/O/E/P)
-    - decisief: één-regel journaalsamenvatting
-    - red_flags: eventuele alarmsymptomen
-    - meta: verwerkingsinformatie
-    """
-    # Valideer bestandsgrootte
-    audio_bytes = await audio.read()
-    max_bytes = config.api.max_audio_mb * 1024 * 1024
-
-    if len(audio_bytes) > max_bytes:
-        return JSONResponse(
+    # Validate file size
+    max_size = config.max_audio_size_mb * 1024 * 1024
+    content = await audio.read()
+    if len(content) > max_size:
+        raise HTTPException(
             status_code=413,
-            content={
-                "error": f"Audio te groot: {len(audio_bytes) / 1024 / 1024:.1f} MB "
-                         f"(max {config.api.max_audio_mb} MB)"
-            },
+            detail=f"Bestand te groot. Maximum is {config.max_audio_size_mb}MB.",
         )
 
-    if len(audio_bytes) < 1000:
-        return JSONResponse(
-            status_code=400,
-            content={"error": "Audio te kort of leeg bestand."},
-        )
+    if len(content) == 0:
+        raise HTTPException(status_code=400, detail="Leeg audiobestand.")
 
-    logger.info(
-        "Consult verwerking gestart: %.1f MB, stt=%s, llm=%s",
-        len(audio_bytes) / 1024 / 1024,
-        stt_provider or "default",
-        llm_provider or "default",
-    )
+    # Determine file extension
+    ext = "webm"
+    if audio.filename:
+        ext = Path(audio.filename).suffix.lstrip(".") or ext
+    elif audio.content_type:
+        content_type_map = {
+            "audio/webm": "webm",
+            "audio/mp3": "mp3",
+            "audio/mpeg": "mp3",
+            "audio/wav": "wav",
+            "audio/mp4": "m4a",
+            "audio/ogg": "ogg",
+        }
+        ext = content_type_map.get(audio.content_type, ext)
 
-    # Draai de pipeline
-    result = await process_consultation(
-        audio_bytes=audio_bytes,
-        filename=audio.filename or "audio.webm",
-        stt_provider_name=stt_provider or None,
-        llm_provider_name=llm_provider or None,
-        skip_red_flags=skip_red_flags,
-    )
-
-    # Foutafhandeling
-    if result.error:
-        logger.warning("Pipeline fout: %s", result.error)
-        return JSONResponse(
-            status_code=422,
-            content={
-                "error": result.error,
-                "partial": result.to_dict(),
-            },
-        )
-
-    return result.to_dict()
-
-
-# ── Transcript-only endpoint (goedkoper) ──────────────────────────
-
-@app.post("/api/v1/consult/transcribe")
-async def transcribe_only(
-    audio: UploadFile = File(...),
-    stt_provider: str = Form(default=""),
-    api_key: str = Depends(verify_api_key),
-):
-    """
-    Alleen transcriptie, zonder SOEP-generatie.
-    Goedkoper — geen LLM-kosten.
-    """
-    from services.cloud_api.stt_service import get_stt_provider
-
-    audio_bytes = await audio.read()
-    max_bytes = config.api.max_audio_mb * 1024 * 1024
-
-    if len(audio_bytes) > max_bytes:
-        return JSONResponse(
-            status_code=413,
-            content={"error": f"Audio te groot (max {config.api.max_audio_mb} MB)"},
-        )
+    # Save to temp file
+    with tempfile.NamedTemporaryFile(
+        dir=config.temp_dir, suffix=f".{ext}", delete=False,
+    ) as tmp:
+        tmp.write(content)
+        audio_path = Path(tmp.name)
 
     try:
-        stt = get_stt_provider(stt_provider or None)
-        transcript = await stt.transcribe(audio_bytes, audio.filename or "audio.webm")
-        return {"transcript": transcript, "stt_provider": stt_provider or "default"}
-    except Exception as exc:
-        logger.exception("Transcriptie fout: %s", exc)
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(exc)},
+        logger.info(
+            "consult.process.start",
+            file_size=len(content),
+            file_ext=ext,
         )
 
+        result = await process_consultation(
+            audio_path=audio_path,
+            stt_provider=stt_provider,
+            llm_provider=llm_provider,
+        )
 
-# ── Uvicorn runner ─────────────────────────────────────────────────
+        processing_time = time.time() - start_time
+        logger.info(
+            "consult.process.complete",
+            processing_time_s=round(processing_time, 2),
+        )
 
-if __name__ == "__main__":
-    import uvicorn
+        response = result.to_dict()
+        response["processing_time_secs"] = round(processing_time, 2)
+        return response
 
+    finally:
+        # Always clean up temp file (privacy: no audio retention)
+        try:
+            audio_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+# ── Provider info endpoint ──
+
+@app.get("/api/v1/providers")
+async def list_providers(_api_key: str = Depends(verify_api_key)):
+    """List available STT and LLM providers."""
+    cfg = get_config()
+    return {
+        "stt": {
+            "default": cfg.stt.default_provider,
+            "available": {
+                "groq": bool(cfg.stt.groq_api_key),
+                "deepgram": bool(cfg.stt.deepgram_api_key),
+                "openai": bool(cfg.stt.openai_api_key),
+            },
+        },
+        "llm": {
+            "default": cfg.llm.default_provider,
+            "available": {
+                "mistral": bool(cfg.llm.mistral_api_key),
+                "anthropic": bool(cfg.llm.anthropic_api_key),
+                "gemini": bool(cfg.llm.gemini_api_key),
+            },
+        },
+    }
+
+
+# ── Entry point ──
+
+def main():
+    cfg = get_config()
     uvicorn.run(
         "services.cloud_api.main:app",
-        host=config.api.host,
-        port=config.api.port,
-        reload=True,
-        log_level=config.api.log_level.lower(),
+        host=cfg.host,
+        port=cfg.port,
+        reload=cfg.debug,
     )
+
+
+if __name__ == "__main__":
+    main()

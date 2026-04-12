@@ -1,155 +1,179 @@
 """
-SmartVoice Cloud API — Processing Pipeline
-=============================================
-Volledige verwerking: audio → transcript → SOEP → decisief regel → rode vlaggen.
-Eén async functie die de Chrome Extension aanroept.
+SmartVoice Cloud API - Processing Pipeline
+
+Orchestrates the full flow: Audio → STT → SOEP → Decisief Regel → Detection
+Single entry point for the Chrome extension.
+Compatible with Python 3.9+.
 """
 
-import logging
-import time
-from dataclasses import dataclass, field
+from __future__ import annotations
 
-from services.cloud_api.stt_service import get_stt_provider
-from services.cloud_api.llm_service import get_llm_provider
-from services.cloud_api.prompts import (
-    build_soep_prompt,
-    build_decisief_prompt,
-    build_red_flags_prompt,
+import json
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+from typing import Dict, List, Optional
+
+import structlog
+
+from . import llm_service, stt_service
+from .prompts import (
+    DECISIEF_SYSTEM_PROMPT,
+    DECISIEF_USER_TEMPLATE,
+    DETECTION_SYSTEM_PROMPT,
+    DETECTION_USER_TEMPLATE,
+    SOEP_SYSTEM_PROMPT,
+    SOEP_USER_TEMPLATE,
 )
 
-logger = logging.getLogger("smartvoice.pipeline")
+logger = structlog.get_logger()
+
+
+@dataclass
+class SOEPResult:
+    s: str = ""
+    o: str = ""
+    e: str = ""
+    p: str = ""
+    icpc_code: str = ""
+    icpc_titel: str = ""
+
+
+@dataclass
+class DetectionResult:
+    rode_vlaggen: List[Dict] = field(default_factory=list)
+    ontbrekende_info: List[Dict] = field(default_factory=list)
 
 
 @dataclass
 class PipelineResult:
-    """Resultaat van de volledige verwerkingspipeline."""
+    """Complete result from a single consultation processing."""
 
     transcript: str = ""
-    soep: dict = field(default_factory=lambda: {
-        "S": "", "O": "", "E": "", "P": "",
-    })
+    soep: SOEPResult = field(default_factory=SOEPResult)
     decisief: str = ""
-    red_flags: str = ""
+    detection: DetectionResult = field(default_factory=DetectionResult)
+    duration_secs: float = 0.0
     stt_provider: str = ""
     llm_provider: str = ""
-    duration_ms: int = 0
-    error: str | None = None
 
     def to_dict(self) -> dict:
         return {
             "transcript": self.transcript,
-            "soep": self.soep,
+            "soep": asdict(self.soep),
             "decisief": self.decisief,
-            "red_flags": self.red_flags,
-            "meta": {
-                "stt_provider": self.stt_provider,
-                "llm_provider": self.llm_provider,
-                "duration_ms": self.duration_ms,
-            },
+            "detection": asdict(self.detection),
+            "duration_secs": self.duration_secs,
+            "stt_provider": self.stt_provider,
+            "llm_provider": self.llm_provider,
         }
 
 
-def _parse_soep(raw_text: str) -> dict:
-    """
-    Parseer de SOEP-output van het LLM naar een dict.
-    Verwacht formaat:
-        S: ...
-        O: ...
-        E: ...
-        P: ...
-    """
-    result = {"S": "", "O": "", "E": "", "P": ""}
-    current_key = None
-
-    for line in raw_text.strip().splitlines():
-        stripped = line.strip()
-
-        # Detecteer sectie-header
-        for key in ("S", "O", "E", "P"):
-            if stripped.upper().startswith(f"{key}:") or stripped.upper().startswith(f"{key} :"):
-                current_key = key
-                # Pak de tekst na "S:" of "S :"
-                after_colon = stripped.split(":", 1)[1].strip() if ":" in stripped else ""
-                result[key] = after_colon
-                break
-        else:
-            # Vervolgregel: voeg toe aan huidige sectie
-            if current_key and stripped:
-                if result[current_key]:
-                    result[current_key] += " " + stripped
-                else:
-                    result[current_key] = stripped
-
-    return result
+def _parse_json_response(text: str) -> dict:
+    """Extract JSON from LLM response, handling markdown code blocks."""
+    text = text.strip()
+    if text.startswith("```"):
+        lines = text.split("\n")
+        lines = [l for l in lines if not l.strip().startswith("```")]
+        text = "\n".join(lines).strip()
+    return json.loads(text)
 
 
 async def process_consultation(
-    audio_bytes: bytes,
-    filename: str = "audio.webm",
-    stt_provider_name: str | None = None,
-    llm_provider_name: str | None = None,
-    skip_red_flags: bool = False,
+    audio_path: Path,
+    stt_provider: str = None,
+    llm_provider: str = None,
 ) -> PipelineResult:
     """
-    Verwerk een consultatie-opname door de volledige pipeline.
+    Process a consultation audio file through the full pipeline.
 
-    Stappen:
-    1. Audio → transcript (STT)
-    2. Transcript → SOEP-verslag (LLM)
-    3. SOEP → decisiefe regel (LLM)
-    4. Transcript + SOEP → rode vlaggen (LLM, optioneel)
+    Steps:
+    1. Transcribe audio (STT)
+    2. Generate SOEP note (LLM)
+    3. Generate decisief regel (LLM)
+    4. Detect red flags (LLM)
     """
-    start = time.monotonic()
     result = PipelineResult()
 
+    # ── Step 1: Transcription ──
+    logger.info("pipeline.step", step="transcription")
+    transcript = await stt_service.transcribe(audio_path, provider=stt_provider)
+    result.transcript = transcript.raw_text
+    result.duration_secs = transcript.duration_secs
+    result.stt_provider = transcript.provider
+
+    if not transcript.raw_text.strip():
+        logger.warning("pipeline.empty_transcript")
+        result.decisief = "Geen spraak gedetecteerd in de opname."
+        return result
+
+    # ── Step 2: SOEP Generation ──
+    logger.info("pipeline.step", step="soep_generation")
     try:
-        # ── Stap 1: Transcriptie ───────────────────────────────────
-        stt = get_stt_provider(stt_provider_name)
-        result.stt_provider = stt_provider_name or "default"
-        logger.info("Pipeline stap 1/4: STT via %s", type(stt).__name__)
+        soep_response = await llm_service.complete(
+            system_prompt=SOEP_SYSTEM_PROMPT,
+            user_prompt=SOEP_USER_TEMPLATE.format(transcript=transcript.raw_text),
+            provider=llm_provider,
+            json_mode=True,
+        )
+        soep_data = _parse_json_response(soep_response)
+        result.soep = SOEPResult(
+            s=soep_data.get("s", ""),
+            o=soep_data.get("o", ""),
+            e=soep_data.get("e", ""),
+            p=soep_data.get("p", ""),
+            icpc_code=soep_data.get("icpc_code", ""),
+            icpc_titel=soep_data.get("icpc_titel", ""),
+        )
+        result.llm_provider = llm_provider or "default"
+    except Exception as e:
+        logger.error("pipeline.soep_error", error=str(e))
+        result.soep = SOEPResult(s="Fout bij SOEP generatie.", e=str(e))
 
-        result.transcript = await stt.transcribe(audio_bytes, filename)
+    # ── Step 3: Decisief Regel ──
+    logger.info("pipeline.step", step="decisief")
+    try:
+        icpc_line = ""
+        if result.soep.icpc_code:
+            icpc_line = f"ICPC: {result.soep.icpc_code} - {result.soep.icpc_titel}"
 
-        if not result.transcript.strip():
-            result.error = "Lege transcriptie — geen spraak gedetecteerd in de audio."
-            result.duration_ms = int((time.monotonic() - start) * 1000)
-            return result
+        decisief_response = await llm_service.complete(
+            system_prompt=DECISIEF_SYSTEM_PROMPT,
+            user_prompt=DECISIEF_USER_TEMPLATE.format(
+                s=result.soep.s,
+                o=result.soep.o,
+                e=result.soep.e,
+                p=result.soep.p,
+                icpc_line=icpc_line,
+            ),
+            provider=llm_provider,
+        )
+        result.decisief = decisief_response.strip().strip('"').strip("'")
+    except Exception as e:
+        logger.error("pipeline.decisief_error", error=str(e))
+        result.decisief = "Fout bij generatie decisief regel."
 
-        # ── Stap 2: SOEP-generatie ─────────────────────────────────
-        llm = get_llm_provider(llm_provider_name)
-        result.llm_provider = llm_provider_name or "default"
-        logger.info("Pipeline stap 2/4: SOEP via %s", type(llm).__name__)
+    # ── Step 4: Red Flag Detection ──
+    logger.info("pipeline.step", step="detection")
+    try:
+        detection_response = await llm_service.complete(
+            system_prompt=DETECTION_SYSTEM_PROMPT,
+            user_prompt=DETECTION_USER_TEMPLATE.format(
+                s=result.soep.s,
+                o=result.soep.o,
+                e=result.soep.e,
+                p=result.soep.p,
+                icpc_code=result.soep.icpc_code or "-",
+                icpc_titel=result.soep.icpc_titel or "-",
+            ),
+            provider=llm_provider,
+            json_mode=True,
+        )
+        detection_data = _parse_json_response(detection_response)
+        result.detection = DetectionResult(
+            rode_vlaggen=detection_data.get("rode_vlaggen", []),
+            ontbrekende_info=detection_data.get("ontbrekende_info", []),
+        )
+    except Exception as e:
+        logger.error("pipeline.detection_error", error=str(e))
 
-        sys_prompt, usr_prompt = build_soep_prompt(result.transcript)
-        soep_raw = await llm.generate(sys_prompt, usr_prompt)
-        result.soep = _parse_soep(soep_raw)
-
-        # ── Stap 3: Decisiefe regel ────────────────────────────────
-        logger.info("Pipeline stap 3/4: Decisiefe regel")
-        soep_text = "\n".join(f"{k}: {v}" for k, v in result.soep.items())
-        sys_prompt, usr_prompt = build_decisief_prompt(soep_text)
-        result.decisief = (await llm.generate(sys_prompt, usr_prompt)).strip()
-
-        # ── Stap 4: Rode vlaggen (optioneel) ───────────────────────
-        if not skip_red_flags:
-            logger.info("Pipeline stap 4/4: Rode vlaggen detectie")
-            sys_prompt, usr_prompt = build_red_flags_prompt(
-                result.transcript, soep_text
-            )
-            result.red_flags = (await llm.generate(sys_prompt, usr_prompt)).strip()
-        else:
-            logger.info("Pipeline stap 4/4: Rode vlaggen overgeslagen")
-            result.red_flags = ""
-
-    except Exception as exc:
-        logger.exception("Pipeline fout: %s", exc)
-        result.error = str(exc)
-
-    result.duration_ms = int((time.monotonic() - start) * 1000)
-    logger.info(
-        "Pipeline voltooid in %d ms (stt=%s, llm=%s)",
-        result.duration_ms,
-        result.stt_provider,
-        result.llm_provider,
-    )
     return result

@@ -1,251 +1,199 @@
 /**
- * SmartVoice — Bricks Content Script
- * Detecteert het Bricks HIS journaalscherm en injecteert SOEP-data.
+ * SmartVoice - Bricks HIS Content Script
  *
- * Bricks (BFRCloud) gebruikt een web-based interface. De exacte selectors
- * kunnen variëren per versie. Dit script probeert meerdere selector-patronen
- * en valt terug op een floating widget als injectie niet lukt.
+ * Detects the Bricks Huisarts web interface and provides:
+ * 1. Floating SmartVoice widget for quick access
+ * 2. SOEP injection into Bricks journal fields
+ * 3. Decisief regel insertion
  */
 
-(() => {
-  "use strict";
+var DEFAULT_SELECTORS = {
+  journaal: [
+    'textarea[name*="journaal"]',
+    'textarea[name*="journal"]',
+    'textarea[name*="notitie"]',
+    '[contenteditable="true"][data-field*="journaal"]',
+    '.journal-editor textarea',
+    '.consult-notes textarea',
+  ],
+  soep_s: ['textarea[name*="subjectief"]', 'textarea[data-soep="S"]', '.soep-field-s textarea'],
+  soep_o: ['textarea[name*="objectief"]', 'textarea[data-soep="O"]', '.soep-field-o textarea'],
+  soep_e: ['textarea[name*="evaluatie"]', 'textarea[data-soep="E"]', '.soep-field-e textarea'],
+  soep_p: ['textarea[name*="plan"]', 'textarea[data-soep="P"]', '.soep-field-p textarea'],
+  icpc: ['input[name*="icpc"]', 'input[name*="ICPC"]', '.icpc-input input'],
+};
 
-  // ─── Default selectors (configureerbaar via options) ─────────────────────
+var userSelectors = {};
+var floatingWidget = null;
+var lastResult = null;
 
-  const DEFAULT_SELECTORS = {
-    // Journaalveld (hoofdtekstveld voor SOEP in Bricks)
-    journaal: [
-      'textarea[name*="journaal"]',
-      'textarea[name*="soep"]',
-      'textarea[data-field*="journaal"]',
-      ".journaal-editor textarea",
-      ".journal-entry textarea",
-      '[class*="journaal"] textarea',
-      '[class*="journal"] textarea',
-      // Fallback: eerste grote textarea op de pagina
-      "textarea.form-control",
-    ],
-    // Aparte S/O/E/P velden (als Bricks die heeft)
-    s_field: ['textarea[name*="subjectief"]', '[data-soep="S"] textarea'],
-    o_field: ['textarea[name*="objectief"]', '[data-soep="O"] textarea'],
-    e_field: ['textarea[name*="evaluatie"]', '[data-soep="E"] textarea'],
-    p_field: ['textarea[name*="plan"]', '[data-soep="P"] textarea'],
-    // ICPC code veld
-    icpc: ['input[name*="icpc"]', '[data-field*="icpc"] input', ".icpc-selector input"],
-  };
-
-  let selectors = { ...DEFAULT_SELECTORS };
-  let widgetEl = null;
-  let lastResult = null;
-
-  // ─── Load custom selectors from storage ──────────────────────────────────
-
-  chrome.storage.sync.get({ bricksSelectors: null }, (data) => {
-    if (data.bricksSelectors) {
-      try {
-        const custom = JSON.parse(data.bricksSelectors);
-        selectors = { ...DEFAULT_SELECTORS, ...custom };
-      } catch (_) {
-        // use defaults
-      }
+async function loadSelectors() {
+  try {
+    var stored = await chrome.storage.sync.get(['bricksSelectors']);
+    if (stored.bricksSelectors) {
+      userSelectors = JSON.parse(stored.bricksSelectors);
     }
-  });
+  } catch (e) { /* Use defaults */ }
+}
 
-  // ─── Listen for INJECT_SOEP from service worker ──────────────────────────
-
-  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-    if (msg.type === "INJECT_SOEP") {
-      lastResult = msg.data;
-      const success = injectSOEP(msg.data);
-      sendResponse({ ok: success });
-
-      if (!success) {
-        showWidget(msg.data);
-      }
-    }
-    return true;
-  });
-
-  // ─── SOEP Injection ──────────────────────────────────────────────────────
-
-  function injectSOEP(data) {
-    const soep = data.soep || {};
-
-    // Strategie 1: Probeer aparte S/O/E/P velden
-    const sField = findElement(selectors.s_field);
-    const oField = findElement(selectors.o_field);
-    const eField = findElement(selectors.e_field);
-    const pField = findElement(selectors.p_field);
-
-    if (sField && oField && eField && pField) {
-      setFieldValue(sField, soep.S || "");
-      setFieldValue(oField, soep.O || "");
-      setFieldValue(eField, soep.E || "");
-      setFieldValue(pField, soep.P || "");
-      injectICPC(soep.icpc_code);
-      showNotification("SOEP ingevuld in aparte velden");
-      return true;
-    }
-
-    // Strategie 2: Probeer enkel journaalveld (SOEP als tekst)
-    const journaal = findElement(selectors.journaal);
-    if (journaal) {
-      const formatted = formatSOEPText(soep, data.decisief_regel);
-      setFieldValue(journaal, formatted);
-      injectICPC(soep.icpc_code);
-      showNotification("SOEP ingevuld in journaalveld");
-      return true;
-    }
-
-    // Geen velden gevonden
-    console.warn("[SmartVoice] Geen Bricks journaalvelden gevonden");
-    return false;
-  }
-
-  function formatSOEPText(soep, decisief) {
-    const parts = [];
-    if (decisief) {
-      parts.push(`[Decisief] ${decisief}`);
-      parts.push("");
-    }
-    if (soep.S) parts.push(`S: ${soep.S}`);
-    if (soep.O) parts.push(`O: ${soep.O}`);
-    if (soep.E) parts.push(`E: ${soep.E}`);
-    if (soep.P) parts.push(`P: ${soep.P}`);
-    if (soep.icpc_code) {
-      parts.push("");
-      parts.push(`ICPC: ${soep.icpc_code}${soep.icpc_titel ? " — " + soep.icpc_titel : ""}`);
-    }
-    return parts.join("\n");
-  }
-
-  function injectICPC(code) {
-    if (!code) return;
-    const icpcField = findElement(selectors.icpc);
-    if (icpcField) {
-      setFieldValue(icpcField, code);
-    }
-  }
-
-  // ─── DOM helpers ─────────────────────────────────────────────────────────
-
-  function findElement(selectorList) {
-    if (!Array.isArray(selectorList)) selectorList = [selectorList];
-    for (const sel of selectorList) {
-      const el = document.querySelector(sel);
+function findElement(selectorKey) {
+  if (userSelectors[selectorKey]) {
+    var selectors = Array.isArray(userSelectors[selectorKey])
+      ? userSelectors[selectorKey] : [userSelectors[selectorKey]];
+    for (var i = 0; i < selectors.length; i++) {
+      var el = document.querySelector(selectors[i]);
       if (el) return el;
     }
-    return null;
+  }
+  var defaults = DEFAULT_SELECTORS[selectorKey] || [];
+  for (var j = 0; j < defaults.length; j++) {
+    var el2 = document.querySelector(defaults[j]);
+    if (el2) return el2;
+  }
+  return null;
+}
+
+function setFieldValue(element, value) {
+  if (!element || !value) return false;
+  if (element.tagName === 'TEXTAREA' || element.tagName === 'INPUT') {
+    element.value = value;
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+  } else if (element.contentEditable === 'true') {
+    element.textContent = value;
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  return true;
+}
+
+function injectSOEP(data) {
+  var soep = data.soep || {};
+  var injected = false;
+
+  var sField = findElement('soep_s');
+  var oField = findElement('soep_o');
+  var eField = findElement('soep_e');
+  var pField = findElement('soep_p');
+
+  if (sField || oField || eField || pField) {
+    if (sField && soep.s) { setFieldValue(sField, soep.s); injected = true; }
+    if (oField && soep.o) { setFieldValue(oField, soep.o); injected = true; }
+    if (eField && soep.e) { setFieldValue(eField, soep.e); injected = true; }
+    if (pField && soep.p) { setFieldValue(pField, soep.p); injected = true; }
   }
 
-  function setFieldValue(el, value) {
-    // Trigger React/Angular change detection
-    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-      window.HTMLTextAreaElement.prototype,
-      "value"
-    )?.set || Object.getOwnPropertyDescriptor(
-      window.HTMLInputElement.prototype,
-      "value"
-    )?.set;
-
-    if (nativeInputValueSetter) {
-      nativeInputValueSetter.call(el, value);
-    } else {
-      el.value = value;
-    }
-
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-    el.dispatchEvent(new Event("change", { bubbles: true }));
-    el.dispatchEvent(new Event("blur", { bubbles: true }));
+  var icpcField = findElement('icpc');
+  if (icpcField && soep.icpc_code) {
+    setFieldValue(icpcField, soep.icpc_code);
   }
 
-  // ─── Floating Widget (fallback) ──────────────────────────────────────────
-
-  function showWidget(data) {
-    removeWidget();
-
-    const soep = data.soep || {};
-    widgetEl = document.createElement("div");
-    widgetEl.id = "smartvoice-widget";
-    widgetEl.innerHTML = `
-      <div class="sv-widget-header">
-        <span class="sv-widget-title">SmartVoice</span>
-        <button class="sv-widget-close" title="Sluiten">&times;</button>
-      </div>
-      <div class="sv-widget-body">
-        ${data.decisief_regel ? `<div class="sv-decisief">${escapeHtml(data.decisief_regel)}</div>` : ""}
-        <div class="sv-soep-row"><span class="sv-badge sv-s">S</span><span>${escapeHtml(soep.S || "-")}</span></div>
-        <div class="sv-soep-row"><span class="sv-badge sv-o">O</span><span>${escapeHtml(soep.O || "-")}</span></div>
-        <div class="sv-soep-row"><span class="sv-badge sv-e">E</span><span>${escapeHtml(soep.E || "-")}</span></div>
-        <div class="sv-soep-row"><span class="sv-badge sv-p">P</span><span>${escapeHtml(soep.P || "-")}</span></div>
-        <div class="sv-widget-actions">
-          <button class="sv-btn sv-btn-copy">Kopieer SOEP</button>
-        </div>
-      </div>
-    `;
-
-    document.body.appendChild(widgetEl);
-
-    // Event listeners
-    widgetEl.querySelector(".sv-widget-close").addEventListener("click", removeWidget);
-    widgetEl.querySelector(".sv-btn-copy").addEventListener("click", () => {
-      const text = formatSOEPText(soep, data.decisief_regel);
-      navigator.clipboard.writeText(text);
-      const btn = widgetEl.querySelector(".sv-btn-copy");
-      btn.textContent = "Gekopieerd!";
-      setTimeout(() => (btn.textContent = "Kopieer SOEP"), 1500);
-    });
-
-    // Make draggable
-    makeDraggable(widgetEl, widgetEl.querySelector(".sv-widget-header"));
-  }
-
-  function removeWidget() {
-    if (widgetEl) {
-      widgetEl.remove();
-      widgetEl = null;
+  if (!injected) {
+    var journalField = findElement('journaal');
+    if (journalField) {
+      setFieldValue(journalField, formatSOEPText(data));
+      injected = true;
     }
   }
 
-  function makeDraggable(el, handle) {
-    let offsetX = 0, offsetY = 0;
-    handle.style.cursor = "move";
-
-    handle.addEventListener("mousedown", (e) => {
-      offsetX = e.clientX - el.getBoundingClientRect().left;
-      offsetY = e.clientY - el.getBoundingClientRect().top;
-
-      function onMove(e) {
-        el.style.left = (e.clientX - offsetX) + "px";
-        el.style.top = (e.clientY - offsetY) + "px";
-        el.style.right = "auto";
-        el.style.bottom = "auto";
-      }
-      function onUp() {
-        document.removeEventListener("mousemove", onMove);
-        document.removeEventListener("mouseup", onUp);
-      }
-      document.addEventListener("mousemove", onMove);
-      document.addEventListener("mouseup", onUp);
-    });
+  if (!injected && document.activeElement) {
+    var active = document.activeElement;
+    if (active.tagName === 'TEXTAREA' || active.contentEditable === 'true') {
+      setFieldValue(active, formatSOEPText(data));
+      injected = true;
+    }
   }
 
-  function escapeHtml(str) {
-    const div = document.createElement("div");
-    div.textContent = str;
-    return div.innerHTML;
-  }
+  return injected;
+}
 
-  // ─── Notification ────────────────────────────────────────────────────────
+function formatSOEPText(data) {
+  var soep = data.soep || {};
+  var parts = [];
+  if (data.decisief) parts.push('[Decisief] ' + data.decisief);
+  parts.push('');
+  if (soep.s) parts.push('S: ' + soep.s);
+  if (soep.o) parts.push('O: ' + soep.o);
+  if (soep.e) parts.push('E: ' + soep.e);
+  if (soep.p) parts.push('P: ' + soep.p);
+  if (soep.icpc_code) parts.push('\nICPC: ' + soep.icpc_code + (soep.icpc_titel ? ' - ' + soep.icpc_titel : ''));
+  return parts.join('\n');
+}
 
-  function showNotification(text) {
-    const notif = document.createElement("div");
-    notif.className = "sv-notification";
-    notif.textContent = text;
-    document.body.appendChild(notif);
-    setTimeout(() => {
-      notif.classList.add("sv-notification-hide");
-      setTimeout(() => notif.remove(), 300);
-    }, 2500);
+function showNotification(text) {
+  var notif = document.createElement('div');
+  notif.className = 'sv-notification';
+  notif.textContent = text;
+  document.body.appendChild(notif);
+  setTimeout(function() {
+    notif.classList.add('sv-notification-fade');
+    setTimeout(function() { notif.remove(); }, 300);
+  }, 2500);
+}
+
+function createWidget() {
+  if (floatingWidget) return;
+
+  floatingWidget = document.createElement('div');
+  floatingWidget.id = 'smartvoice-widget';
+  floatingWidget.innerHTML = '<div class="sv-widget-btn" id="sv-toggle" title="SmartVoice">' +
+    '<svg width="20" height="20" viewBox="0 0 24 24" fill="white">' +
+    '<path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>' +
+    '<path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>' +
+    '</svg></div>' +
+    '<div class="sv-widget-panel hidden" id="sv-panel">' +
+    '<div class="sv-panel-header"><span>SmartVoice</span><button id="sv-close" class="sv-close">&times;</button></div>' +
+    '<div class="sv-panel-body">' +
+    '<div id="sv-no-result" class="sv-message">Nog geen resultaat. Gebruik de extensie popup om een consult op te nemen.</div>' +
+    '<div id="sv-result" class="hidden">' +
+    '<div class="sv-decisief"><strong>Decisief:</strong><p id="sv-decisief-text"></p></div>' +
+    '<div class="sv-actions">' +
+    '<button id="sv-inject" class="sv-btn sv-btn-primary">Invoegen in Bricks</button>' +
+    '<button id="sv-copy" class="sv-btn sv-btn-secondary">Kopieer</button>' +
+    '</div></div></div></div>';
+
+  document.body.appendChild(floatingWidget);
+
+  document.getElementById('sv-toggle').addEventListener('click', function() {
+    document.getElementById('sv-panel').classList.toggle('hidden');
+  });
+  document.getElementById('sv-close').addEventListener('click', function() {
+    document.getElementById('sv-panel').classList.add('hidden');
+  });
+  document.getElementById('sv-inject').addEventListener('click', function() {
+    if (lastResult) {
+      var success = injectSOEP(lastResult);
+      showNotification(success ? 'SOEP succesvol ingevoegd!' : 'Kon geen velden vinden.');
+    }
+  });
+  document.getElementById('sv-copy').addEventListener('click', function() {
+    if (lastResult) {
+      navigator.clipboard.writeText(formatSOEPText(lastResult));
+      showNotification('Gekopieerd naar klembord!');
+    }
+  });
+}
+
+function updateWidget(data) {
+  lastResult = data;
+  document.getElementById('sv-no-result').classList.add('hidden');
+  document.getElementById('sv-result').classList.remove('hidden');
+  document.getElementById('sv-decisief-text').textContent = data.decisief || '';
+  document.getElementById('sv-panel').classList.remove('hidden');
+}
+
+chrome.runtime.onMessage.addListener(function(msg, _sender, sendResponse) {
+  if (msg.action === 'INJECT_SOEP') {
+    var success = injectSOEP(msg.data);
+    updateWidget(msg.data);
+    sendResponse({ success: success });
+    showNotification(success ? 'SOEP ingevoegd in Bricks!' : 'Velden niet gevonden. Gebruik de widget.');
+    return false;
   }
-})();
+});
+
+async function init() {
+  await loadSelectors();
+  createWidget();
+}
+
+init();

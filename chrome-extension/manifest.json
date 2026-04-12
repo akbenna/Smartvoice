@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "SmartVoice — AI Consultassistent",
-  "version": "0.1.0",
-  "description": "Neem consulten op, genereer SOEP-documentatie, en push naar Bricks HIS",
+  "version": "1.0.0",
+  "description": "Neem consulten op en genereer automatisch SOEP-notities voor Bricks Huisarts",
   "permissions": [
     "activeTab",
     "storage",
@@ -12,10 +12,15 @@
   "host_permissions": [
     "https://*.bfrcloud.com/*",
     "https://*.bfrnet.nl/*",
-    "https://*.bricks-huisarts.nl/*"
+    "https://*.bricks-huisarts.nl/*",
+    "https://*.bfrw.nl/*",
+    "https://*.bfrw.cloud/*",
+    "https://*.brickshuisarts.nl/*",
+    "https://*.bfrw-online.nl/*"
   ],
   "action": {
     "default_popup": "popup/popup.html",
+    "default_title": "SmartVoice — AI Consultassistent",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
@@ -31,14 +36,21 @@
       "matches": [
         "https://*.bfrcloud.com/*",
         "https://*.bfrnet.nl/*",
-        "https://*.bricks-huisarts.nl/*"
+        "https://*.bricks-huisarts.nl/*",
+        "https://*.bfrw.nl/*",
+        "https://*.bfrw.cloud/*",
+        "https://*.brickshuisarts.nl/*",
+        "https://*.bfrw-online.nl/*"
       ],
       "js": ["content/bricks.js"],
       "css": ["content/bricks.css"],
       "run_at": "document_idle"
     }
   ],
-  "options_page": "options/options.html",
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",

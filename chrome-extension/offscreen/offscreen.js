@@ -1,28 +1,36 @@
 /**
- * SmartVoice — Offscreen Document
- * Persistente audio-opname via MediaRecorder.
- * Draait door ook als popup wordt gesloten.
+ * SmartVoice - Offscreen Audio Recorder
+ *
+ * Runs in an offscreen document to persist audio recording even when the
+ * popup is closed. Uses MediaRecorder API with noise suppression.
  */
 
 let mediaRecorder = null;
 let audioChunks = [];
-let stream = null;
+let audioStream = null;
 
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg.type === "OFFSCREEN_START_RECORDING") {
-    startRecording().then(() => sendResponse({ ok: true })).catch((err) => sendResponse({ error: err.message }));
-    return true;
-  }
-  if (msg.type === "OFFSCREEN_STOP_RECORDING") {
-    stopRecording().then(() => sendResponse({ ok: true })).catch((err) => sendResponse({ error: err.message }));
-    return true;
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  switch (msg.action) {
+    case 'OFFSCREEN_START_RECORDING':
+      startRecording().then(sendResponse).catch(err =>
+        sendResponse({ error: err.message })
+      );
+      return true;
+
+    case 'OFFSCREEN_STOP_RECORDING':
+      stopRecording().then(sendResponse).catch(err =>
+        sendResponse({ error: err.message })
+      );
+      return true;
+
+    case 'OFFSCREEN_GET_STATUS':
+      sendResponse({ recording: mediaRecorder?.state === 'recording' });
+      return false;
   }
 });
 
 async function startRecording() {
-  audioChunks = [];
-
-  stream = await navigator.mediaDevices.getUserMedia({
+  audioStream = await navigator.mediaDevices.getUserMedia({
     audio: {
       channelCount: 1,
       sampleRate: 16000,
@@ -32,14 +40,17 @@ async function startRecording() {
     },
   });
 
-  // Prefer webm/opus for good compression + quality
-  const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-    ? "audio/webm;codecs=opus"
-    : "audio/webm";
+  audioChunks = [];
 
-  mediaRecorder = new MediaRecorder(stream, {
+  const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+    ? 'audio/webm;codecs=opus'
+    : MediaRecorder.isTypeSupported('audio/webm')
+      ? 'audio/webm'
+      : 'audio/mp4';
+
+  mediaRecorder = new MediaRecorder(audioStream, {
     mimeType,
-    audioBitsPerSecond: 64000,
+    audioBitsPerSecond: 128000,
   });
 
   mediaRecorder.ondataavailable = (event) => {
@@ -48,33 +59,41 @@ async function startRecording() {
     }
   };
 
-  mediaRecorder.onstop = async () => {
-    const blob = new Blob(audioChunks, { type: mimeType });
-
-    // Convert to base64 data URL for transfer to service worker
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      chrome.runtime.sendMessage({
-        type: "RECORDING_DATA",
-        blob: reader.result,
-      });
-    };
-    reader.readAsDataURL(blob);
-
-    // Clean up stream
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
-      stream = null;
-    }
-  };
-
-  mediaRecorder.start(1000); // Chunk every second
-  console.log("[SmartVoice] Recording started");
+  mediaRecorder.start(5000);
+  return { success: true, mimeType };
 }
 
 async function stopRecording() {
-  if (mediaRecorder && mediaRecorder.state !== "inactive") {
-    mediaRecorder.stop();
-    console.log("[SmartVoice] Recording stopped");
+  if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+    return { error: 'Geen actieve opname.' };
   }
+
+  return new Promise((resolve) => {
+    mediaRecorder.onstop = async () => {
+      const mimeType = mediaRecorder.mimeType;
+      const blob = new Blob(audioChunks, { type: mimeType });
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = reader.result.split(',')[1];
+        resolve({
+          success: true,
+          audio: base64,
+          mimeType,
+          size: blob.size,
+          duration: audioChunks.length * 5,
+        });
+      };
+      reader.readAsDataURL(blob);
+
+      if (audioStream) {
+        audioStream.getTracks().forEach(t => t.stop());
+        audioStream = null;
+      }
+      mediaRecorder = null;
+      audioChunks = [];
+    };
+
+    mediaRecorder.stop();
+  });
 }

@@ -2,95 +2,161 @@
 <html lang="nl">
 <head>
   <meta charset="UTF-8">
-  <title>SmartVoice Instellingen</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmartVoice - Instellingen</title>
   <style>
+    :root {
+      --primary: #059669;
+      --primary-hover: #047857;
+      --text: #1f2937;
+      --text-secondary: #6b7280;
+      --bg: #f9fafb;
+      --card: #ffffff;
+      --border: #e5e7eb;
+      --radius: 8px;
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #f8f9fa; color: #1a1a2e;
-      max-width: 560px; margin: 40px auto; padding: 0 20px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 32px;
+      max-width: 640px;
+      margin: 0 auto;
     }
-    h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; color: #1B4F72; }
-    .subtitle { font-size: 13px; color: #6b7280; margin-bottom: 24px; }
-    .section { background: white; border-radius: 10px; padding: 20px; margin-bottom: 16px; border: 1px solid #e5e7eb; }
-    .section-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #1a1a2e; }
+    h1 { font-size: 22px; margin-bottom: 8px; }
+    .subtitle { color: var(--text-secondary); font-size: 14px; margin-bottom: 24px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .card h2 { font-size: 15px; margin-bottom: 12px; }
     .field { margin-bottom: 14px; }
     .field:last-child { margin-bottom: 0; }
-    label { display: block; font-size: 12px; font-weight: 500; color: #374151; margin-bottom: 4px; }
-    .hint { font-size: 11px; color: #9ca3af; margin-top: 2px; }
-    input, select, textarea {
-      width: 100%; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px;
-      font-size: 13px; font-family: inherit; color: #1a1a2e; background: #fafafa;
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 4px;
     }
-    input:focus, select:focus, textarea:focus { outline: none; border-color: #1B4F72; background: white; }
-    textarea { min-height: 80px; font-family: 'SF Mono', Consolas, monospace; font-size: 11px; }
-    .btn-save {
-      background: #1B4F72; color: white; border: none; padding: 10px 24px;
-      border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer;
+    .hint { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+    input[type="text"], input[type="url"], input[type="password"], select, textarea {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: inherit;
+      transition: border-color 0.15s;
     }
-    .btn-save:hover { background: #163d5a; }
-    .saved { color: #16a34a; font-size: 12px; margin-left: 10px; display: none; }
-    .footer { text-align: center; margin-top: 20px; }
-    .footer-text { font-size: 11px; color: #9ca3af; }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.1);
+    }
+    textarea { height: 60px; resize: vertical; font-family: monospace; font-size: 12px; }
+    .btn {
+      padding: 9px 20px;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .actions { display: flex; gap: 8px; margin-top: 20px; }
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--text);
+      color: white;
+      padding: 10px 20px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .toast.show { opacity: 1; }
   </style>
 </head>
 <body>
   <h1>SmartVoice Instellingen</h1>
-  <p class="subtitle">Configureer de API-verbinding en Bricks-integratie</p>
+  <p class="subtitle">Configureer de verbinding met de SmartVoice Cloud API en Bricks integratie.</p>
 
-  <div class="section">
-    <div class="section-title">API Verbinding</div>
+  <div class="card">
+    <h2>API Verbinding</h2>
     <div class="field">
       <label for="apiUrl">API URL</label>
       <input type="url" id="apiUrl" placeholder="http://localhost:8002">
-      <div class="hint">De URL van je SmartVoice Cloud API</div>
+      <p class="hint">De URL van de SmartVoice Cloud API server</p>
     </div>
     <div class="field">
-      <label for="apiKey">API Key</label>
-      <input type="password" id="apiKey" placeholder="sv_xxxxxxxxxxxxxxxx">
-      <div class="hint">Je API-sleutel voor authenticatie</div>
+      <label for="apiKey">API Sleutel</label>
+      <input type="password" id="apiKey" placeholder="Leeg voor dev-mode">
+      <p class="hint">Laat leeg als je lokaal draait zonder API keys</p>
     </div>
   </div>
 
-  <div class="section">
-    <div class="section-title">AI Providers</div>
+  <div class="card">
+    <h2>AI Providers</h2>
     <div class="field">
-      <label for="sttProvider">Spraakherkenning (STT)</label>
+      <label for="sttProvider">Spraak-naar-tekst (STT)</label>
       <select id="sttProvider">
-        <option value="groq">Groq Whisper (gratis, goed)</option>
-        <option value="deepgram">Deepgram Nova-2 (best voor NL, betaald)</option>
-        <option value="openai">OpenAI Whisper (betaald)</option>
+        <option value="deepgram">Deepgram Nova-2 (beste Nederlands)</option>
+        <option value="groq">Groq Whisper (gratis tier, snel)</option>
+        <option value="openai">OpenAI Whisper</option>
       </select>
-      <div class="hint">Groq is gratis maar heeft rate limits (14.400 sec/dag)</div>
+      <p class="hint">Deepgram is het nauwkeurigst voor Nederlands, Groq is gratis</p>
     </div>
     <div class="field">
       <label for="llmProvider">Taalmodel (LLM)</label>
       <select id="llmProvider">
-        <option value="mistral">Mistral Small (EU, goedkoop)</option>
+        <option value="mistral">Mistral Small (EU-gevestigd, goedkoop)</option>
         <option value="anthropic">Claude Haiku (beste kwaliteit)</option>
-        <option value="gemini">Gemini 2.0 Flash (goedkoopst)</option>
+        <option value="gemini">Gemini Flash 2.0 (goedkoopst)</option>
       </select>
-      <div class="hint">Mistral is EU-gevestigd (Parijs) — beste keuze voor AVG</div>
+      <p class="hint">Mistral is EU-gevestigd (beste AVG). Claude Haiku levert de beste medische kwaliteit.</p>
     </div>
   </div>
 
-  <div class="section">
-    <div class="section-title">Bricks Selectors (geavanceerd)</div>
+  <div class="card">
+    <h2>Bricks Veld Selectors (geavanceerd)</h2>
+    <p class="hint" style="margin-bottom: 10px;">
+      Optioneel: pas CSS-selectors aan als SmartVoice de Bricks-velden niet automatisch vindt.
+    </p>
     <div class="field">
-      <label for="bricksSelectors">Custom CSS Selectors (JSON)</label>
-      <textarea id="bricksSelectors" placeholder='{"journaal": ["textarea.mijn-veld"]}'></textarea>
-      <div class="hint">Overschrijf de standaard selectors als Bricks een andere DOM-structuur heeft. Laat leeg voor defaults.</div>
+      <label for="selJournaal">Journaal veld</label>
+      <input type="text" id="selJournaal" placeholder="textarea.journal-field">
+    </div>
+    <div class="field">
+      <label for="selSoepS">S-veld</label>
+      <input type="text" id="selSoepS" placeholder="textarea[data-soep='S']">
+    </div>
+    <div class="field">
+      <label for="selSoepO">O-veld</label>
+      <input type="text" id="selSoepO" placeholder="textarea[data-soep='O']">
+    </div>
+    <div class="field">
+      <label for="selSoepE">E-veld</label>
+      <input type="text" id="selSoepE" placeholder="textarea[data-soep='E']">
+    </div>
+    <div class="field">
+      <label for="selSoepP">P-veld</label>
+      <input type="text" id="selSoepP" placeholder="textarea[data-soep='P']">
     </div>
   </div>
 
-  <div>
-    <button class="btn-save" id="btnSave">Opslaan</button>
-    <span class="saved" id="savedMsg">Opgeslagen!</span>
+  <div class="actions">
+    <button id="btn-save" class="btn btn-primary">Opslaan</button>
+    <button id="btn-test" class="btn" style="background:#f3f4f6;border:1px solid #e5e7eb;">Test verbinding</button>
   </div>
 
-  <div class="footer">
-    <div class="footer-text">SmartVoice v0.1.0 — AI Consultassistent voor de huisartsenpraktijk</div>
-  </div>
+  <div id="toast" class="toast"></div>
 
   <script src="options.js"></script>
 </body>

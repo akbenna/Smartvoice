@@ -9,96 +9,112 @@
 <body>
   <div id="app">
     <!-- Header -->
-    <div class="header">
-      <div class="logo">
-        <span class="logo-icon">AI</span>
-        <div>
-          <div class="logo-title">SmartVoice</div>
-          <div class="logo-sub">Consultassistent</div>
-        </div>
+    <header class="header">
+      <div class="header-left">
+        <div class="logo">SV</div>
+        <h1>SmartVoice</h1>
       </div>
       <button id="btn-settings" class="btn-icon" title="Instellingen">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
         </svg>
       </button>
-    </div>
+    </header>
 
     <!-- Status bar -->
-    <div id="status-bar" class="status-bar status-idle">
+    <div id="status-bar" class="status-bar hidden">
       <span id="status-dot" class="status-dot"></span>
-      <span id="status-text">Klaar voor opname</span>
+      <span id="status-text"></span>
     </div>
 
-    <!-- Recording section -->
-    <div id="section-record" class="section">
-      <div class="timer-display">
-        <span id="timer">00:00</span>
-      </div>
-      <div class="waveform" id="waveform">
-        <canvas id="waveform-canvas" width="280" height="40"></canvas>
-      </div>
-      <div class="controls">
-        <button id="btn-record" class="btn-record" title="Start opname">
-          <svg id="icon-mic" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-          <svg id="icon-stop" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="display:none">
-            <rect x="6" y="6" width="12" height="12" rx="2"/>
+    <!-- State: Idle (ready to record) -->
+    <section id="state-idle" class="state">
+      <div class="record-area">
+        <button id="btn-start" class="btn-record" title="Start opname">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
           </svg>
         </button>
+        <p class="hint">Klik om consult op te nemen</p>
       </div>
-    </div>
+    </section>
 
-    <!-- Processing section -->
-    <div id="section-processing" class="section" style="display:none">
-      <div class="processing-spinner"></div>
-      <div class="processing-text">Verwerking bezig...</div>
-      <div id="processing-step" class="processing-step">Audio wordt getranscribeerd</div>
-    </div>
+    <!-- State: Recording -->
+    <section id="state-recording" class="state hidden">
+      <div class="recording-area">
+        <div class="recording-indicator">
+          <span class="pulse-dot"></span>
+          <span id="timer">00:00</span>
+        </div>
+        <canvas id="waveform" width="340" height="48"></canvas>
+        <div class="recording-actions">
+          <button id="btn-stop" class="btn btn-danger">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
+            Stop &amp; verwerk
+          </button>
+        </div>
+      </div>
+    </section>
 
-    <!-- Result section -->
-    <div id="section-result" class="section" style="display:none">
-      <!-- Decisief regel -->
-      <div class="result-card decisief">
-        <div class="result-label">Decisief regel</div>
-        <div id="decisief-text" class="result-text"></div>
-        <button id="btn-copy-decisief" class="btn-small" title="Kopieer">Kopieer</button>
+    <!-- State: Processing -->
+    <section id="state-processing" class="state hidden">
+      <div class="processing-area">
+        <div class="spinner"></div>
+        <p id="processing-step">Audio wordt verwerkt...</p>
+        <div class="progress-bar">
+          <div id="progress-fill" class="progress-fill"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- State: Results -->
+    <section id="state-results" class="state hidden">
+      <div class="result-card result-decisief">
+        <div class="result-header">
+          <h3>Decisief regel</h3>
+          <button id="btn-copy-decisief" class="btn-icon btn-copy" title="Kopieer">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          </button>
+        </div>
+        <p id="decisief-text" class="decisief-text"></p>
       </div>
 
-      <!-- SOEP compact -->
-      <div class="result-card soep">
-        <div class="result-label">SOEP</div>
+      <div class="result-card">
+        <div class="result-header">
+          <h3>SOEP-notitie</h3>
+          <button id="btn-copy-soep" class="btn-icon btn-copy" title="Kopieer alles">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          </button>
+        </div>
         <div class="soep-fields">
-          <div class="soep-field"><span class="soep-badge s">S</span><span id="soep-s" class="soep-text"></span></div>
-          <div class="soep-field"><span class="soep-badge o">O</span><span id="soep-o" class="soep-text"></span></div>
-          <div class="soep-field"><span class="soep-badge e">E</span><span id="soep-e" class="soep-text"></span></div>
-          <div class="soep-field"><span class="soep-badge p">P</span><span id="soep-p" class="soep-text"></span></div>
+          <div class="soep-field"><label>S</label><p id="soep-s"></p></div>
+          <div class="soep-field"><label>O</label><p id="soep-o"></p></div>
+          <div class="soep-field"><label>E</label><p id="soep-e"></p></div>
+          <div class="soep-field"><label>P</label><p id="soep-p"></p></div>
+        </div>
+        <div id="icpc-badge" class="icpc-badge hidden">
+          <span id="icpc-code"></span>
+          <span id="icpc-title"></span>
         </div>
       </div>
 
-      <!-- Red flags -->
-      <div id="red-flags-container" class="result-card flags" style="display:none">
-        <div class="result-label flags-label">Rode vlaggen</div>
-        <div id="red-flags-list"></div>
+      <div class="result-actions">
+        <button id="btn-push-bricks" class="btn btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7-7 7 7"/></svg>
+          Push naar Bricks
+        </button>
+        <button id="btn-new-consult" class="btn btn-secondary">Nieuw consult</button>
       </div>
+    </section>
 
-      <!-- Actions -->
-      <div class="actions">
-        <button id="btn-push-bricks" class="btn-primary">Naar Bricks</button>
-        <button id="btn-copy-soep" class="btn-secondary">Kopieer SOEP</button>
-        <button id="btn-new" class="btn-ghost">Nieuw consult</button>
+    <!-- State: Error -->
+    <section id="state-error" class="state hidden">
+      <div class="error-area">
+        <p id="error-message"></p>
+        <button id="btn-retry" class="btn btn-secondary">Opnieuw proberen</button>
       </div>
-    </div>
-
-    <!-- Error section -->
-    <div id="section-error" class="section" style="display:none">
-      <div class="error-icon">!</div>
-      <div id="error-text" class="error-text"></div>
-      <button id="btn-retry" class="btn-secondary">Opnieuw proberen</button>
-    </div>
+    </section>
   </div>
 
   <script src="popup.js"></script>
