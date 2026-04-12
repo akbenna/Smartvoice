@@ -103,9 +103,20 @@ async function processAudio(audioBase64, mimeType) {
     state.step = 'Verwerking voltooid!';
     state.status = 'results';
     state.data = result;
+
+    // Persist results so popup can retrieve them even after service worker sleeps
+    chrome.storage.local.set({
+      sv_state: 'results',
+      sv_data: result,
+    });
+
     broadcastComplete(result);
   } catch (err) {
     state.status = 'error';
+    chrome.storage.local.set({
+      sv_state: 'error',
+      sv_error: err.message,
+    });
     broadcastError(err.message);
   }
 }
@@ -183,46 +194,39 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       return false;
 
     case 'START_RECORDING':
+      // Open recorder tab (works in Edge + Chrome, no offscreen needed)
       (async () => {
         try {
-          await ensureOffscreen();
-          const result = await chrome.runtime.sendMessage({
-            action: 'OFFSCREEN_START_RECORDING',
+          const tab = await chrome.tabs.create({
+            url: chrome.runtime.getURL('recorder/recorder.html'),
+            active: true,
           });
-          if (result?.error) {
-            sendResponse({ error: result.error });
-            return;
-          }
           state.status = 'recording';
           state.startTime = Date.now();
           state.data = null;
+          chrome.storage.local.remove(['sv_state', 'sv_data', 'sv_error']);
           sendResponse({ success: true });
         } catch (err) {
-          sendResponse({ error: `Kon microfoon niet starten: ${err.message}` });
+          sendResponse({ error: `Kon recorder niet openen: ${err.message}` });
         }
       })();
       return true;
+
+    case 'RECORDER_STARTED':
+      state.status = 'recording';
+      state.startTime = Date.now();
+      sendResponse({ success: true });
+      return false;
+
+    case 'RECORDER_AUDIO':
+      // Audio received from recorder tab
+      sendResponse({ success: true });
+      processAudio(msg.audio, msg.mimeType);
+      return false;
 
     case 'STOP_RECORDING':
-      (async () => {
-        try {
-          const result = await chrome.runtime.sendMessage({
-            action: 'OFFSCREEN_STOP_RECORDING',
-          });
-          await closeOffscreen();
-
-          if (result?.error) {
-            sendResponse({ error: result.error });
-            return;
-          }
-
-          sendResponse({ success: true });
-          processAudio(result.audio, result.mimeType);
-        } catch (err) {
-          sendResponse({ error: `Fout bij stoppen opname: ${err.message}` });
-        }
-      })();
-      return true;
+      sendResponse({ success: true });
+      return false;
 
     case 'PUSH_TO_BRICKS':
       pushToBricks().then(sendResponse);

@@ -33,10 +33,13 @@ app = FastAPI(
 # ── CORS ──
 
 config = get_config()
+
+# Chrome-extension:// origins are NOT matched by allow_origins=["*"].
+# Use allow_origin_regex to match everything including chrome-extension://.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=config.cors_origins.split(","),
-    allow_credentials=True,
+    allow_origin_regex=r".*",
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

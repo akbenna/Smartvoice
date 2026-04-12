@@ -183,6 +183,7 @@ document.getElementById('btn-push-bricks').addEventListener('click', async funct
 document.getElementById('btn-new-consult').addEventListener('click', function() {
   hideStatus();
   setState('idle');
+  chrome.storage.local.remove(['sv_state', 'sv_data', 'sv_error']);
 });
 
 document.getElementById('btn-retry').addEventListener('click', function() {
@@ -235,22 +236,57 @@ chrome.runtime.onMessage.addListener(function(msg) {
   }
 });
 
+// ── Watch for storage changes (backup channel when messages don't arrive) ──
+
+chrome.storage.onChanged.addListener(function(changes, area) {
+  if (area !== 'local') return;
+  if (changes.sv_state) {
+    var newState = changes.sv_state.newValue;
+    if (newState === 'results' && changes.sv_data && changes.sv_data.newValue) {
+      displayResults(changes.sv_data.newValue);
+    } else if (newState === 'error') {
+      var errMsg = (changes.sv_error && changes.sv_error.newValue) || 'Er is een fout opgetreden.';
+      setState('error');
+      document.getElementById('error-message').textContent = errMsg;
+      showStatus('Fout bij verwerking', true);
+    }
+  }
+});
+
 // ── Initialize ──
 
 async function init() {
-  var response = await sendMessage('GET_STATE');
-  if (response && response.state === 'recording') {
-    setState('recording');
-    showStatus('Opname actief...', false);
-    recordingStartTime = response.startTime || Date.now();
-    startTimer();
-    startWaveform();
-  } else if (response && response.state === 'processing') {
-    setState('processing');
-    showStatus('Verwerken...', false);
-    updateProgress(response.percent || 50, response.step || 'Bezig met verwerken...');
-  } else if (response && response.state === 'results' && response.data) {
-    displayResults(response.data);
+  // First try the service worker (fast, in-memory)
+  try {
+    var response = await sendMessage('GET_STATE');
+    if (response && response.state === 'recording') {
+      setState('recording');
+      showStatus('Opname actief...', false);
+      recordingStartTime = response.startTime || Date.now();
+      startTimer();
+      startWaveform();
+      return;
+    } else if (response && response.state === 'processing') {
+      setState('processing');
+      showStatus('Verwerken...', false);
+      updateProgress(response.percent || 50, response.step || 'Bezig met verwerken...');
+      return;
+    } else if (response && response.state === 'results' && response.data) {
+      displayResults(response.data);
+      return;
+    }
+  } catch (e) {
+    // Service worker may have gone to sleep
+  }
+
+  // Fallback: check persisted state in storage
+  var stored = await chrome.storage.local.get(['sv_state', 'sv_data', 'sv_error']);
+  if (stored.sv_state === 'results' && stored.sv_data) {
+    displayResults(stored.sv_data);
+  } else if (stored.sv_state === 'error' && stored.sv_error) {
+    setState('error');
+    document.getElementById('error-message').textContent = stored.sv_error;
+    showStatus('Fout bij verwerking', true);
   } else {
     setState('idle');
   }
