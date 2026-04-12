@@ -1,38 +1,31 @@
 # =============================================================================
-# AI-Consultassistent — Railway Deployment (CPU-only API)
+# SmartVoice Cloud API — Railway Deployment
 # =============================================================================
-# Voor Railway/Fly.io: API server zonder GPU-afhankelijkheden.
-# Whisper en Ollama draaien extern (GPU-server of cloud API).
+# Lightweight API server: no GPU, no ML models.
+# STT via Deepgram/Groq, LLM via Mistral/Claude — all cloud API calls.
 # =============================================================================
 
-FROM python:3.12-slim AS base
+FROM python:3.12-slim
 
-# Systeemafhankelijkheden
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Dependencies — alleen wat de API server nodig heeft (geen torch/whisper/pyannote)
-COPY services/requirements-railway.txt /tmp/requirements.txt
+# Install only cloud API dependencies (lightweight)
+COPY services/cloud_api/requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
-# Applicatie code
-COPY services/ /app/services/
-COPY shared/ /app/shared/
-COPY database/ /app/database/
-COPY scripts/ /app/scripts/
+# Copy cloud API code + ensure __init__.py exists
+COPY services/cloud_api/ /app/services/cloud_api/
+RUN touch /app/services/__init__.py /app/services/cloud_api/__init__.py
 
 ENV PYTHONPATH="/app"
-ENV APP_ENV="production"
-
-RUN chmod +x /app/scripts/railway_start.sh
 
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-    CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
+    CMD curl -f http://localhost:${PORT:-8002}/health || exit 1
 
-EXPOSE ${PORT:-8000}
+EXPOSE ${PORT:-8002}
 
-CMD ["/app/scripts/railway_start.sh"]
+CMD uvicorn services.cloud_api.main:app --host 0.0.0.0 --port ${PORT:-8002}
