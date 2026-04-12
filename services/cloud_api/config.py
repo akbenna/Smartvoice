@@ -68,7 +68,7 @@ def get_config() -> AppConfig:
     """Load configuration from environment variables."""
     return AppConfig(
         host=os.getenv("API_HOST", "0.0.0.0"),
-        port=int(os.getenv("API_PORT", "8002")),
+        port=int(os.getenv("PORT", os.getenv("API_PORT", "8002"))),
         debug=os.getenv("DEBUG", "false").lower() == "true",
         cors_origins=os.getenv("CORS_ORIGINS", "*"),
         api_keys=os.getenv("API_KEYS", ""),

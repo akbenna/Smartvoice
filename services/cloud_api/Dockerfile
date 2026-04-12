@@ -19,6 +19,6 @@ ENV PYTHONPATH=/app
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8002/health || exit 1
 
-EXPOSE 8002
+EXPOSE ${PORT:-8002}
 
-CMD ["uvicorn", "services.cloud_api.main:app", "--host", "0.0.0.0", "--port", "8002"]
+CMD uvicorn services.cloud_api.main:app --host 0.0.0.0 --port ${PORT:-8002}

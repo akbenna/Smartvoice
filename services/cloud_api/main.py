@@ -17,6 +17,7 @@ import structlog
 import uvicorn
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 
 from .auth import verify_api_key
 from .config import get_config
@@ -114,7 +115,10 @@ async def process_consult(
         logger.info(
             "consult.process.start",
             file_size=len(content),
+            file_size_kb=round(len(content) / 1024, 1),
             file_ext=ext,
+            content_type=audio.content_type,
+            filename=audio.filename,
         )
 
         result = await process_consultation(
@@ -165,6 +169,17 @@ async def list_providers(_api_key: str = Depends(verify_api_key)):
             },
         },
     }
+
+
+# ── Debug test page ──
+
+@app.get("/debug", response_class=HTMLResponse)
+async def debug_page():
+    """Serve the debug test page."""
+    debug_html = Path(__file__).parent / "debug_test.html"
+    if debug_html.exists():
+        return debug_html.read_text(encoding="utf-8")
+    return "<h1>debug_test.html niet gevonden</h1>"
 
 
 # ── Entry point ──

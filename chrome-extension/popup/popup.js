@@ -1,40 +1,33 @@
 /**
- * SmartVoice Chrome Extension - Popup Controller
+ * SmartVoice - Popup Controller
  *
- * Manages UI state transitions and communication with service worker.
- * States: idle → recording → processing → results → idle
+ * Standalone recorder that works everywhere (not just Bricks).
+ * Records audio → sends to Cloud API → shows SOEP results.
+ * On Bricks pages, the content script widget is the primary UI.
+ * This popup is the fallback for non-Bricks contexts.
  */
 
-const STATES = ['idle', 'recording', 'processing', 'results', 'error'];
-
-let currentState = null;
-let timerInterval = null;
-let recordingStartTime = null;
-let waveformAnimationId = null;
+var STATES = ['idle', 'recording', 'processing', 'results', 'error'];
+var mediaRecorder = null;
+var audioChunks = [];
+var audioStream = null;
+var timerInterval = null;
+var recStartTime = null;
 
 // ── State management ──
 
 function setState(name) {
-  STATES.forEach(s => {
-    const el = document.getElementById(`state-${s}`);
-    if (el) {
-      el.classList.add('hidden');
-    }
+  STATES.forEach(function(s) {
+    var el = document.getElementById('state-' + s);
+    if (el) el.classList.toggle('hidden', s !== name);
   });
-  const active = document.getElementById(`state-${name}`);
-  if (active) {
-    active.classList.remove('hidden');
-  }
-  currentState = name;
 }
 
 function showStatus(text, isError) {
-  const bar = document.getElementById('status-bar');
-  const dot = document.getElementById('status-dot');
-  const textEl = document.getElementById('status-text');
+  var bar = document.getElementById('status-bar');
   bar.classList.remove('hidden');
-  dot.classList.toggle('error', !!isError);
-  textEl.textContent = text;
+  document.getElementById('status-dot').classList.toggle('error', !!isError);
+  document.getElementById('status-text').textContent = text;
 }
 
 function hideStatus() {
@@ -43,165 +36,124 @@ function hideStatus() {
 
 // ── Timer ──
 
-function startTimer() {
-  recordingStartTime = Date.now();
-  timerInterval = setInterval(updateTimer, 1000);
-  updateTimer();
-}
-
-function stopTimer() {
-  if (timerInterval) clearInterval(timerInterval);
-  timerInterval = null;
-}
-
 function updateTimer() {
-  const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
-  const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
-  const secs = String(elapsed % 60).padStart(2, '0');
-  document.getElementById('timer').textContent = `${mins}:${secs}`;
+  if (!recStartTime) return;
+  var s = Math.floor((Date.now() - recStartTime) / 1000);
+  document.getElementById('timer').textContent =
+    String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
 }
 
-// ── Waveform visualization ──
+// ── Recording ──
 
-function startWaveform() {
-  const canvas = document.getElementById('waveform');
-  const ctx = canvas.getContext('2d');
-  const bars = 40;
-  const barWidth = canvas.width / bars - 2;
-
-  function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#059669';
-    for (let i = 0; i < bars; i++) {
-      const height = Math.random() * canvas.height * 0.8 + canvas.height * 0.1;
-      const x = i * (barWidth + 2);
-      const y = (canvas.height - height) / 2;
-      ctx.fillRect(x, y, barWidth, height);
-    }
-    waveformAnimationId = requestAnimationFrame(draw);
-  }
-  draw();
-}
-
-function stopWaveform() {
-  if (waveformAnimationId) cancelAnimationFrame(waveformAnimationId);
-  waveformAnimationId = null;
-}
-
-// ── Clipboard helper ──
-
-async function copyToClipboard(text, btnEl) {
+async function startRecording() {
   try {
-    await navigator.clipboard.writeText(text);
-    btnEl.classList.add('copied');
-    setTimeout(() => btnEl.classList.remove('copied'), 1500);
-  } catch (e) {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    btnEl.classList.add('copied');
-    setTimeout(() => btnEl.classList.remove('copied'), 1500);
+    audioStream = await navigator.mediaDevices.getUserMedia({
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+    });
+  } catch (err) {
+    setState('error');
+    document.getElementById('error-message').textContent = 'Microfoon niet beschikbaar: ' + err.message;
+    return;
   }
-}
 
-// ── Format SOEP for clipboard ──
+  audioChunks = [];
+  var mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+    ? 'audio/webm;codecs=opus' : 'audio/webm';
 
-function formatSOEPText(soep) {
-  let text = '';
-  if (soep.s) text += `S: ${soep.s}\n`;
-  if (soep.o) text += `O: ${soep.o}\n`;
-  if (soep.e) text += `E: ${soep.e}\n`;
-  if (soep.p) text += `P: ${soep.p}\n`;
-  if (soep.icpc_code) text += `\nICPC: ${soep.icpc_code} - ${soep.icpc_titel || ''}`;
-  return text.trim();
-}
+  mediaRecorder = new MediaRecorder(audioStream, { mimeType: mimeType, audioBitsPerSecond: 128000 });
 
-// ── Service worker communication ──
+  mediaRecorder.ondataavailable = function(e) {
+    if (e.data && e.data.size > 0) audioChunks.push(e.data);
+  };
 
-function sendMessage(action, data) {
-  return chrome.runtime.sendMessage({ action: action, ...(data || {}) });
-}
+  mediaRecorder.onstop = function() {
+    var mime = mediaRecorder ? mediaRecorder.mimeType : 'audio/webm';
+    var blob = new Blob(audioChunks, { type: mime });
 
-// ── Event handlers ──
+    if (audioStream) { audioStream.getTracks().forEach(function(t) { t.stop(); }); audioStream = null; }
 
-document.getElementById('btn-settings').addEventListener('click', function() {
-  chrome.runtime.openOptionsPage();
-});
+    if (blob.size < 1000) {
+      setState('idle');
+      showStatus('Opname te kort. Probeer langer.', true);
+      return;
+    }
 
-document.getElementById('btn-start').addEventListener('click', async function() {
+    setState('processing');
+    showStatus('Verwerken...', false);
+    updateProgress(10, 'Audio wordt verzonden...');
+    sendAudioToAPI(blob, mime);
+  };
+
+  mediaRecorder.start();
+  recStartTime = Date.now();
+  timerInterval = setInterval(updateTimer, 500);
   setState('recording');
   showStatus('Opname actief...', false);
-  startTimer();
-  startWaveform();
-  var response = await sendMessage('START_RECORDING');
-  if (response && response.error) {
-    stopTimer();
-    stopWaveform();
+}
+
+function stopRecording() {
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop();
+  }
+}
+
+// ── API call ──
+
+async function sendAudioToAPI(blob, mimeType) {
+  try {
+    var config = await chrome.storage.sync.get(['apiUrl', 'apiKey', 'sttProvider', 'llmProvider']);
+    var apiUrl = (config.apiUrl || 'http://localhost:8002').replace(/\/$/, '');
+
+    var formData = new FormData();
+    var ext = mimeType.includes('webm') ? 'webm' : 'wav';
+    formData.append('audio', blob, 'consult.' + ext);
+    if (config.sttProvider) formData.append('stt_provider', config.sttProvider);
+    if (config.llmProvider) formData.append('llm_provider', config.llmProvider);
+
+    var headers = {};
+    if (config.apiKey) headers['X-API-Key'] = config.apiKey;
+
+    updateProgress(30, 'Audio wordt getranscribeerd...');
+
+    var response = await fetch(apiUrl + '/api/v1/consult/process', {
+      method: 'POST',
+      headers: headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      var errText = await response.text();
+      throw new Error('API fout (' + response.status + '): ' + errText.substring(0, 200));
+    }
+
+    var result = await response.json();
+
+    // Persist for widget pickup on Bricks
+    chrome.storage.local.set({ sv_state: 'results', sv_data: result });
+
+    displayResults(result);
+
+  } catch (err) {
     setState('error');
-    document.getElementById('error-message').textContent = response.error;
+    document.getElementById('error-message').textContent = err.message;
+    showStatus('Fout', true);
   }
-});
+}
 
-document.getElementById('btn-stop').addEventListener('click', async function() {
-  stopTimer();
-  stopWaveform();
-  setState('processing');
-  showStatus('Verwerken...', false);
-  updateProgress(10, 'Audio wordt verzonden...');
-  await sendMessage('STOP_RECORDING');
-});
-
-document.getElementById('btn-copy-decisief').addEventListener('click', function() {
-  var text = document.getElementById('decisief-text').textContent;
-  copyToClipboard(text, this);
-});
-
-document.getElementById('btn-copy-soep').addEventListener('click', function() {
-  var soep = {
-    s: document.getElementById('soep-s').textContent,
-    o: document.getElementById('soep-o').textContent,
-    e: document.getElementById('soep-e').textContent,
-    p: document.getElementById('soep-p').textContent,
-    icpc_code: document.getElementById('icpc-code') ? document.getElementById('icpc-code').textContent : '',
-    icpc_titel: document.getElementById('icpc-title') ? document.getElementById('icpc-title').textContent : '',
-  };
-  copyToClipboard(formatSOEPText(soep), this);
-});
-
-document.getElementById('btn-push-bricks').addEventListener('click', async function() {
-  var result = await sendMessage('PUSH_TO_BRICKS');
-  if (result && result.success) {
-    showStatus('Succesvol naar Bricks gepusht!', false);
-  } else {
-    showStatus((result && result.error) || 'Bricks-pagina niet gevonden.', true);
-  }
-});
-
-document.getElementById('btn-new-consult').addEventListener('click', function() {
-  hideStatus();
-  setState('idle');
-  chrome.storage.local.remove(['sv_state', 'sv_data', 'sv_error']);
-});
-
-document.getElementById('btn-retry').addEventListener('click', function() {
-  hideStatus();
-  setState('idle');
-});
-
-// ── Progress updates ──
+// ── Progress ──
 
 function updateProgress(percent, step) {
-  document.getElementById('progress-fill').style.width = percent + '%';
-  if (step) document.getElementById('processing-step').textContent = step;
+  var fill = document.getElementById('progress-fill');
+  if (fill) fill.style.width = percent + '%';
+  var stepEl = document.getElementById('processing-step');
+  if (stepEl && step) stepEl.textContent = step;
 }
 
 // ── Display results ──
 
 function displayResults(data) {
-  document.getElementById('decisief-text').textContent = data.decisief || 'Geen decisief regel gegenereerd.';
+  document.getElementById('decisief-text').textContent = data.decisief || '-';
 
   var soep = data.soep || {};
   document.getElementById('soep-s').textContent = soep.s || '-';
@@ -221,72 +173,91 @@ function displayResults(data) {
   showStatus('Verwerking voltooid', false);
 }
 
-// ── Listen for messages from service worker ──
+// ── Clipboard ──
 
-chrome.runtime.onMessage.addListener(function(msg) {
-  if (msg.action === 'PROCESSING_UPDATE') {
-    updateProgress(msg.percent, msg.step);
-  } else if (msg.action === 'PROCESSING_COMPLETE') {
-    displayResults(msg.data);
-  } else if (msg.action === 'PROCESSING_ERROR') {
-    setState('error');
-    document.getElementById('error-message').textContent =
-      msg.error || 'Er is een fout opgetreden bij het verwerken.';
-    showStatus('Fout bij verwerking', true);
+function formatSOEPText(soep) {
+  var parts = [];
+  if (soep.s) parts.push('S: ' + soep.s);
+  if (soep.o) parts.push('O: ' + soep.o);
+  if (soep.e) parts.push('E: ' + soep.e);
+  if (soep.p) parts.push('P: ' + soep.p);
+  if (soep.icpc_code) parts.push('\nICPC: ' + soep.icpc_code + (soep.icpc_titel ? ' - ' + soep.icpc_titel : ''));
+  return parts.join('\n');
+}
+
+async function copyToClipboard(text, btn) {
+  try { await navigator.clipboard.writeText(text); } catch (e) {
+    var ta = document.createElement('textarea'); ta.value = text;
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+  }
+  if (btn) { btn.classList.add('copied'); setTimeout(function() { btn.classList.remove('copied'); }, 1500); }
+}
+
+// ── Event listeners ──
+
+document.getElementById('btn-settings').addEventListener('click', function() {
+  chrome.runtime.openOptionsPage();
+});
+
+document.getElementById('btn-start').addEventListener('click', function() {
+  startRecording();
+});
+
+document.getElementById('btn-stop').addEventListener('click', function() {
+  stopRecording();
+});
+
+document.getElementById('btn-copy-decisief').addEventListener('click', function() {
+  copyToClipboard(document.getElementById('decisief-text').textContent, this);
+});
+
+document.getElementById('btn-copy-soep').addEventListener('click', function() {
+  var soep = {
+    s: document.getElementById('soep-s').textContent,
+    o: document.getElementById('soep-o').textContent,
+    e: document.getElementById('soep-e').textContent,
+    p: document.getElementById('soep-p').textContent,
+    icpc_code: document.getElementById('icpc-code') ? document.getElementById('icpc-code').textContent : '',
+    icpc_titel: document.getElementById('icpc-title') ? document.getElementById('icpc-title').textContent : '',
+  };
+  copyToClipboard(formatSOEPText(soep), this);
+});
+
+document.getElementById('btn-push-bricks').addEventListener('click', async function() {
+  var result = await chrome.runtime.sendMessage({ action: 'PUSH_TO_BRICKS' });
+  if (result && result.success) {
+    showStatus('Naar Bricks gepusht!', false);
+  } else {
+    showStatus((result && result.error) || 'Bricks-tab niet gevonden.', true);
   }
 });
 
-// ── Watch for storage changes (backup channel when messages don't arrive) ──
+document.getElementById('btn-new-consult').addEventListener('click', function() {
+  hideStatus();
+  setState('idle');
+  chrome.storage.local.remove(['sv_state', 'sv_data', 'sv_error']);
+});
+
+document.getElementById('btn-retry').addEventListener('click', function() {
+  hideStatus();
+  setState('idle');
+});
+
+// ── Watch storage for widget-initiated results ──
 
 chrome.storage.onChanged.addListener(function(changes, area) {
   if (area !== 'local') return;
-  if (changes.sv_state) {
-    var newState = changes.sv_state.newValue;
-    if (newState === 'results' && changes.sv_data && changes.sv_data.newValue) {
-      displayResults(changes.sv_data.newValue);
-    } else if (newState === 'error') {
-      var errMsg = (changes.sv_error && changes.sv_error.newValue) || 'Er is een fout opgetreden.';
-      setState('error');
-      document.getElementById('error-message').textContent = errMsg;
-      showStatus('Fout bij verwerking', true);
-    }
+  if (changes.sv_state && changes.sv_state.newValue === 'results' && changes.sv_data && changes.sv_data.newValue) {
+    displayResults(changes.sv_data.newValue);
   }
 });
 
-// ── Initialize ──
+// ── Init: check for existing results ──
 
 async function init() {
-  // First try the service worker (fast, in-memory)
-  try {
-    var response = await sendMessage('GET_STATE');
-    if (response && response.state === 'recording') {
-      setState('recording');
-      showStatus('Opname actief...', false);
-      recordingStartTime = response.startTime || Date.now();
-      startTimer();
-      startWaveform();
-      return;
-    } else if (response && response.state === 'processing') {
-      setState('processing');
-      showStatus('Verwerken...', false);
-      updateProgress(response.percent || 50, response.step || 'Bezig met verwerken...');
-      return;
-    } else if (response && response.state === 'results' && response.data) {
-      displayResults(response.data);
-      return;
-    }
-  } catch (e) {
-    // Service worker may have gone to sleep
-  }
-
-  // Fallback: check persisted state in storage
-  var stored = await chrome.storage.local.get(['sv_state', 'sv_data', 'sv_error']);
+  var stored = await chrome.storage.local.get(['sv_state', 'sv_data']);
   if (stored.sv_state === 'results' && stored.sv_data) {
     displayResults(stored.sv_data);
-  } else if (stored.sv_state === 'error' && stored.sv_error) {
-    setState('error');
-    document.getElementById('error-message').textContent = stored.sv_error;
-    showStatus('Fout bij verwerking', true);
   } else {
     setState('idle');
   }

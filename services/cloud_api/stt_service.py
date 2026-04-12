@@ -124,6 +124,16 @@ async def _transcribe_deepgram(audio_path: Path) -> TranscriptResult:
         with open(audio_path, "rb") as f:
             audio_data = f.read()
 
+        logger.info(
+            "deepgram.request",
+            audio_size_bytes=len(audio_data),
+            audio_size_kb=round(len(audio_data) / 1024, 1),
+            content_type=content_type,
+            file_ext=ext,
+            model=config.stt.deepgram_model,
+            language=config.stt.deepgram_language,
+        )
+
         response = await client.post(
             "https://api.deepgram.com/v1/listen",
             headers={
@@ -140,13 +150,36 @@ async def _transcribe_deepgram(audio_path: Path) -> TranscriptResult:
             },
             content=audio_data,
         )
+
+        logger.info("deepgram.response_status", status_code=response.status_code)
+
+        if response.status_code != 200:
+            logger.error("deepgram.error", status=response.status_code, body=response.text[:500])
+
         response.raise_for_status()
         data = response.json()
+
+    # Log full Deepgram response for debugging
+    metadata = data.get("metadata", {})
+    logger.info(
+        "deepgram.result",
+        duration=metadata.get("duration", 0),
+        channels_count=len(data.get("results", {}).get("channels", [])),
+        model_info=metadata.get("model_info", {}),
+        request_id=metadata.get("request_id", ""),
+    )
 
     result = data.get("results", {})
     channels = result.get("channels", [{}])
     alternatives = channels[0].get("alternatives", [{}]) if channels else [{}]
     transcript_text = alternatives[0].get("transcript", "") if alternatives else ""
+
+    logger.info(
+        "deepgram.transcript",
+        text_length=len(transcript_text),
+        text_preview=transcript_text[:200] if transcript_text else "(LEEG)",
+        confidence=alternatives[0].get("confidence", 0) if alternatives else 0,
+    )
 
     segments = []
     for utt in result.get("utterances", []):

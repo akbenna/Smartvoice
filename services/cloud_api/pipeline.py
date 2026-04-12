@@ -102,8 +102,18 @@ async def process_consultation(
     result.stt_provider = transcript.provider
 
     if not transcript.raw_text.strip():
-        logger.warning("pipeline.empty_transcript")
-        result.decisief = "Geen spraak gedetecteerd in de opname."
+        logger.warning(
+            "pipeline.empty_transcript",
+            audio_path=str(audio_path),
+            duration_secs=transcript.duration_secs,
+            provider=transcript.provider,
+        )
+        result.decisief = (
+            f"Geen spraak gedetecteerd. "
+            f"Audio duur: {transcript.duration_secs:.1f}s, "
+            f"Provider: {transcript.provider}, "
+            f"Bestandsgrootte: {audio_path.stat().st_size / 1024:.1f} KB"
+        )
         return result
 
     # ── Step 2: SOEP Generation ──

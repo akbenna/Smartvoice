@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <title>SmartVoice - Debug Test</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: -apple-system, sans-serif; max-width: 700px; margin: 40px auto; padding: 20px; color: #1f2937; }
+    h1 { font-size: 22px; margin-bottom: 8px; }
+    .sub { color: #6b7280; margin-bottom: 24px; }
+    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+    h2 { font-size: 16px; margin-bottom: 12px; }
+    button { padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; margin: 4px; }
+    .btn-green { background: #059669; color: white; }
+    .btn-red { background: #dc2626; color: white; }
+    .btn-blue { background: #2563eb; color: white; }
+    .btn-gray { background: #f3f4f6; border: 1px solid #e5e7eb; }
+    pre { background: #f9fafb; border: 1px solid #e5e7eb; padding: 12px; border-radius: 8px; font-size: 12px; overflow-x: auto; max-height: 400px; overflow-y: auto; white-space: pre-wrap; margin-top: 8px; }
+    .status { padding: 8px 12px; border-radius: 6px; font-size: 13px; margin: 8px 0; }
+    .ok { background: #d1fae5; color: #065f46; }
+    .err { background: #fee2e2; color: #991b1b; }
+    .info { background: #dbeafe; color: #1e40af; }
+    #timer { font-size: 24px; font-variant-numeric: tabular-nums; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <h1>SmartVoice Debug Test</h1>
+  <p class="sub">Test elke stap apart: microfoon → audio → API → Deepgram → SOEP</p>
+
+  <!-- Step 1: API Health -->
+  <div class="card">
+    <h2>1. API Health Check</h2>
+    <button class="btn-green" onclick="testHealth()">Test API</button>
+    <div id="health-result"></div>
+  </div>
+
+  <!-- Step 2: Record Audio -->
+  <div class="card">
+    <h2>2. Audio Opname (in browser)</h2>
+    <button class="btn-green" id="rec-start" onclick="startRec()">Start opname</button>
+    <button class="btn-red" id="rec-stop" onclick="stopRec()" disabled>Stop opname</button>
+    <span id="timer"></span>
+    <div id="rec-result"></div>
+    <audio id="playback" controls class="hidden" style="width:100%;margin-top:8px;"></audio>
+  </div>
+
+  <!-- Step 3: Send to API -->
+  <div class="card">
+    <h2>3. Verstuur naar API</h2>
+    <button class="btn-blue" id="btn-send" onclick="sendToAPI()" disabled>Verstuur opname naar API</button>
+    <button class="btn-gray" onclick="sendTestTone()">Verstuur test-toon (piep)</button>
+    <div id="api-result"></div>
+    <pre id="api-raw" class="hidden"></pre>
+  </div>
+
+  <!-- Step 4: Upload bestaand bestand -->
+  <div class="card">
+    <h2>4. Of upload een audiobestand</h2>
+    <input type="file" id="file-upload" accept="audio/*" onchange="onFileSelected()">
+    <button class="btn-blue" id="btn-upload" onclick="sendFile()" disabled>Verstuur bestand</button>
+    <div id="upload-result"></div>
+  </div>
+
+  <script>
+    const API_URL = 'http://localhost:8002';
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let audioBlob = null;
+    let audioStream = null;
+    let timerInterval = null;
+    let recStart = null;
+    let uploadedFile = null;
+
+    // ── 1. Health ──
+    async function testHealth() {
+      const el = document.getElementById('health-result');
+      try {
+        const r = await fetch(API_URL + '/health');
+        const d = await r.json();
+        el.innerHTML = '<div class="status ok">API OK: ' + JSON.stringify(d) + '</div>';
+      } catch(e) {
+        el.innerHTML = '<div class="status err">API niet bereikbaar: ' + e.message + '. Draait de server? (python3 -m services.cloud_api.main)</div>';
+      }
+    }
+
+    // ── 2. Record ──
+    async function startRec() {
+      try {
+        audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioChunks = [];
+
+        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus' : 'audio/webm';
+
+        mediaRecorder = new MediaRecorder(audioStream, { mimeType });
+
+        mediaRecorder.ondataavailable = function(e) {
+          if (e.data.size > 0) audioChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = function() {
+          audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+          const el = document.getElementById('rec-result');
+          el.innerHTML = '<div class="status ok">Opgenomen: ' +
+            Math.round(audioBlob.size/1024) + ' KB, type: ' + audioBlob.type +
+            ', chunks: ' + audioChunks.length + '</div>';
+
+          // Show playback
+          const audio = document.getElementById('playback');
+          audio.src = URL.createObjectURL(audioBlob);
+          audio.classList.remove('hidden');
+
+          document.getElementById('btn-send').disabled = false;
+
+          // Cleanup
+          if (audioStream) {
+            audioStream.getTracks().forEach(t => t.stop());
+            audioStream = null;
+          }
+        };
+
+        mediaRecorder.start();
+        recStart = Date.now();
+        timerInterval = setInterval(() => {
+          const s = Math.floor((Date.now() - recStart) / 1000);
+          document.getElementById('timer').textContent =
+            String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
+        }, 500);
+
+        document.getElementById('rec-start').disabled = true;
+        document.getElementById('rec-stop').disabled = false;
+        document.getElementById('rec-result').innerHTML = '<div class="status info">Opname actief... Spreek iets in.</div>';
+
+      } catch(e) {
+        document.getElementById('rec-result').innerHTML =
+          '<div class="status err">Microfoon fout: ' + e.message + '</div>';
+      }
+    }
+
+    function stopRec() {
+      clearInterval(timerInterval);
+      document.getElementById('rec-start').disabled = false;
+      document.getElementById('rec-stop').disabled = true;
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
+    }
+
+    // ── 3. Send to API ──
+    async function sendToAPI() {
+      if (!audioBlob) return;
+      const el = document.getElementById('api-result');
+      const raw = document.getElementById('api-raw');
+      el.innerHTML = '<div class="status info">Bezig met verzenden (' + Math.round(audioBlob.size/1024) + ' KB)...</div>';
+
+      try {
+        const formData = new FormData();
+        formData.append('audio', audioBlob, 'consult.webm');
+
+        const r = await fetch(API_URL + '/api/v1/consult/process', {
+          method: 'POST',
+          body: formData,
+        });
+
+        const text = await r.text();
+        let d;
+        try { d = JSON.parse(text); } catch { d = null; }
+
+        if (r.ok && d) {
+          const soep = d.soep || {};
+          el.innerHTML = '<div class="status ' + (d.transcript ? 'ok' : 'err') + '">' +
+            '<b>Transcript:</b> ' + (d.transcript || '(LEEG)') + '<br>' +
+            '<b>Decisief:</b> ' + (d.decisief || '-') + '<br>' +
+            '<b>S:</b> ' + (soep.s || '-') + '<br>' +
+            '<b>O:</b> ' + (soep.o || '-') + '<br>' +
+            '<b>E:</b> ' + (soep.e || '-') + '<br>' +
+            '<b>P:</b> ' + (soep.p || '-') + '<br>' +
+            '<b>ICPC:</b> ' + (soep.icpc_code || '-') + ' ' + (soep.icpc_titel || '') + '<br>' +
+            '<b>Verwerktijd:</b> ' + (d.processing_time_secs || '?') + 's' +
+            '</div>';
+        } else {
+          el.innerHTML = '<div class="status err">API fout ' + r.status + '</div>';
+        }
+
+        raw.textContent = JSON.stringify(d || text, null, 2);
+        raw.classList.remove('hidden');
+
+      } catch(e) {
+        el.innerHTML = '<div class="status err">Fout: ' + e.message + '</div>';
+      }
+    }
+
+    // ── Test tone (generates a 3-second beep) ──
+    async function sendTestTone() {
+      const el = document.getElementById('api-result');
+      el.innerHTML = '<div class="status info">Genereer test-toon en verstuur...</div>';
+
+      try {
+        // Generate a 3-second 440Hz sine wave as WAV
+        const sampleRate = 16000;
+        const duration = 3;
+        const numSamples = sampleRate * duration;
+        const buffer = new ArrayBuffer(44 + numSamples * 2);
+        const view = new DataView(buffer);
+
+        // WAV header
+        const writeStr = (o, s) => { for(let i=0;i<s.length;i++) view.setUint8(o+i, s.charCodeAt(i)); };
+        writeStr(0, 'RIFF');
+        view.setUint32(4, 36 + numSamples * 2, true);
+        writeStr(8, 'WAVE');
+        writeStr(12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        writeStr(36, 'data');
+        view.setUint32(40, numSamples * 2, true);
+
+        // Sine wave
+        for (let i = 0; i < numSamples; i++) {
+          const sample = Math.sin(2 * Math.PI * 440 * i / sampleRate) * 0.5;
+          view.setInt16(44 + i * 2, sample * 32767, true);
+        }
+
+        const blob = new Blob([buffer], { type: 'audio/wav' });
+        el.innerHTML = '<div class="status info">Verstuur WAV test-toon (' + Math.round(blob.size/1024) + ' KB)...</div>';
+
+        const formData = new FormData();
+        formData.append('audio', blob, 'test.wav');
+
+        const r = await fetch(API_URL + '/api/v1/consult/process', {
+          method: 'POST',
+          body: formData,
+        });
+
+        const text = await r.text();
+        let d;
+        try { d = JSON.parse(text); } catch { d = null; }
+
+        const raw = document.getElementById('api-raw');
+
+        if (r.ok && d) {
+          el.innerHTML = '<div class="status ' + (r.ok ? 'info' : 'err') + '">' +
+            '<b>Status:</b> ' + r.status + '<br>' +
+            '<b>Transcript:</b> ' + (d.transcript || '(LEEG - normaal voor een pieptoon)') + '<br>' +
+            '<b>Decisief:</b> ' + (d.decisief || '-') + '<br>' +
+            '<b>Verwerktijd:</b> ' + (d.processing_time_secs || '?') + 's' +
+            '</div>';
+        } else {
+          el.innerHTML = '<div class="status err">API fout ' + r.status + ': ' + text.substring(0, 300) + '</div>';
+        }
+
+        raw.textContent = JSON.stringify(d || text, null, 2);
+        raw.classList.remove('hidden');
+
+      } catch(e) {
+        el.innerHTML = '<div class="status err">Fout: ' + e.message + '</div>';
+      }
+    }
+
+    // ── 4. File upload ──
+    function onFileSelected() {
+      uploadedFile = document.getElementById('file-upload').files[0];
+      document.getElementById('btn-upload').disabled = !uploadedFile;
+    }
+
+    async function sendFile() {
+      if (!uploadedFile) return;
+      const el = document.getElementById('upload-result');
+      el.innerHTML = '<div class="status info">Verstuur ' + uploadedFile.name + ' (' + Math.round(uploadedFile.size/1024) + ' KB)...</div>';
+
+      try {
+        const formData = new FormData();
+        formData.append('audio', uploadedFile);
+
+        const r = await fetch(API_URL + '/api/v1/consult/process', {
+          method: 'POST',
+          body: formData,
+        });
+
+        const d = await r.json();
+        const soep = d.soep || {};
+
+        el.innerHTML = '<div class="status ' + (d.transcript ? 'ok' : 'err') + '">' +
+          '<b>Transcript:</b> ' + (d.transcript || '(LEEG)') + '<br>' +
+          '<b>Decisief:</b> ' + (d.decisief || '-') + '<br>' +
+          '<b>S:</b> ' + (soep.s || '-') + '<br>' +
+          '<b>O:</b> ' + (soep.o || '-') + '<br>' +
+          '<b>E:</b> ' + (soep.e || '-') + '<br>' +
+          '<b>P:</b> ' + (soep.p || '-') + '<br>' +
+          '<b>ICPC:</b> ' + (soep.icpc_code || '-') + '</div>';
+
+      } catch(e) {
+        el.innerHTML = '<div class="status err">Fout: ' + e.message + '</div>';
+      }
+    }
+
+    // Auto-run health check
+    testHealth();
+  </script>
+</body>
+</html>

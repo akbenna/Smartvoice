@@ -1,12 +1,11 @@
 {
   "manifest_version": 3,
   "name": "SmartVoice — AI Consultassistent",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Neem consulten op en genereer automatisch SOEP-notities voor Bricks Huisarts",
   "permissions": [
     "activeTab",
     "storage",
-    "offscreen",
     "tabs"
   ],
   "host_permissions": [
@@ -16,15 +15,16 @@
     "https://*.bfrw.nl/*",
     "https://*.bfrw.cloud/*",
     "https://*.brickshuisarts.nl/*",
-    "https://*.bfrw-online.nl/*"
+    "https://*.bfrw-online.nl/*",
+    "http://localhost:8002/*",
+    "https://*.up.railway.app/*"
   ],
   "action": {
     "default_popup": "popup/popup.html",
     "default_title": "SmartVoice — AI Consultassistent"
   },
   "background": {
-    "service_worker": "background/service-worker.js",
-    "type": "module"
+    "service_worker": "background/service-worker.js"
   },
   "content_scripts": [
     {
@@ -35,7 +35,8 @@
         "https://*.bfrw.nl/*",
         "https://*.bfrw.cloud/*",
         "https://*.brickshuisarts.nl/*",
-        "https://*.bfrw-online.nl/*"
+        "https://*.bfrw-online.nl/*",
+        "http://localhost:8002/*"
       ],
       "js": ["content/bricks.js"],
       "css": ["content/bricks.css"],
@@ -45,12 +46,5 @@
   "options_ui": {
     "page": "options/options.html",
     "open_in_tab": true
-  },
-  "web_accessible_resources": [
-    {
-      "resources": ["recorder/recorder.html"],
-      "matches": ["<all_urls>"]
-    }
-  ],
-  "icons": {}
+  }
 }
