@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "SmartVoice — AI Consultassistent",
+  "version": "0.1.0",
+  "description": "Neem consulten op, genereer SOEP-documentatie, en push naar Bricks HIS",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "offscreen",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://*.bfrcloud.com/*",
+    "https://*.bfrnet.nl/*",
+    "https://*.bricks-huisarts.nl/*"
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.bfrcloud.com/*",
+        "https://*.bfrnet.nl/*",
+        "https://*.bricks-huisarts.nl/*"
+      ],
+      "js": ["content/bricks.js"],
+      "css": ["content/bricks.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_page": "options/options.html",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

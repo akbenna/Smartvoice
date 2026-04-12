@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmartVoice</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <div class="header">
+      <div class="logo">
+        <span class="logo-icon">AI</span>
+        <div>
+          <div class="logo-title">SmartVoice</div>
+          <div class="logo-sub">Consultassistent</div>
+        </div>
+      </div>
+      <button id="btn-settings" class="btn-icon" title="Instellingen">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Status bar -->
+    <div id="status-bar" class="status-bar status-idle">
+      <span id="status-dot" class="status-dot"></span>
+      <span id="status-text">Klaar voor opname</span>
+    </div>
+
+    <!-- Recording section -->
+    <div id="section-record" class="section">
+      <div class="timer-display">
+        <span id="timer">00:00</span>
+      </div>
+      <div class="waveform" id="waveform">
+        <canvas id="waveform-canvas" width="280" height="40"></canvas>
+      </div>
+      <div class="controls">
+        <button id="btn-record" class="btn-record" title="Start opname">
+          <svg id="icon-mic" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <svg id="icon-stop" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="display:none">
+            <rect x="6" y="6" width="12" height="12" rx="2"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Processing section -->
+    <div id="section-processing" class="section" style="display:none">
+      <div class="processing-spinner"></div>
+      <div class="processing-text">Verwerking bezig...</div>
+      <div id="processing-step" class="processing-step">Audio wordt getranscribeerd</div>
+    </div>
+
+    <!-- Result section -->
+    <div id="section-result" class="section" style="display:none">
+      <!-- Decisief regel -->
+      <div class="result-card decisief">
+        <div class="result-label">Decisief regel</div>
+        <div id="decisief-text" class="result-text"></div>
+        <button id="btn-copy-decisief" class="btn-small" title="Kopieer">Kopieer</button>
+      </div>
+
+      <!-- SOEP compact -->
+      <div class="result-card soep">
+        <div class="result-label">SOEP</div>
+        <div class="soep-fields">
+          <div class="soep-field"><span class="soep-badge s">S</span><span id="soep-s" class="soep-text"></span></div>
+          <div class="soep-field"><span class="soep-badge o">O</span><span id="soep-o" class="soep-text"></span></div>
+          <div class="soep-field"><span class="soep-badge e">E</span><span id="soep-e" class="soep-text"></span></div>
+          <div class="soep-field"><span class="soep-badge p">P</span><span id="soep-p" class="soep-text"></span></div>
+        </div>
+      </div>
+
+      <!-- Red flags -->
+      <div id="red-flags-container" class="result-card flags" style="display:none">
+        <div class="result-label flags-label">Rode vlaggen</div>
+        <div id="red-flags-list"></div>
+      </div>
+
+      <!-- Actions -->
+      <div class="actions">
+        <button id="btn-push-bricks" class="btn-primary">Naar Bricks</button>
+        <button id="btn-copy-soep" class="btn-secondary">Kopieer SOEP</button>
+        <button id="btn-new" class="btn-ghost">Nieuw consult</button>
+      </div>
+    </div>
+
+    <!-- Error section -->
+    <div id="section-error" class="section" style="display:none">
+      <div class="error-icon">!</div>
+      <div id="error-text" class="error-text"></div>
+      <button id="btn-retry" class="btn-secondary">Opnieuw proberen</button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

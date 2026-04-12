@@ -1,0 +1,13 @@
+# SmartVoice Cloud API — Dependencies
+# Lichtgewicht: alleen wat de cloud API nodig heeft
+
+# Web framework
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.9
+
+# HTTP client voor STT/LLM provider API calls
+httpx>=0.27.0
+
+# Environment variabelen laden
+python-dotenv>=1.0.0
