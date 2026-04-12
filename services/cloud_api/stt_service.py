@@ -1,0 +1,201 @@
+"""
+SmartVoice Cloud API - Speech-to-Text Service
+
+Pluggable STT with support for:
+  - Groq Whisper (free tier, fast)
+  - Deepgram Nova-2 (best Dutch accuracy)
+  - OpenAI Whisper API
+
+All providers return a unified TranscriptResult.
+"""
+
+from __future__ import annotations
+
+import tempfile
+from dataclasses import dataclass
+from pathlib import Path
+
+import httpx
+import structlog
+
+from .config import get_config
+
+logger = structlog.get_logger()
+
+
+@dataclass
+class TranscriptSegment:
+    """A single segment of transcribed speech."""
+
+    text: str
+    start: float
+    end: float
+    speaker: str = ""
+    confidence: float = 0.0
+
+
+@dataclass
+class TranscriptResult:
+    """Unified transcription result across all providers."""
+
+    raw_text: str
+    segments: list[TranscriptSegment]
+    language: str = "nl"
+    duration_secs: float = 0.0
+    provider: str = ""
+
+
+async def transcribe(audio_path: Path, provider: str | None = None) -> TranscriptResult:
+    """Transcribe audio file using the specified or default provider."""
+    config = get_config()
+    provider = provider or config.stt.default_provider
+
+    logger.info("stt.start", provider=provider, file=str(audio_path))
+
+    match provider:
+        case "groq":
+            return await _transcribe_groq(audio_path)
+        case "deepgram":
+            return await _transcribe_deepgram(audio_path)
+        case "openai":
+            return await _transcribe_openai(audio_path)
+        case _:
+            raise ValueError(f"Onbekende STT provider: {provider}")
+
+
+async def _transcribe_groq(audio_path: Path) -> TranscriptResult:
+    """Transcribe using Groq's free Whisper API."""
+    config = get_config()
+    api_key = config.stt.groq_api_key
+    if not api_key:
+        raise ValueError("GROQ_API_KEY niet geconfigureerd.")
+
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        with open(audio_path, "rb") as f:
+            response = await client.post(
+                "https://api.groq.com/openai/v1/audio/transcriptions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                files={"file": (audio_path.name, f, "audio/webm")},
+                data={
+                    "model": config.stt.groq_model,
+                    "language": "nl",
+                    "response_format": "verbose_json",
+                    "timestamp_granularities[]": "segment",
+                },
+            )
+        response.raise_for_status()
+        data = response.json()
+
+    segments = []
+    for seg in data.get("segments", []):
+        segments.append(TranscriptSegment(
+            text=seg.get("text", "").strip(),
+            start=seg.get("start", 0.0),
+            end=seg.get("end", 0.0),
+            confidence=seg.get("avg_logprob", 0.0),
+        ))
+
+    return TranscriptResult(
+        raw_text=data.get("text", ""),
+        segments=segments,
+        language=data.get("language", "nl"),
+        duration_secs=data.get("duration", 0.0),
+        provider="groq",
+    )
+
+
+async def _transcribe_deepgram(audio_path: Path) -> TranscriptResult:
+    """Transcribe using Deepgram Nova-2 (best Dutch accuracy)."""
+    config = get_config()
+    api_key = config.stt.deepgram_api_key
+    if not api_key:
+        raise ValueError("DEEPGRAM_API_KEY niet geconfigureerd.")
+
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        with open(audio_path, "rb") as f:
+            audio_data = f.read()
+
+        response = await client.post(
+            "https://api.deepgram.com/v1/listen",
+            headers={
+                "Authorization": f"Token {api_key}",
+                "Content-Type": "audio/webm",
+            },
+            params={
+                "model": config.stt.deepgram_model,
+                "language": config.stt.deepgram_language,
+                "punctuate": "true",
+                "diarize": "true",
+                "smart_format": "true",
+                "utterances": "true",
+            },
+            content=audio_data,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+    result = data.get("results", {})
+    channels = result.get("channels", [{}])
+    alternatives = channels[0].get("alternatives", [{}]) if channels else [{}]
+    transcript_text = alternatives[0].get("transcript", "") if alternatives else ""
+
+    segments = []
+    for utt in result.get("utterances", []):
+        segments.append(TranscriptSegment(
+            text=utt.get("transcript", "").strip(),
+            start=utt.get("start", 0.0),
+            end=utt.get("end", 0.0),
+            speaker=f"spreker_{utt.get('speaker', 0)}",
+            confidence=utt.get("confidence", 0.0),
+        ))
+
+    duration = result.get("metadata", {}).get("duration", 0.0)
+
+    return TranscriptResult(
+        raw_text=transcript_text,
+        segments=segments,
+        language="nl",
+        duration_secs=duration,
+        provider="deepgram",
+    )
+
+
+async def _transcribe_openai(audio_path: Path) -> TranscriptResult:
+    """Transcribe using OpenAI Whisper API."""
+    config = get_config()
+    api_key = config.stt.openai_api_key
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY niet geconfigureerd.")
+
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        with open(audio_path, "rb") as f:
+            response = await client.post(
+                "https://api.openai.com/v1/audio/transcriptions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                files={"file": (audio_path.name, f, "audio/webm")},
+                data={
+                    "model": config.stt.openai_model,
+                    "language": "nl",
+                    "response_format": "verbose_json",
+                    "timestamp_granularities[]": "segment",
+                },
+            )
+        response.raise_for_status()
+        data = response.json()
+
+    segments = []
+    for seg in data.get("segments", []):
+        segments.append(TranscriptSegment(
+            text=seg.get("text", "").strip(),
+            start=seg.get("start", 0.0),
+            end=seg.get("end", 0.0),
+            confidence=seg.get("avg_logprob", 0.0),
+        ))
+
+    return TranscriptResult(
+        raw_text=data.get("text", ""),
+        segments=segments,
+        language=data.get("language", "nl"),
+        duration_secs=data.get("duration", 0.0),
+        provider="openai",
+    )
