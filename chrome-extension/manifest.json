@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "SmartVoice - Consult Assistent",
+  "version": "1.0.0",
+  "description": "Neem consulten op en genereer automatisch SOEP-notities voor Bricks Huisarts",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "offscreen",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://*.bfrw.nl/*",
+    "https://*.bfrw.cloud/*",
+    "https://*.brickshuisarts.nl/*",
+    "https://*.bfrw-online.nl/*"
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "SmartVoice - Consult Assistent"
+  },
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.bfrw.nl/*",
+        "https://*.bfrw.cloud/*",
+        "https://*.brickshuisarts.nl/*",
+        "https://*.bfrw-online.nl/*"
+      ],
+      "js": ["content/bricks.js"],
+      "css": ["content/bricks.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  }
+}

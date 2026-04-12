@@ -1,0 +1,16 @@
+# SmartVoice Cloud API - Dependencies
+# Lightweight: no ML models, uses cloud APIs for STT and LLM
+
+# Web framework
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.18
+
+# HTTP client for provider APIs
+httpx>=0.27.0,<0.28.0
+
+# Logging
+structlog==24.4.0
+
+# Config
+python-dotenv==1.0.1
