@@ -15,7 +15,7 @@ from pathlib import Path
 
 import structlog
 import uvicorn
-from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 
@@ -44,6 +44,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Permissions-Policy header ──
+# Allow microphone access for pages served from this API (e.g. /debug).
+# This tells browsers that microphone usage is explicitly permitted.
+
+@app.middleware("http")
+async def add_permissions_policy(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Permissions-Policy"] = "microphone=*"
+    return response
+
 
 # ── Ensure temp directory exists ──
 

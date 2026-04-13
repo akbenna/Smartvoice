@@ -133,6 +133,15 @@ function updateTimer() {
 /* ── Recording ── */
 
 async function startRecording() {
+  // Pre-check microfoontoestemming
+  try {
+    var permResult = await navigator.permissions.query({ name: 'microphone' });
+    if (permResult.state === 'denied') {
+      showNotification('Microfoontoegang geblokkeerd. Sta microfoon toe in de browserinstellingen (adresbalk → slot-icoon).');
+      return;
+    }
+  } catch (e) { /* permissions API niet beschikbaar, probeer gewoon */ }
+
   try {
     var config = await chrome.storage.sync.get(['micDevice']);
     var audioConstraints = { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true };
@@ -142,7 +151,12 @@ async function startRecording() {
       audio: audioConstraints
     });
   } catch (err) {
-    showNotification('Microfoon niet beschikbaar: ' + err.message);
+    var errMsg = err.message || '';
+    if (errMsg.toLowerCase().includes('dismiss')) {
+      showNotification('Microfoontoegang geweigerd (dismissed). Klik op het slot-icoon in de adresbalk om microfoontoegang in te schakelen.');
+    } else {
+      showNotification('Microfoon niet beschikbaar: ' + errMsg);
+    }
     return;
   }
 

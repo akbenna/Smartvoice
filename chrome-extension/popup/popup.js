@@ -45,7 +45,43 @@ function updateTimer() {
 
 // ── Recording ──
 
+async function checkMicPermission() {
+  try {
+    var result = await navigator.permissions.query({ name: 'microphone' });
+    return result.state; // 'granted', 'denied', 'prompt'
+  } catch (e) {
+    return 'unknown';
+  }
+}
+
 async function startRecording() {
+  // Check of microfoontoestemming al is verleend.
+  // In een popup context kan de toestemmingsdialoog de popup sluiten,
+  // waardoor "Permission dismissed" optreedt. Stuur de gebruiker naar
+  // de instellingenpagina als toestemming nog niet is verleend.
+  var permState = await checkMicPermission();
+
+  if (permState === 'prompt' || permState === 'denied') {
+    setState('error');
+    document.getElementById('error-message').innerHTML =
+      '<strong>Microfoontoegang vereist</strong><br>' +
+      'Ga naar <a href="#" id="open-settings-link" style="color:#059669;text-decoration:underline;">Instellingen</a> ' +
+      'en klik op "Test microfoon" om toestemming te verlenen.<br>' +
+      '<span style="font-size:11px;color:#6b7280;">In een cloud-omgeving moet de toestemming vanuit een vast tabblad worden verleend, niet vanuit de popup.</span>';
+
+    // Wacht even tot DOM is bijgewerkt
+    setTimeout(function() {
+      var link = document.getElementById('open-settings-link');
+      if (link) {
+        link.addEventListener('click', function(e) {
+          e.preventDefault();
+          chrome.runtime.openOptionsPage();
+        });
+      }
+    }, 50);
+    return;
+  }
+
   try {
     var config = await chrome.storage.sync.get(['micDevice']);
     var audioConstraints = { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true };
@@ -56,7 +92,25 @@ async function startRecording() {
     });
   } catch (err) {
     setState('error');
-    document.getElementById('error-message').textContent = 'Microfoon niet beschikbaar: ' + err.message;
+
+    if (err.message && err.message.toLowerCase().includes('dismiss')) {
+      document.getElementById('error-message').innerHTML =
+        '<strong>Microfoontoegang geweigerd (dismissed)</strong><br>' +
+        'Dit gebeurt vaak in cloud-omgevingen. Ga naar ' +
+        '<a href="#" id="open-settings-link2" style="color:#059669;text-decoration:underline;">Instellingen</a> ' +
+        'en klik op "Test microfoon" om toestemming te verlenen.';
+      setTimeout(function() {
+        var link = document.getElementById('open-settings-link2');
+        if (link) {
+          link.addEventListener('click', function(e) {
+            e.preventDefault();
+            chrome.runtime.openOptionsPage();
+          });
+        }
+      }, 50);
+    } else {
+      document.getElementById('error-message').textContent = 'Microfoon niet beschikbaar: ' + err.message;
+    }
     return;
   }
 
