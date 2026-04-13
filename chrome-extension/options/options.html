@@ -125,6 +125,26 @@
   </div>
 
   <div class="card">
+    <h2>Microfoon</h2>
+    <div class="field">
+      <label for="micDevice">Invoerapparaat</label>
+      <select id="micDevice">
+        <option value="">Standaard microfoon (systeem)</option>
+      </select>
+      <p class="hint">Kies een externe microfoon als je systeem die niet automatisch selecteert.</p>
+    </div>
+    <div class="field">
+      <button id="btn-refresh-mic" class="btn" style="background:#f3f4f6;border:1px solid #e5e7eb;font-size:12px;padding:6px 14px;">
+        Ververs apparatenlijst
+      </button>
+      <button id="btn-test-mic" class="btn" style="background:#f3f4f6;border:1px solid #e5e7eb;font-size:12px;padding:6px 14px;margin-left:6px;">
+        Test microfoon
+      </button>
+      <span id="mic-test-status" style="font-size:12px;margin-left:8px;color:var(--text-secondary);"></span>
+    </div>
+  </div>
+
+  <div class="card">
     <h2>Bricks Veld Selectors (geavanceerd)</h2>
     <p class="hint" style="margin-bottom: 10px;">
       Optioneel: pas CSS-selectors aan als SmartVoice de Bricks-velden niet automatisch vindt.

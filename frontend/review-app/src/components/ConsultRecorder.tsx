@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useAudioRecorder } from "@/lib/useAudioRecorder";
+import { useMicrophoneDevices } from "@/lib/useMicrophoneDevices";
 
 interface ConsultRecorderProps {
   onComplete: (sessionId: string) => void;
@@ -25,6 +26,9 @@ interface SavedRecording {
  * zodat ze nooit verloren gaan als de backend offline is.
  */
 export default function ConsultRecorder({ onComplete }: ConsultRecorderProps) {
+  const { devices, selectedDeviceId, selectDevice, loading: devicesLoading } =
+    useMicrophoneDevices();
+
   const {
     state,
     duration,
@@ -37,7 +41,9 @@ export default function ConsultRecorder({ onComplete }: ConsultRecorderProps) {
     resume,
     stop,
     reset,
-  } = useAudioRecorder();
+  } = useAudioRecorder({
+    deviceId: selectedDeviceId || undefined,
+  });
 
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -280,6 +286,40 @@ export default function ConsultRecorder({ onComplete }: ConsultRecorderProps) {
             </div>
           )}
         </div>
+
+        {/* Microfoon selectie */}
+        {state === "idle" && (
+          <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+            <label
+              htmlFor="mic-select"
+              className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2"
+            >
+              <MicSettingsIcon />
+              Microfoon
+            </label>
+            {devicesLoading ? (
+              <p className="text-sm text-gray-400">Apparaten laden...</p>
+            ) : devices.length === 0 ? (
+              <p className="text-sm text-amber-600">
+                Geen microfoon gevonden. Sluit een microfoon aan en ververs de pagina.
+              </p>
+            ) : (
+              <select
+                id="mic-select"
+                value={selectedDeviceId}
+                onChange={(e) => selectDevice(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              >
+                <option value="">Standaard microfoon</option>
+                {devices.map((d) => (
+                  <option key={d.deviceId} value={d.deviceId}>
+                    {d.label}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
 
         {/* Timer */}
         <div className="text-center my-6">
@@ -579,6 +619,17 @@ function CheckIcon() {
   return (
     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+    </svg>
+  );
+}
+
+function MicSettingsIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19 10v2a7 7 0 01-14 0v-2" />
+      <circle cx="18" cy="18" r="3" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M18 15v1.5M18 20.5V22M15.4 16.4l1.06 1.06M19.54 20.54l1.06 1.06M15 18h1.5M20.5 18H22M15.4 19.6l1.06-1.06M19.54 15.46l1.06-1.06" />
     </svg>
   );
 }

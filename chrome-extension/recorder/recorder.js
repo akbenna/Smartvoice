@@ -53,8 +53,12 @@ function startWaveform() {
 
 btnStart.addEventListener('click', async function() {
   try {
+    var config = await chrome.storage.sync.get(['micDevice']);
+    var audioConstraints = { channelCount: 1, sampleRate: 16000, echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+    if (config.micDevice) audioConstraints.deviceId = { exact: config.micDevice };
+
     audioStream = await navigator.mediaDevices.getUserMedia({
-      audio: { channelCount: 1, sampleRate: 16000, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+      audio: audioConstraints
     });
 
     audioChunks = [];

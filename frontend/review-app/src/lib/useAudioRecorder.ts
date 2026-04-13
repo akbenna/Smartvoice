@@ -4,6 +4,11 @@ import { useState, useRef, useCallback, useEffect } from "react";
 
 export type RecorderState = "idle" | "recording" | "paused" | "stopped";
 
+export interface UseAudioRecorderOptions {
+  /** MediaDeviceInfo.deviceId van de gewenste microfoon. Leeg = systeemstandaard. */
+  deviceId?: string;
+}
+
 export interface UseAudioRecorderReturn {
   state: RecorderState;
   duration: number;
@@ -23,7 +28,7 @@ export interface UseAudioRecorderReturn {
  * Gebruikt MediaRecorder API met WAV-achtige kwaliteit (webm/opus, hoge bitrate).
  * Voor de spreekkamer: start/pauze/stop met real-time waveform data.
  */
-export function useAudioRecorder(): UseAudioRecorderReturn {
+export function useAudioRecorder(options?: UseAudioRecorderOptions): UseAudioRecorderReturn {
   const [state, setState] = useState<RecorderState>("idle");
   const [duration, setDuration] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -81,15 +86,19 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
     pausedDurationRef.current = 0;
 
     try {
-      // Vraag microfoon toegang
+      // Vraag microfoon toegang (met optioneel specifiek apparaat)
+      const audioConstraints: MediaTrackConstraints = {
+        channelCount: 1,
+        sampleRate: 16000,
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      };
+      if (options?.deviceId) {
+        audioConstraints.deviceId = { exact: options.deviceId };
+      }
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          channelCount: 1,
-          sampleRate: 16000,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
+        audio: audioConstraints,
       });
       streamRef.current = stream;
 
