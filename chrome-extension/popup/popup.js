@@ -139,7 +139,35 @@ async function startRecording() {
     setState('processing');
     showStatus('Verwerken...', false);
     updateProgress(10, 'Audio wordt verzonden...');
-    sendAudioToAPI(blob, mime);
+
+    // Converteer naar base64 en stuur naar service worker.
+    // De service worker maakt de API call — die overleeft het sluiten van de popup.
+    var reader = new FileReader();
+    reader.onloadend = function() {
+      var base64 = reader.result.split(',')[1];
+      chrome.runtime.sendMessage({
+        action: 'PROCESS_AUDIO',
+        audio: base64,
+        mimeType: mime,
+        size: blob.size,
+      }, function(response) {
+        if (chrome.runtime.lastError) {
+          // Service worker niet bereikbaar — fallback naar directe API call
+          sendAudioToAPI(blob, mime);
+          return;
+        }
+        if (response && response.success && response.data) {
+          displayResults(response.data);
+        } else if (response && response.error) {
+          setState('error');
+          document.getElementById('error-message').textContent = response.error;
+          showStatus('Fout', true);
+        }
+        // Als popup al dicht is: resultaten staan in chrome.storage.local
+        // en worden opgepikt bij heropenen (init functie + storage listener).
+      });
+    };
+    reader.readAsDataURL(blob);
   };
 
   mediaRecorder.start();
@@ -194,7 +222,14 @@ async function sendAudioToAPI(blob, mimeType) {
 
   } catch (err) {
     setState('error');
-    document.getElementById('error-message').textContent = err.message;
+    var errorMsg = err.message || 'Onbekende fout';
+
+    if (errorMsg === 'Failed to fetch') {
+      errorMsg = 'Kan de API niet bereiken op: ' + apiUrl +
+        '\n\nControleer:\n• Is de API URL correct? (Instellingen → API URL)\n• Is de server actief?\n• Heb je internetverbinding?';
+    }
+
+    document.getElementById('error-message').textContent = errorMsg;
     showStatus('Fout', true);
   }
 }
@@ -301,21 +336,42 @@ document.getElementById('btn-retry').addEventListener('click', function() {
   setState('idle');
 });
 
-// ── Watch storage for widget-initiated results ──
+// ── Watch storage for service-worker / widget results ──
 
 chrome.storage.onChanged.addListener(function(changes, area) {
   if (area !== 'local') return;
-  if (changes.sv_state && changes.sv_state.newValue === 'results' && changes.sv_data && changes.sv_data.newValue) {
-    displayResults(changes.sv_data.newValue);
+
+  if (changes.sv_state) {
+    var newState = changes.sv_state.newValue;
+
+    if (newState === 'results' && changes.sv_data && changes.sv_data.newValue) {
+      displayResults(changes.sv_data.newValue);
+    } else if (newState === 'error' && changes.sv_error && changes.sv_error.newValue) {
+      setState('error');
+      document.getElementById('error-message').textContent = changes.sv_error.newValue;
+      showStatus('Fout', true);
+    } else if (newState === 'processing') {
+      setState('processing');
+      var step = changes.sv_step ? changes.sv_step.newValue : 'Verwerken...';
+      updateProgress(30, step || 'Verwerken...');
+    }
   }
 });
 
-// ── Init: check for existing results ──
+// ── Init: check for existing results / in-progress processing ──
 
 async function init() {
-  var stored = await chrome.storage.local.get(['sv_state', 'sv_data']);
+  var stored = await chrome.storage.local.get(['sv_state', 'sv_data', 'sv_error']);
   if (stored.sv_state === 'results' && stored.sv_data) {
     displayResults(stored.sv_data);
+  } else if (stored.sv_state === 'processing') {
+    setState('processing');
+    showStatus('Verwerken...', false);
+    updateProgress(30, 'Wachten op resultaat van server...');
+  } else if (stored.sv_state === 'error' && stored.sv_error) {
+    setState('error');
+    document.getElementById('error-message').textContent = stored.sv_error;
+    showStatus('Fout', true);
   } else {
     setState('idle');
   }

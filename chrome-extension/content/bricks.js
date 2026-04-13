@@ -238,8 +238,15 @@ async function sendAudioToAPI(blob, mimeType) {
     displayResults(result);
 
   } catch (err) {
+    var errorMsg = err.message || 'Onbekende fout';
+
+    if (errorMsg === 'Failed to fetch') {
+      errorMsg = 'Kan de API niet bereiken op: ' + apiUrl +
+        '. Controleer de API URL in SmartVoice Instellingen.';
+    }
+
     setWidgetState('error');
-    document.getElementById('sv-error-msg').textContent = err.message;
+    document.getElementById('sv-error-msg').textContent = errorMsg;
   }
 }
 
