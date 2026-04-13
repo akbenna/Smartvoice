@@ -57,6 +57,15 @@ btnStart.addEventListener('click', async function() {
     var audioConstraints = { channelCount: 1, sampleRate: 16000, echoCancellation: true, noiseSuppression: true, autoGainControl: true };
     if (config.micDevice) audioConstraints.deviceId = { exact: config.micDevice };
 
+    // Pre-check toestemming
+    try {
+      var permResult = await navigator.permissions.query({ name: 'microphone' });
+      if (permResult.state === 'denied') {
+        showError('Microfoontoegang geblokkeerd. Sta microfoon toe in je browserinstellingen (slot-icoon in adresbalk).');
+        return;
+      }
+    } catch (e) { /* permissions API niet beschikbaar */ }
+
     audioStream = await navigator.mediaDevices.getUserMedia({
       audio: audioConstraints
     });
@@ -122,7 +131,12 @@ btnStart.addEventListener('click', async function() {
     chrome.runtime.sendMessage({ action: 'RECORDER_STARTED' });
 
   } catch (err) {
-    showError('Microfoon niet beschikbaar: ' + err.message);
+    var errMsg = err.message || '';
+    if (errMsg.toLowerCase().includes('dismiss')) {
+      showError('Microfoontoegang geweigerd (dismissed). In cloud-omgevingen: ga naar SmartVoice Instellingen en klik "Test microfoon" om toestemming te verlenen.');
+    } else {
+      showError('Microfoon niet beschikbaar: ' + errMsg);
+    }
   }
 });
 
