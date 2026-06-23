@@ -21,6 +21,13 @@ from fastapi.responses import HTMLResponse
 
 from .auth import verify_api_key
 from .config import get_config
+from .medical_vocabulary import (
+    add_custom_correction,
+    correct_transcript_full,
+    get_hotwords,
+    load_custom_vocabulary,
+    save_custom_vocabulary,
+)
 from .pipeline import process_consultation
 
 logger = structlog.get_logger()
@@ -59,6 +66,12 @@ async def add_permissions_policy(request: Request, call_next):
 # ── Ensure temp directory exists ──
 
 os.makedirs(config.temp_dir, exist_ok=True)
+
+# ── Load custom vocabulary if available ──
+
+_custom_vocab_path = Path(config.temp_dir) / "custom_vocabulary.json"
+if _custom_vocab_path.exists():
+    load_custom_vocabulary(_custom_vocab_path)
 
 
 # ── Health check (no auth required) ──
@@ -179,6 +192,57 @@ async def list_providers(_api_key: str = Depends(verify_api_key)):
                 "gemini": bool(cfg.llm.gemini_api_key),
             },
         },
+    }
+
+
+# ── Vocabulary management endpoints ──
+
+
+@app.get("/api/v1/vocabulary/hotwords")
+async def get_vocabulary_hotwords(_api_key: str = Depends(verify_api_key)):
+    """Geeft de hotwords-string voor VibeVoice-ASR (toekomstig)."""
+    return {"hotwords": get_hotwords()}
+
+
+@app.post("/api/v1/vocabulary/correction")
+async def add_vocabulary_correction(
+    wrong: str = Form(..., description="Verkeerde transcriptie"),
+    correct: str = Form(..., description="Correcte spelling"),
+    _api_key: str = Depends(verify_api_key),
+):
+    """
+    Voeg een correctie toe aan de custom woordenlijst.
+    Onderdeel van de feedbackloop: arts corrigeert -> systeem leert.
+    """
+    add_custom_correction(wrong, correct)
+
+    # Persist naar disk
+    custom_path = Path(get_config().temp_dir) / "custom_vocabulary.json"
+    save_custom_vocabulary(custom_path)
+
+    return {
+        "status": "ok",
+        "wrong": wrong,
+        "correct": correct,
+        "message": f"Correctie toegevoegd: '{wrong}' → '{correct}'",
+    }
+
+
+@app.post("/api/v1/vocabulary/test")
+async def test_vocabulary_correction(
+    text: str = Form(..., description="Tekst om te corrigeren"),
+    _api_key: str = Depends(verify_api_key),
+):
+    """Test de woordenlijstcorrectie op een stuk tekst."""
+    corrected, stats = correct_transcript_full(text)
+    return {
+        "original": text,
+        "corrected": corrected,
+        "total_corrections": stats.total_corrections,
+        "corrections": [
+            {"from": wrong, "to": correct}
+            for wrong, correct in stats.corrections_applied
+        ],
     }
 
 

@@ -262,6 +262,17 @@ function displayResults(data) {
     document.getElementById('icpc-badge').classList.add('hidden');
   }
 
+  // Show vocabulary corrections count if any
+  var corrEl = document.getElementById('corrections-info');
+  if (corrEl) {
+    if (data.transcript_corrections && data.transcript_corrections > 0) {
+      corrEl.textContent = data.transcript_corrections + ' medische woordcorrectie(s) toegepast';
+      corrEl.classList.remove('hidden');
+    } else {
+      corrEl.classList.add('hidden');
+    }
+  }
+
   setState('results');
   showStatus('Verwerking voltooid', false);
 }

@@ -295,6 +295,33 @@
 
 .sv-icpc.hidden { display: none; }
 
+/* ── Vocabulary corrections badge ── */
+
+.sv-corrections-badge {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: #1e40af;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sv-corrections-badge.hidden { display: none; }
+
+.sv-corrections-badge span {
+  font-weight: 600;
+  background: #1e40af;
+  color: white;
+  border-radius: 10px;
+  padding: 0 6px;
+  font-size: 10px;
+  line-height: 18px;
+}
+
 .sv-actions {
   display: flex;
   gap: 8px;

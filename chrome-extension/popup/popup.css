@@ -205,6 +205,17 @@ body {
 }
 .icpc-badge span:first-child { font-weight: 700; color: var(--primary); }
 
+.corrections-info {
+  margin-top: 6px;
+  padding: 4px 8px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #1e40af;
+}
+.corrections-info.hidden { display: none; }
+
 /* Result actions */
 .result-actions {
   display: flex; gap: 8px;

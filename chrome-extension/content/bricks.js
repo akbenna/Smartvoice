@@ -308,6 +308,9 @@ function createWidget() {
           '<div class="sv-label">DECISIEF</div>' +
           '<p id="sv-decisief" class="sv-decisief-text"></p>' +
         '</div>' +
+        '<div id="sv-corrections-badge" class="sv-corrections-badge hidden">' +
+          '<span id="sv-corrections-count"></span> woordcorrecties toegepast' +
+        '</div>' +
         '<div class="sv-soep-grid">' +
           '<div class="sv-soep-item"><span class="sv-soep-letter">S</span><p id="sv-soep-s"></p></div>' +
           '<div class="sv-soep-item"><span class="sv-soep-letter">O</span><p id="sv-soep-o"></p></div>' +
@@ -410,6 +413,15 @@ function displayResults(data) {
     document.getElementById('sv-icpc-title').textContent = soep.icpc_titel || '';
   } else {
     icpcEl.classList.add('hidden');
+  }
+
+  // Vocabulary corrections badge
+  var corrBadge = document.getElementById('sv-corrections-badge');
+  if (data.transcript_corrections && data.transcript_corrections > 0) {
+    corrBadge.classList.remove('hidden');
+    document.getElementById('sv-corrections-count').textContent = data.transcript_corrections;
+  } else {
+    corrBadge.classList.add('hidden');
   }
 }
 

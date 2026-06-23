@@ -16,6 +16,7 @@ from typing import Dict, List, Optional
 import structlog
 
 from . import llm_service, stt_service
+from .medical_vocabulary import correct_transcript_full, CorrectionStats
 from .prompts import (
     DECISIEF_SYSTEM_PROMPT,
     DECISIEF_USER_TEMPLATE,
@@ -49,6 +50,8 @@ class PipelineResult:
     """Complete result from a single consultation processing."""
 
     transcript: str = ""
+    transcript_raw: str = ""
+    transcript_corrections: int = 0
     soep: SOEPResult = field(default_factory=SOEPResult)
     decisief: str = ""
     detection: DetectionResult = field(default_factory=DetectionResult)
@@ -59,6 +62,8 @@ class PipelineResult:
     def to_dict(self) -> dict:
         return {
             "transcript": self.transcript,
+            "transcript_raw": self.transcript_raw,
+            "transcript_corrections": self.transcript_corrections,
             "soep": asdict(self.soep),
             "decisief": self.decisief,
             "detection": asdict(self.detection),
@@ -97,9 +102,28 @@ async def process_consultation(
     # ── Step 1: Transcription ──
     logger.info("pipeline.step", step="transcription")
     transcript = await stt_service.transcribe(audio_path, provider=stt_provider)
-    result.transcript = transcript.raw_text
+    result.transcript_raw = transcript.raw_text
     result.duration_secs = transcript.duration_secs
     result.stt_provider = transcript.provider
+
+    # ── Step 1b: Medical vocabulary postprocessing ──
+    if transcript.raw_text.strip():
+        corrected_text, correction_stats = correct_transcript_full(transcript.raw_text)
+        result.transcript = corrected_text
+        result.transcript_corrections = correction_stats.total_corrections
+
+        if correction_stats.total_corrections > 0:
+            logger.info(
+                "pipeline.vocabulary_corrections",
+                total=correction_stats.total_corrections,
+                medication=correction_stats.medication_corrections,
+                medical_terms=correction_stats.medical_term_corrections,
+                icpc=correction_stats.icpc_corrections,
+                local=correction_stats.local_corrections,
+                corrections=correction_stats.corrections_applied[:10],
+            )
+    else:
+        result.transcript = transcript.raw_text
 
     if not transcript.raw_text.strip():
         logger.warning(
@@ -121,7 +145,7 @@ async def process_consultation(
     try:
         soep_response = await llm_service.complete(
             system_prompt=SOEP_SYSTEM_PROMPT,
-            user_prompt=SOEP_USER_TEMPLATE.format(transcript=transcript.raw_text),
+            user_prompt=SOEP_USER_TEMPLATE.format(transcript=result.transcript),
             provider=llm_provider,
             json_mode=True,
         )
