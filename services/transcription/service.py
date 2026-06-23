@@ -104,6 +104,7 @@ class TranscriptionService:
         self._initialized = False
         self._initial_prompt = None   # Compacte medische context voor Whisper
         self._hotwords = None         # Volledige termenlijst voor hotwords-param
+        self._align_cache = {}        # WhisperX alignment-modellen (per taal/device)
 
     async def initialize(self):
         """Laad Whisper en diarisatie modellen. Duurt ~30s bij eerste keer."""
@@ -254,6 +255,22 @@ class TranscriptionService:
             })
             all_text_parts.append(segment.text.strip())
             total_confidence += segment.avg_logprob
+
+        # --- Stap 1a2: Forced alignment (optioneel, WhisperX) ---
+        # Verfijnt woord-timestamps via wav2vec2 zodat sprekergrenzen preciezer
+        # op de woordgrens vallen. Valt terug op Faster-Whisper bij fout.
+        if getattr(self.config.whisper, "use_forced_alignment", False):
+            try:
+                from services.transcription import whisperx_align
+                whisper_segments = whisperx_align.forced_align(
+                    str(audio_path),
+                    whisper_segments,
+                    language=info.language or self.config.whisper.language,
+                    device=self.config.whisper.alignment_device,
+                    model_cache=self._align_cache,
+                )
+            except Exception as e:
+                logger.warning("Forced alignment overgeslagen", error=str(e))
 
         # --- Stap 1b: Deterministische naberekening via de woordenlijst ---
         # Corrigeert veelvoorkomende STT-fouten in medicatie-/medische termen

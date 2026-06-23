@@ -65,6 +65,10 @@ class WhisperConfig:
     custom_vocab_path: str = os.getenv(
         "WHISPER_CUSTOM_VOCAB_PATH", "/data/vocabulary/custom_vocabulary.json"
     )
+    # WhisperX forced-alignment (Fase 3): preciezere woord-timestamps. Zwaar
+    # (extra model + GPU); standaard uit, met fallback naar Faster-Whisper.
+    use_forced_alignment: bool = os.getenv("WHISPER_USE_FORCED_ALIGNMENT", "false").lower() == "true"
+    alignment_device: str = os.getenv("WHISPER_ALIGNMENT_DEVICE", "cuda")
 
 
 @dataclass

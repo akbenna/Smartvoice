@@ -255,7 +255,17 @@ De fragiele "eerste spreker = arts"-aanname en de segment-niveau sprekertoewijzi
 - **Rolherkenning** (`services/transcription/role_assignment.py`): arts vs. patiënt wordt bepaald op taalkundige cues — vragen stellen, beleid/advies geven en medische terminologie (arts) versus klachten in de ik-vorm (patiënt). Robuust voor wie het consult opent en voor een derde stem (kind/mantelzorger/tolk). De pipeline gebruikt woord-niveau wanneer woord-timestamps beschikbaar zijn en valt anders terug op segment-niveau — beide nu met de cue-gebaseerde rolbepaling.
 - **Tests**: `tests/test_diarization.py`, inclusief een end-to-end merge die een tweesprekersegment correct splitst en de rollen toewijst. Totaal nu 45 unit tests, alle groen.
 
-Wat van Fase 3 nog openstaat (bewust, want het vergt verzamelde data + GPU): volledige WhisperX-forced-alignment voor nóg preciezere woord-timestamps, en model-fine-tuning/DPO van Whisper (STT) en het SOEP-LLM op de eigen correctieparen.
+#### Fase 3 — forced-alignment & fine-tuning (geïmplementeerd, GPU-zijde)
+
+De zwaarste laag is gebouwd en getest, klaar om op een GPU-machine te draaien zodra er genoeg feedback is:
+
+- **WhisperX forced-alignment** (`services/transcription/whisperx_align.py`): optionele wav2vec2-verfijning van woord-timestamps (toggle `WHISPER_USE_FORCED_ALIGNMENT`), met automatische fallback naar Faster-Whisper. Voedt de woord-niveau diarisatie nóg preciezer.
+- **Trainingsdata-export** (`services/learning/training/` + `tools/build_training_data.py`): bouwt uit `consultation_feedback` een ASR-postcorrectie-SFT-dataset (transcript→correctie, **geen audio nodig** — past binnen het audioverwijderbeleid) en een SOEP-DPO-voorkeursdataset (goedgekeurd = chosen, origineel = rejected), met kwaliteitsfilters en datadrempels.
+- **Trainingsscripts**: `finetune_asr_correction.py` (mT5-SFT), `train_soep_dpo.py` (LoRA/DPO op het SOEP-LLM) en — alleen achter een expliciete consent/retentie-vlag — `finetune_whisper.py` (akoestische FT). Elk weigert te draaien onder de datadrempel.
+- **Runbook**: `docs/FASE3_FINETUNING.md` met vereisten, procedure, en de verplichte evaluatie-en-rollback via de meetlat vóór productie.
+- **Tests**: `tests/test_whisperx_align.py` + `tests/test_training_datasets.py` (pure mappers en data-builders). Totaal nu 53 unit tests, alle groen.
+
+Bewuste ontwerpkeuze: omdat het privacybeleid audio na goedkeuring verwijdert, is de primaire STT-fine-tuning **tekstgebaseerd** (ASR-postcorrectie op de overvloedige transcriptcorrecties); akoestische Whisper-FT blijft optioneel en alleen mogelijk met aparte, toestemming-gedekte audio-retentie.
 
 ---
 
