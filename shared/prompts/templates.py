@@ -72,7 +72,11 @@ SOEP-FORMAAT:
 REGELS:
 - Schrijf in telegramstijl (geen volledige zinnen, beknopt).
 - Gebruik standaard medische afkortingen (LE, BSE, RR, etc.).
-- NOOIT informatie verzinnen die niet in de extractie staat.
+- NOOIT informatie verzinnen die niet in de extractie staat (grounding).
+  Elke uitspraak moet herleidbaar zijn tot de extractie. Twijfel je of iets
+  daadwerkelijk genoemd is, markeer dan met [?] in plaats van te gokken.
+- Bondigheid: hou elk veld kort (richtlijn max. ~3 regels). Liever te beknopt
+  dan breedsprakig — breedsprakigheid leidt tot verzonnen details.
 - O-veld: als er geen lichamelijk onderzoek is verricht, schrijf "Geen LO verricht".
 
 Geef je antwoord als JSON:
@@ -89,6 +93,35 @@ SOEP_USER_TEMPLATE = """Schrijf een SOEP-notitie op basis van de volgende medisc
 
 EXTRACTIE:
 {extraction_json}"""
+
+# Few-shot: voorbeelden van eerder door de arts goedgekeurde SOEP's uit DEZE
+# praktijk. Ze leren het model de stijl/het abstractieniveau, niet de inhoud —
+# de inhoud komt uitsluitend uit de extractie van het huidige consult.
+SOEP_FEWSHOT_PREAMBLE = """Hieronder staan {n} voorbeelden van goedgekeurde SOEP-notities uit deze praktijk.
+Neem de STIJL, beknoptheid en afkortingsgewoonten over, maar NOOIT de inhoud.
+Baseer de nieuwe SOEP uitsluitend op de extractie van het huidige consult."""
+
+
+def format_soep_examples(examples) -> str:
+    """Bouw het few-shot-blok voor de SOEP-prompt uit geselecteerde voorbeelden.
+
+    `examples` is een lijst van FewShotExample (of objecten met een `.soep` dict).
+    Geeft een lege string terug als er geen voorbeelden zijn.
+    """
+    if not examples:
+        return ""
+    blocks = []
+    for i, ex in enumerate(examples, start=1):
+        soep = getattr(ex, "soep", None) or {}
+        blocks.append(
+            f"VOORBEELD {i}:\n"
+            f"S: {soep.get('S', '')}\n"
+            f"O: {soep.get('O', '')}\n"
+            f"E: {soep.get('E', '')}\n"
+            f"P: {soep.get('P', '')}"
+        )
+    preamble = SOEP_FEWSHOT_PREAMBLE.format(n=len(examples))
+    return preamble + "\n\n" + "\n\n".join(blocks) + "\n\n"
 
 # =============================================================================
 # Stap 3: Rode Vlaggen & Missing Info Detectie

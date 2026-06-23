@@ -56,6 +56,15 @@ class WhisperConfig:
     compute_type: str = os.getenv("WHISPER_COMPUTE_TYPE", "float16")
     language: str = os.getenv("WHISPER_LANGUAGE", "nl")
     beam_size: int = int(os.getenv("WHISPER_BEAM_SIZE", "5"))
+    # Medische context-biasing (zie shared/vocabulary.py)
+    use_initial_prompt: bool = os.getenv("WHISPER_USE_INITIAL_PROMPT", "true").lower() == "true"
+    use_hotwords: bool = os.getenv("WHISPER_USE_HOTWORDS", "true").lower() == "true"
+    # Deterministische naberekening van het transcript via de woordenlijst
+    postcorrect_transcript: bool = os.getenv("WHISPER_POSTCORRECT", "true").lower() == "true"
+    # Pad naar geleerde (custom) correcties uit de feedbackloop
+    custom_vocab_path: str = os.getenv(
+        "WHISPER_CUSTOM_VOCAB_PATH", "/data/vocabulary/custom_vocabulary.json"
+    )
 
 
 @dataclass
@@ -70,6 +79,15 @@ class OllamaConfig:
     model: str = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
     fallback_model: str = os.getenv("OLLAMA_FALLBACK_MODEL", "")
     timeout: int = int(os.getenv("OLLAMA_TIMEOUT", "120"))
+
+
+@dataclass
+class FewShotConfig:
+    """Dynamische few-shot uit goedgekeurde SOEP's (zelflerende laag, niveau 2)."""
+    enabled: bool = os.getenv("FEWSHOT_ENABLED", "true").lower() == "true"
+    bank_path: str = os.getenv("FEWSHOT_BANK_PATH", "/data/fewshot/soep_examples.json")
+    k: int = int(os.getenv("FEWSHOT_K", "3"))
+    max_examples: int = int(os.getenv("FEWSHOT_MAX_EXAMPLES", "500"))
 
 
 @dataclass
@@ -139,6 +157,7 @@ class AppConfig:
     whisper: WhisperConfig = field(default_factory=WhisperConfig)
     diarization: DiarizationConfig = field(default_factory=DiarizationConfig)
     ollama: OllamaConfig = field(default_factory=OllamaConfig)
+    fewshot: FewShotConfig = field(default_factory=FewShotConfig)
     cloud_fallback: CloudFallbackConfig = field(default_factory=CloudFallbackConfig)
     audio: AudioConfig = field(default_factory=AudioConfig)
     audit: AuditConfig = field(default_factory=AuditConfig)

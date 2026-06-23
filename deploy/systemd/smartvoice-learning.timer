@@ -1,0 +1,12 @@
+[Unit]
+Description=SmartVoice zelflerende jobs — wekelijkse trigger
+
+[Timer]
+# Elke maandag 03:00 (rustig moment, buiten spreekuren)
+OnCalendar=Mon *-*-* 03:00:00
+# Mis je een run (server uit)? Dan alsnog draaien bij eerstvolgende start
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

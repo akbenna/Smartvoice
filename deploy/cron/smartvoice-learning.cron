@@ -1,0 +1,8 @@
+# SmartVoice — zelflerende jobs (alternatief voor de systemd-timer)
+# Installeren:  crontab -e   en onderstaande regel plakken (pas pad/gebruiker aan)
+# Of plaats dit bestand in /etc/cron.d/smartvoice-learning (dan met gebruikersveld).
+#
+# Draait elke maandag om 03:00. Logging gaat naar $SMARTVOICE_ROOT/logs/.
+
+# m h dom mon dow   command
+0 3 * * 1   smartvoice   /opt/smartvoice/scripts/run_learning_jobs.sh >> /opt/smartvoice/logs/cron.log 2>&1

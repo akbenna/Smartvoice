@@ -32,7 +32,9 @@ from shared.prompts.templates import (
     DETECTION_SYSTEM_PROMPT,
     DETECTION_USER_TEMPLATE,
     PATIENT_INSTRUCTION_PROMPT,
+    format_soep_examples,
 )
+from services.learning.fewshot_bank import FewShotBank, build_query_from_extraction
 
 # Laad JSON schema's voor validatie
 SCHEMA_DIR = Path(__file__).parent.parent.parent / "shared" / "schemas"
@@ -70,6 +72,7 @@ class LLMClient:
         system_prompt: str,
         user_prompt: str,
         format_json: bool = True,
+        schema: dict | None = None,
     ) -> dict | str:
         """
         Genereer een response van het lokale LLM.
@@ -78,6 +81,10 @@ class LLMClient:
             system_prompt: Systeeminstructie
             user_prompt: Gebruikersprompt met data
             format_json: Als True, dwing JSON output af
+            schema: Optioneel JSON-schema. Als meegegeven, gebruikt Ollama
+                grammatica-gestuurde decoding op dit schema (betrouwbaarder en
+                sneller dan generieke "json"-modus). Valt terug op "json" als
+                geen schema is opgegeven.
 
         Returns:
             Geparsed JSON dict of raw string
@@ -97,7 +104,8 @@ class LLMClient:
         }
 
         if format_json:
-            payload["format"] = "json"
+            # Een concreet JSON-schema dwingt geldige, volledige output af.
+            payload["format"] = schema if schema else "json"
 
         async def _do_request():
             async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -173,6 +181,24 @@ class ExtractionService:
             model=config.ollama.model,
             timeout=config.ollama.timeout,
         )
+        self._fewshot_bank = None
+        self._fewshot_loaded = False
+
+    def _get_fewshot_bank(self):
+        """Laad de few-shot-bank lazily (zelflerende laag, niveau 2)."""
+        if self._fewshot_loaded:
+            return self._fewshot_bank
+        self._fewshot_loaded = True
+        fs = getattr(self.config, "fewshot", None)
+        if fs and getattr(fs, "enabled", False):
+            try:
+                self._fewshot_bank = FewShotBank.load(fs.bank_path)
+                logger.info("Few-shot-bank geladen",
+                            examples=len(self._fewshot_bank.examples))
+            except Exception as e:
+                logger.warning("Few-shot-bank laden mislukt", error=str(e))
+                self._fewshot_bank = None
+        return self._fewshot_bank
 
     async def extract(self, transcript_text: str) -> dict:
         """
@@ -194,6 +220,7 @@ class ExtractionService:
             system_prompt=EXTRACTION_SYSTEM_PROMPT,
             user_prompt=user_prompt,
             format_json=True,
+            schema=EXTRACTION_SCHEMA or None,
         )
 
         # Valideer tegen JSON schema
@@ -224,10 +251,22 @@ class ExtractionService:
             extraction_json=json.dumps(extraction, ensure_ascii=False, indent=2)
         )
 
+        # Dynamische few-shot: meest gelijkende goedgekeurde SOEP's uit deze
+        # praktijk vooraan plaatsen, zodat het model de praktijkstijl overneemt.
+        bank = self._get_fewshot_bank()
+        if bank is not None and bank.examples:
+            query = build_query_from_extraction(extraction)
+            examples = bank.select(query, k=getattr(self.config.fewshot, "k", 3))
+            fewshot_block = format_soep_examples(examples)
+            if fewshot_block:
+                user_prompt = fewshot_block + user_prompt
+                logger.info("Few-shot voorbeelden toegevoegd", count=len(examples))
+
         result = await self.llm.generate(
             system_prompt=SOEP_SYSTEM_PROMPT,
             user_prompt=user_prompt,
             format_json=True,
+            schema=SOEP_SCHEMA or None,
         )
 
         # Valideer verplichte velden
@@ -270,6 +309,7 @@ class ExtractionService:
             system_prompt=DETECTION_SYSTEM_PROMPT,
             user_prompt=user_prompt,
             format_json=True,
+            schema=DETECTION_SCHEMA or None,
         )
 
         rode_vlaggen = result.get("rode_vlaggen", [])

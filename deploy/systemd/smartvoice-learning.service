@@ -1,0 +1,21 @@
+[Unit]
+# SmartVoice — zelflerende jobs (vocabulaire + few-shot)
+Description=SmartVoice zelflerende jobs (vocabulaire + few-shot)
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Pas User/WorkingDirectory aan naar de installatie op de praktijkserver
+User=smartvoice
+WorkingDirectory=/opt/smartvoice
+# Het wrapper-script laadt zelf .env en kiest de venv-python
+ExecStart=/opt/smartvoice/scripts/run_learning_jobs.sh
+Nice=10
+# Beveiliging: minimale rechten
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

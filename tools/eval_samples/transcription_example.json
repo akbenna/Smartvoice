@@ -1,0 +1,10 @@
+[
+  {
+    "reference": "patient met hypertensie gebruikt metformine en amlodipine, bloeddruk te hoog",
+    "hypothesis": "patient met hypertensie gebruikt metaformien en amlodiepine, bloeddruk te hoog"
+  },
+  {
+    "reference": "bekend met diabetes mellitus type 2, start gliclazide",
+    "hypothesis": "bekend met diabetes melitus type 2, start gliclazide"
+  }
+]
