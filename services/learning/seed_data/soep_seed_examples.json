@@ -1,0 +1,402 @@
+{
+  "note": "SYNTHETISCHE seed-voorbeelden voor de koude start van de few-shot-bank. Geen patientdata. Bedoeld om de SOEP-STIJL (telegramstijl, beknoptheid, ICPC) te ankeren, NIET de inhoud. Door arts te reviewen voor klinisch gebruik. Vervang/uitbreiden zodra echte goedgekeurde SOEP's beschikbaar zijn (tools/build_fewshot_bank.py).",
+  "version": "1.1",
+  "examples": [
+    {
+      "id": "seed_n95_spanningshoofdpijn",
+      "soep": {
+        "S": "Hoofdpijn sinds 3 dagen, drukkend bandgevoel rondom hoofd. Geen koorts, geen nekpijn, geen visus- of neurologische uitval. Paracetamol onvoldoende effect.",
+        "O": "RR 130/85. Geen nekstijfheid. Neurologisch oriënterend gb.",
+        "E": "Spanningshoofdpijn. DD migraine, medicatie-overgebruikshoofdpijn.",
+        "P": "Uitleg benigne karakter. Ibuprofen 400 mg zn, max 3dd. Analgeticagebruik <2 dgn/wk. Controle bij persisteren >1 wk of alarmsymptomen.",
+        "icpc_code": "N95",
+        "icpc_titel": "Spanningshoofdpijn"
+      }
+    },
+    {
+      "id": "seed_u71_cystitis",
+      "soep": {
+        "S": "Sinds 2 dagen pijnlijke mictie en frequente aandrang. Geen koorts, geen flankpijn. Niet zwanger, geen afweerstoornis.",
+        "O": "Urinestick: leuko positief, nitriet positief.",
+        "E": "Ongecompliceerde cystitis.",
+        "P": "Nitrofurantoïne 100 mg 2dd 5 dgn. Adviezen ruime vochtinname. Terug bij koorts of flankpijn (verdenking pyelonefritis).",
+        "icpc_code": "U71",
+        "icpc_titel": "Cystitis/urineweginfectie"
+      }
+    },
+    {
+      "id": "seed_r78_acute_bronchitis",
+      "soep": {
+        "S": "Hoesten sinds 1 week, productief, geen dyspneu in rust, subfebriel geweest. Niet-roker, geen comorbiditeit.",
+        "O": "Temp 37,6. Saturatie 98%. Longen: licht verlengd expirium, geen crepitaties.",
+        "E": "Acute bronchitis, viraal beeld. DD pneumonie (laag risico).",
+        "P": "Uitleg zelflimiterend beloop, geen antibioticum geïndiceerd. Terug bij dyspneu, hoge koorts of klachten >3 wk.",
+        "icpc_code": "R78",
+        "icpc_titel": "Acute bronchitis/bronchiolitis"
+      }
+    },
+    {
+      "id": "seed_h71_otitis_media",
+      "soep": {
+        "S": "Kind 4 jr, oorpijn rechts sinds afgelopen nacht, koorts 38,9, recent verkouden. Drinkt redelijk.",
+        "O": "Trommelvlies rechts rood en bomberend, lichtreflex afwezig. Links normaal.",
+        "E": "Acute otitis media rechts.",
+        "P": "Adequate pijnstilling paracetamol op gewicht. Afwachtend beleid (geen AB eerste 2-3 dgn). Terug bij verslechtering, uitblijven verbetering na 48 u of ziek kind met otorroe.",
+        "icpc_code": "H71",
+        "icpc_titel": "Acute otitis media/myringitis"
+      }
+    },
+    {
+      "id": "seed_l03_lagerugpijn",
+      "soep": {
+        "S": "Lage rugpijn sinds 4 dgn na tillen. Geen uitstraling in been, geen mictie-/defecatieproblemen, geen krachtsverlies.",
+        "O": "Paravertebrale spierspanning lumbaal. SLR negatief. Neurologisch gb.",
+        "E": "Aspecifieke lagerugpijn. Geen rode vlaggen.",
+        "P": "Uitleg gunstige prognose. In beweging blijven, activiteit doseren. Paracetamol/NSAID zn. Controle bij uitstraling, neurologische uitval of klachten >6 wk.",
+        "icpc_code": "L03",
+        "icpc_titel": "Lage-rugklachten zonder uitstraling"
+      }
+    },
+    {
+      "id": "seed_l77_enkeldistorsie",
+      "soep": {
+        "S": "Gisteren enkel verzwikt (inversietrauma). Kan met moeite belasten, zwelling laterale enkel.",
+        "O": "Zwelling en drukpijn rond laterale malleolus. Geen drukpijn os naviculare of basis MT5. Kan 4 stappen lopen.",
+        "E": "Lateraal enkelbandletsel (distorsie). Ottawa: geen indicatie X-enkel.",
+        "P": "RICE, belasten op geleide van pijn, NSAID zn. Mobiliseren. Controle bij uitblijven verbetering na 1 wk.",
+        "icpc_code": "L77",
+        "icpc_titel": "Verstuiking/distorsie enkel"
+      }
+    },
+    {
+      "id": "seed_k86_hypertensie_controle",
+      "soep": {
+        "S": "Controle bekende hypertensie. Geen klachten, therapietrouw goed. Geen pijn op de borst of dyspneu.",
+        "O": "RR 138/86 (gemiddelde). Pols regulair. Gewicht stabiel.",
+        "E": "Essentiële hypertensie, redelijk gereguleerd.",
+        "P": "Continueer amlodipine 5 mg 1dd. Leefstijl: zoutbeperking, beweging. Jaarlijks CVRM/lab. Controle over 3 mnd.",
+        "icpc_code": "K86",
+        "icpc_titel": "Hypertensie zonder orgaanbeschadiging"
+      }
+    },
+    {
+      "id": "seed_t90_dm2_controle",
+      "soep": {
+        "S": "Kwartaalcontrole DM type 2. Geen hypo's, geen visus- of voetklachten.",
+        "O": "RR 134/82. Gewicht 88 kg. HbA1c 53 mmol/mol. Voetinspectie: intacte huid, sensibiliteit gb.",
+        "E": "Diabetes mellitus type 2, redelijke regulatie.",
+        "P": "Continueer metformine 1000 mg 2dd. Leefstijladvies. Jaarlijkse fundus- en voetcontrole. Controle over 3 mnd.",
+        "icpc_code": "T90",
+        "icpc_titel": "Diabetes mellitus type 2"
+      }
+    },
+    {
+      "id": "seed_r74_bovensteluchtweginfectie",
+      "soep": {
+        "S": "Sinds 4 dgn loopneus, keelpijn, niezen, milde malaise. Geen dyspneu.",
+        "O": "Temp 37,2. Keel licht rood, geen exsudaat. Longen schoon.",
+        "E": "Virale bovensteluchtweginfectie.",
+        "P": "Symptomatisch: rust, vocht, paracetamol zn. Zelflimiterend. Terug bij koorts >3-4 dgn, dyspneu of oorpijn.",
+        "icpc_code": "R74",
+        "icpc_titel": "Acute infectie bovenste luchtwegen"
+      }
+    },
+    {
+      "id": "seed_f70_conjunctivitis",
+      "soep": {
+        "S": "Rood, plakkend rechteroog sinds 2 dgn, 's ochtends dichtgeplakt. Geen visusdaling, geen pijn of fotofobie.",
+        "O": "Conjunctivale roodheid rechts met purulente afscheiding. Cornea helder, pupil normaal.",
+        "E": "Infectieuze conjunctivitis. Geen alarmsymptomen.",
+        "P": "Hygiëne-adviezen, meestal zelflimiterend. Terug bij visusdaling, pijn of fotofobie.",
+        "icpc_code": "F70",
+        "icpc_titel": "Conjunctivitis infectieus"
+      }
+    },
+    {
+      "id": "seed_s87_eczeem",
+      "soep": {
+        "S": "Bekend met constitutioneel eczeem. Sinds 1 wk jeukende plekken in elleboogplooien, droge huid.",
+        "O": "Erythemateuze, schilferende plaques in elleboogplooien met krabeffecten. Geen tekenen van impetiginisatie.",
+        "E": "Exacerbatie constitutioneel eczeem.",
+        "P": "Indifferente therapie ruim smeren. Lokaal corticosteroïd klasse 2 1dd gedurende 1-2 wk. Triggers vermijden. Controle bij onvoldoende effect of infectie.",
+        "icpc_code": "S87",
+        "icpc_titel": "Constitutioneel eczeem"
+      }
+    },
+    {
+      "id": "seed_r97_allergische_rhinitis",
+      "soep": {
+        "S": "Elk voorjaar niezen, jeukende ogen, waterige rhinorroe en verstopte neus.",
+        "O": "Neusslijmvlies bleek/oedemateus met heldere afscheiding. Conjunctivae licht geprikkeld.",
+        "E": "Seizoensgebonden allergische rhinitis.",
+        "P": "Oraal antihistaminicum zn; bij persisteren nasaal corticosteroïd. Allergeenvermijding. Controle bij onvoldoende effect.",
+        "icpc_code": "R97",
+        "icpc_titel": "Allergische rhinitis"
+      }
+    },
+    {
+      "id": "seed_d73_gastro_enteritis",
+      "soep": {
+        "S": "Sinds 2 dgn waterige diarree, misselijk, 1x braken, milde buikkrampen. Geen bloed/slijm, geen recent buitenlandverblijf.",
+        "O": "Temp 37,4. Buik soepel, normale peristaltiek, geen défense. Niet gedehydreerd.",
+        "E": "Gastro-enteritis, vermoedelijk viraal.",
+        "P": "Orale rehydratie, voeding op geleide. Hygiëneadvies. Terug bij bloederige diarree, hoge koorts, dehydratie of klachten >1 wk.",
+        "icpc_code": "D73",
+        "icpc_titel": "Gastro-enteritis vermoedelijk infectieus"
+      }
+    },
+    {
+      "id": "seed_n89_migraine",
+      "soep": {
+        "S": "Recidiverende eenzijdige bonzende hoofdpijn met misselijkheid, foto- en fonofobie, verergerend bij inspanning, 1-2x per maand.",
+        "O": "Neurologisch oriënterend gb. RR 124/78.",
+        "E": "Migraine zonder aura.",
+        "P": "Aanvalsbehandeling NSAID; bij onvoldoende effect triptaan. Hoofdpijndagboek. Profylaxe bespreken bij ≥2 aanvallen/mnd. Alarmsymptomen besproken.",
+        "icpc_code": "N89",
+        "icpc_titel": "Migraine"
+      }
+    },
+    {
+      "id": "seed_s74_tinea_pedis",
+      "soep": {
+        "S": "Jeuk en schilfering tussen de tenen van beide voeten sinds enkele weken, vochtig aspect.",
+        "O": "Maceratie en schilfering interdigitaal IV-V beide voeten. Geen nageldystrofie.",
+        "E": "Tinea pedis.",
+        "P": "Lokaal antimycoticum (terbinafine crème) 1dd 1-2 wk. Voeten droog houden. Controle bij uitblijven effect of nagelbetrokkenheid.",
+        "icpc_code": "S74",
+        "icpc_titel": "Dermatomycose"
+      }
+    },
+    {
+      "id": "seed_p76_depressie",
+      "soep": {
+        "S": "Sinds 6 wk somber, verminderde interesse, slecht slapen, moe. Geen suïcidale ideatie. Functioneert beperkt op werk.",
+        "O": "Verzorgd, helder bewustzijn, geen psychotische kenmerken. Geen acute suïcidaliteit.",
+        "E": "Depressieve episode, mild.",
+        "P": "Psycho-educatie, activering, dagstructuur. Begeleide zelfhulp/POH-GGZ. Vangnetafspraken besproken. Controle over 2 wk; medicatie heroverwegen bij persisteren of toename ernst.",
+        "icpc_code": "P76",
+        "icpc_titel": "Depressie"
+      }
+    },
+    {
+      "id": "seed_r95_copd_controle",
+      "soep": {
+        "S": "Controle bekende COPD. Toegenomen kortademigheid bij inspanning, geen koorts, geen toename of purulentie sputum. Rookt nog ~10 sigaretten/dag.",
+        "O": "Saturatie 95%. Ademfrequentie 18. Longen: verlengd expirium, licht piepen. Geen perifeer oedeem.",
+        "E": "COPD, stabiel. Doorgaande tabaksverslaving.",
+        "P": "Inhalatietechniek gecontroleerd. Continueer luchtwegverwijders. Stoppen-met-roken opnieuw aangeboden (belangrijkste interventie). Griepvaccinatie. Controle 6 mnd of bij exacerbatie.",
+        "icpc_code": "R95",
+        "icpc_titel": "COPD"
+      }
+    },
+    {
+      "id": "seed_r96_astma",
+      "soep": {
+        "S": "Bekend met astma. Sinds 2 wk meer nachtelijke hoest en piepen, salbutamol >3x/wk nodig. Pollenseizoen.",
+        "O": "Saturatie 98%. Longen: licht expiratoir piepen, geen acute benauwdheid.",
+        "E": "Astma, onvoldoende gecontroleerd.",
+        "P": "Inhalatietechniek en therapietrouw gecheckt. Onderhoud inhalatiecorticosteroïd optimaliseren/ophogen. Salbutamol zn. Astma-actieplan. Controle 4-6 wk.",
+        "icpc_code": "R96",
+        "icpc_titel": "Astma"
+      }
+    },
+    {
+      "id": "seed_k77_hartfalen",
+      "soep": {
+        "S": "Bekende decompensatio cordis. Sinds 1 wk toegenomen kortademigheid, dikke enkels en 2 kg gewichtstoename. Orthopneu.",
+        "O": "RR 128/80, pols 88 regulair. Basaal crepitaties beide longen. Pitting oedeem onderbenen.",
+        "E": "Hartfalen met tekenen van overvulling.",
+        "P": "Diureticum tijdelijk ophogen, dagelijks wegen, zout- en vochtbeperking. Lab (nierfunctie/elektrolyten) controleren. Controle 1 wk; eerder bij verslechtering.",
+        "icpc_code": "K77",
+        "icpc_titel": "Decompensatio cordis/hartfalen"
+      }
+    },
+    {
+      "id": "seed_k78_atriumfibrilleren",
+      "soep": {
+        "S": "Onregelmatige hartslag en palpitaties sinds gisteren. Geen pijn op de borst, geen syncope, milde kortademigheid.",
+        "O": "Pols irregulair ~110/min. RR 132/84. ECG: atriumfibrilleren.",
+        "E": "Atriumfibrilleren, nieuw vastgesteld.",
+        "P": "Frequentiecontrole bespreken. CHA2DS2-VASc bepalen, antistolling overwegen. Lab incl. schildklier. Overleg/verwijzing cardiologie. Alarmsymptomen besproken.",
+        "icpc_code": "K78",
+        "icpc_titel": "Boezemfibrilleren/-fladderen"
+      }
+    },
+    {
+      "id": "seed_k74_angina_pectoris",
+      "soep": {
+        "S": "Sinds enkele weken drukkend gevoel op de borst bij inspanning, verdwijnt in rust binnen minuten. Geen klachten in rust.",
+        "O": "RR 140/85, pols regulair. Cor/pulm in rust gb. ECG in rust: geen acute afwijkingen.",
+        "E": "Verdenking stabiele angina pectoris.",
+        "P": "Uitleg, CVRM/leefstijl. Start trombocytenaggregatieremmer en statine, kortwerkend nitraat zn. Verwijzing cardiologie. Direct contact bij pijn in rust of >15 min (ACS).",
+        "icpc_code": "K74",
+        "icpc_titel": "Ischemische hartziekte met angina"
+      }
+    },
+    {
+      "id": "seed_t93_hypercholesterolemie",
+      "soep": {
+        "S": "CVRM-controle, geen klachten. Bekend met verhoogd cholesterol.",
+        "O": "RR 134/82. LDL 3,4 mmol/l.",
+        "E": "Hypercholesterolemie in kader van CVRM.",
+        "P": "Leefstijladvies. Start/continueer atorvastatine, streefwaarde LDL bespreken. Lab controle 3 mnd. Jaarlijkse risico-evaluatie.",
+        "icpc_code": "T93",
+        "icpc_titel": "Vetstofwisselingsstoornis"
+      }
+    },
+    {
+      "id": "seed_t86_hypothyreoidie",
+      "soep": {
+        "S": "Moeheid, kouwelijk, obstipatie en gewichtstoename sinds maanden. Bekend met hypothyreoïdie, gebruikt levothyroxine.",
+        "O": "Pols 64. Geen struma. TSH verhoogd, FT4 laag-normaal.",
+        "E": "Onvoldoende gesubstitueerde hypothyreoïdie.",
+        "P": "Levothyroxine ophogen. TSH-controle over 6-8 wk. Uitleg nuchtere inname.",
+        "icpc_code": "T86",
+        "icpc_titel": "Verworven hypothyroïdie"
+      }
+    },
+    {
+      "id": "seed_t82_obesitas",
+      "soep": {
+        "S": "Wil afvallen, eerdere pogingen mislukt, gemotiveerd. Geen eetbuistoornis.",
+        "O": "Gewicht 98 kg, lengte 1,70 m, BMI 34. Buikomvang 112 cm. RR 138/86.",
+        "E": "Obesitas klasse 1 met verhoogd cardiometabool risico.",
+        "P": "Verwijzing Gecombineerde Leefstijlinterventie (GLI). Voedings- en beweegadvies. CVRM-screening via lab. Realistische doelen, controle 3 mnd.",
+        "icpc_code": "T82",
+        "icpc_titel": "Adipositas"
+      }
+    },
+    {
+      "id": "seed_l90_gonartrose",
+      "soep": {
+        "S": "Pijn in rechterknie bij belasten en traplopen sinds maanden, ochtendstijfheid <30 min. Geen slotklachten.",
+        "O": "Knie rechts: crepitaties, lichte drukpijn mediale gewrichtsspleet, geen hydrops, banden stabiel.",
+        "E": "Gonartrose rechts.",
+        "P": "Uitleg. Belaste oefentherapie/fysiotherapie, gewichtsreductie indien van toepassing. Paracetamol, NSAID zn. Controle bij progressie; verwijzing bij ernstige hinder.",
+        "icpc_code": "L90",
+        "icpc_titel": "Artrose knie"
+      }
+    },
+    {
+      "id": "seed_l86_radiculair_syndroom",
+      "soep": {
+        "S": "Lage rugpijn met uitstraling tot onder de knie links sinds 1 wk, tintelingen voet. Geen mictie-/defecatiestoornis, geen krachtsverlies.",
+        "O": "SLR links positief bij 45°. Kracht en sensibiliteit grof intact, geen reflexverschil. Geen rode vlaggen.",
+        "E": "Lumbosacraal radiculair syndroom links.",
+        "P": "Uitleg gunstig natuurlijk beloop, in beweging blijven. Adequate pijnstilling. Controle 1-2 wk; direct terug bij krachtsverlies of mictie-/defecatieproblemen (cauda).",
+        "icpc_code": "L86",
+        "icpc_titel": "Rugsyndroom met uitstraling"
+      }
+    },
+    {
+      "id": "seed_p74_angststoornis",
+      "soep": {
+        "S": "Sinds maanden veel piekeren, gespannen, hartkloppingen en slecht slapen. Vermijdt drukke plekken. Geen suïcidaliteit.",
+        "O": "Rustig, helder bewustzijn, geen psychotische kenmerken. Lichamelijk geen verklaring.",
+        "E": "Gegeneraliseerde angststoornis.",
+        "P": "Psycho-educatie, leefstijl, ademhalingsoefeningen. Verwijzing POH-GGZ/CGT. SSRI heroverwegen bij onvoldoende effect. Controle 2-3 wk.",
+        "icpc_code": "P74",
+        "icpc_titel": "Angststoornis"
+      }
+    },
+    {
+      "id": "seed_p06_insomnie",
+      "soep": {
+        "S": "Sinds 2 mnd slecht inslapen en vaak wakker, moe overdag. Veel stress, 's avonds veel schermgebruik. Geen overmatig cafeïne/alcohol.",
+        "O": "Geen aanwijzingen voor onderliggende somatische of psychiatrische oorzaak.",
+        "E": "Insomnie, vermoedelijk stress- en gedragsgerelateerd.",
+        "P": "Slaaphygiëne en stimuluscontrole. Geen benzodiazepine als eerste keus. CGT-i overwegen. Controle 4 wk.",
+        "icpc_code": "P06",
+        "icpc_titel": "Slapeloosheid"
+      }
+    },
+    {
+      "id": "seed_p17_stoppen_met_roken",
+      "soep": {
+        "S": "Rookt 15 sigaretten/dag sinds jaren, wil stoppen. Eerdere poging mislukt, nu gemotiveerd.",
+        "O": "Geen acute klachten.",
+        "E": "Tabaksverslaving met stopwens.",
+        "P": "Stoppen-met-roken-begeleiding, stopdatum gepland. Nicotinevervanging/medicatie besproken. Terugvalpreventie. Controle 2 wk na stopdatum.",
+        "icpc_code": "P17",
+        "icpc_titel": "Tabaksmisbruik"
+      }
+    },
+    {
+      "id": "seed_p15_alcohol",
+      "soep": {
+        "S": "Drinkt dagelijks 6-8 eenheden, ervaart dit als te veel en wil minderen. Geen onttrekkingsverschijnselen, geen eerdere detox.",
+        "O": "Geen icterus, geen tremor. RR 142/88. Lab (lever/MCV) aangevraagd.",
+        "E": "Schadelijk/chronisch alcoholgebruik.",
+        "P": "Motiverende gespreksvoering, reductiedoel. Verwijzing verslavingszorg aangeboden. Lab vervolgen, veilig minderen besproken. Controle 2 wk.",
+        "icpc_code": "P15",
+        "icpc_titel": "Chronisch alcoholmisbruik"
+      }
+    },
+    {
+      "id": "seed_a04_moeheid_solk",
+      "soep": {
+        "S": "Al maanden moe zonder duidelijke aanleiding. Slaapt redelijk, stemming wisselend, veel zorgen thuis en werk. Geen gewichtsverlies, geen koorts.",
+        "O": "Lichamelijk onderzoek geen afwijkingen. Niet bleek, geen lymfadenopathie.",
+        "E": "Aanhoudende moeheid, vermoedelijk multifactorieel. DD anemie, hypothyreoïdie.",
+        "P": "Uitleg, oriënterend lab (Hb, TSH, glucose, ferritine). Aandacht psychosociale context. Controle bij labuitslag of na 2 wk.",
+        "icpc_code": "A04",
+        "icpc_titel": "Moeheid/zwakte"
+      }
+    },
+    {
+      "id": "seed_h70_otitis_externa",
+      "soep": {
+        "S": "Jeuk en pijn linker gehoorgang sinds 3 dgn, na zwemmen. Wat afscheiding, gehoor iets minder.",
+        "O": "Gehoorgang links rood en gezwollen met debris, tractie-/traguspijn. Trommelvlies voor zover zichtbaar intact.",
+        "E": "Otitis externa links.",
+        "P": "Reinigen indien mogelijk, oordruppels (zuur/corticosteroïd) volgens richtlijn. Oor droog houden. Controle bij uitblijven verbetering na 1 wk.",
+        "icpc_code": "H70",
+        "icpc_titel": "Otitis externa"
+      }
+    },
+    {
+      "id": "seed_s84_impetigo",
+      "soep": {
+        "S": "Kind, sinds enkele dagen blaasjes en korstjes rond neus en mond, geel-korstig, breidt uit.",
+        "O": "Honingkleurige korsten perinasaal en peroraal, erytheem. Geen systemische ziekteverschijnselen.",
+        "E": "Impetigo.",
+        "P": "Hygiëne-adviezen, korsten weken. Lokaal antibioticum (fusidinezuur) volgens richtlijn; orale therapie bij uitgebreide vorm. School tot korsten droog. Controle bij uitbreiding.",
+        "icpc_code": "S84",
+        "icpc_titel": "Impetigo"
+      }
+    },
+    {
+      "id": "seed_d12_obstipatie",
+      "soep": {
+        "S": "Sinds weken harde, moeizame ontlasting 2x/wk met persen en opgeblazen gevoel. Weinig vezels/vocht. Geen bloed, geen gewichtsverlies, geen alarmsymptomen.",
+        "O": "Buik soepel, niet pijnlijk, normale peristaltiek. Geen palpabele massa.",
+        "E": "Functionele obstipatie.",
+        "P": "Leefstijl: vezels, vocht, beweging. Osmotisch laxans (macrogol) zn. Terug bij bloedverlies, gewichtsverlies of veranderd defecatiepatroon >50 jr.",
+        "icpc_code": "D12",
+        "icpc_titel": "Obstipatie"
+      }
+    },
+    {
+      "id": "seed_n17_bppd",
+      "soep": {
+        "S": "Kortdurende draaiduizeligheid bij omdraaien in bed en opkijken sinds enkele dagen, seconden durend, met misselijkheid. Geen gehoorverlies, geen uitval.",
+        "O": "Neurologisch gb. Dix-Hallpike rechts: kortdurende rotatoire nystagmus met vertigo.",
+        "E": "Benigne paroxismale positieduizeligheid (BPPD) rechts.",
+        "P": "Uitleg benigne aard. Epley-manoeuvre uitgevoerd en geïnstrueerd. Terug bij aanhoudende klachten of neurologische uitval.",
+        "icpc_code": "N17",
+        "icpc_titel": "Vertigo/duizeligheid"
+      }
+    },
+    {
+      "id": "seed_d87_dyspepsie",
+      "soep": {
+        "S": "Sinds weken zuurbranden en vol gevoel na eten, 's nachts oprispingen. Geen alarmsymptomen (geen slik-/gewichtsproblemen, geen melena), <50 jr.",
+        "O": "Buik soepel, epigastrisch licht drukpijnlijk, geen massa.",
+        "E": "Functionele dyspepsie/refluxklachten.",
+        "P": "Leefstijl: kleinere maaltijden, niet laat eten, gewicht/roken/alcohol. Proefbehandeling PPI 4 wk. Bij alarmsymptomen of onvoldoende effect H. pylori-test of verwijzing.",
+        "icpc_code": "D87",
+        "icpc_titel": "Maagfunctiestoornis"
+      }
+    }
+  ]
+}

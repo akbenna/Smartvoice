@@ -5,6 +5,38 @@ automatisch met de praktijk laten meegroeien. Beide horen **periodiek** te
 draaien op de praktijkserver — niet eenmalig. Dit document beschrijft de
 installatie.
 
+## Koude start: kennis vanaf dag 1 (vóór er feedback is)
+
+De lerende jobs hebben artscorrecties nodig; bij de start is er nog niets om uit
+te leren. Toch begint het systeem niet blanco. Twee kennisbronnen geven meteen
+niveau:
+
+1. **Medische woordenlijst** (`shared/vocabulary.py`): een gecureerde lijst van
+   honderden NL medicatie-/diagnosetermen + lokale verwijslocaties. Deze voedt
+   vanaf de eerste opname de Whisper-hotwords en de naberekening — geen actie
+   nodig, staat standaard aan.
+
+2. **Seed-few-shot-bank** (gecureerde, synthetische SOEP-voorbeelden): laad
+   eenmalig vóór go-live een set hoogwaardige voorbeelden voor veelvoorkomende
+   huisartspresentaties, zodat de SOEP-generatie meteen de juiste stijl,
+   beknoptheid en ICPC-conventies aanhoudt.
+
+   ```bash
+   python tools/seed_fewshot_bank.py
+   ```
+
+   De voorbeelden bevatten **geen patiëntdata** en sturen alleen de *stijl* (de
+   prompt zegt expliciet: stijl overnemen, nooit de inhoud). Ze staan in
+   `services/learning/seed_data/soep_seed_examples.json` — **review ze als arts**
+   en pas ze aan je eigen voorkeuren aan vóór go-live. Zodra echte goedgekeurde
+   SOEP's binnenkomen, vult `tools/build_fewshot_bank.py` de bank met
+   praktijkeigen voorbeelden; die komen náást de seed-voorbeelden te staan
+   (seed-id's beginnen met `seed_`).
+
+Wat een koude start NIET kan: model-fine-tuning/DPO (Fase 3) en de akoestische
+verbeteringen vergen echte, verzamelde feedback en blijven dus voor later — zie
+`docs/FASE3_FINETUNING.md`.
+
 ## Wat er draait
 
 | Job | Script | Wat het doet |
