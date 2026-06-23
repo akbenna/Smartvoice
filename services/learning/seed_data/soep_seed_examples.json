@@ -1,6 +1,6 @@
 {
-  "note": "SYNTHETISCHE seed-voorbeelden voor de koude start van de few-shot-bank. Geen patientdata. Bedoeld om de SOEP-STIJL (telegramstijl, beknoptheid, ICPC) te ankeren, NIET de inhoud. Door arts te reviewen voor klinisch gebruik. Vervang/uitbreiden zodra echte goedgekeurde SOEP's beschikbaar zijn (tools/build_fewshot_bank.py).",
-  "version": "1.1",
+  "note": "SYNTHETISCHE seed-voorbeelden voor de koude start van de few-shot-bank. Geen patientdata. Afgestemd op de meest voorkomende ICPC-codes in de Nederlandse huisartspraktijk (NIVEL Zorgregistraties Eerste Lijn), met extra gewicht op een achterstandswijk-populatie (CVRM, COPD/astma, GGZ, leefstijl/verslaving, SOLK). Bedoeld om de SOEP-STIJL (telegramstijl, beknoptheid, ICPC) te ankeren, NIET de inhoud. Door arts te reviewen voor klinisch gebruik. Vervang/uitbreiden zodra echte goedgekeurde SOEP's beschikbaar zijn (tools/build_fewshot_bank.py).",
+  "version": "1.2",
   "examples": [
     {
       "id": "seed_n95_spanningshoofdpijn",
@@ -396,6 +396,83 @@
         "P": "Leefstijl: kleinere maaltijden, niet laat eten, gewicht/roken/alcohol. Proefbehandeling PPI 4 wk. Bij alarmsymptomen of onvoldoende effect H. pylori-test of verwijzing.",
         "icpc_code": "D87",
         "icpc_titel": "Maagfunctiestoornis"
+      }
+    },
+    {
+      "id": "seed_r76_acute_tonsillitis",
+      "soep": {
+        "S": "Sinds 2 dgn keelpijn met pijn bij slikken, koorts 38,5. Geen hoest, geen heesheid. Ziek gevoel.",
+        "O": "Temp 38,5. Tonsillen rood en vergroot met beslag. Pijnlijke submandibulaire lymfklieren. Geen trismus of peritonsillaire zwelling.",
+        "E": "Acute tonsillitis. Centor 3-4.",
+        "P": "Uitleg veelal zelflimiterend beloop. Adequate pijnstilling en koortsbestrijding paracetamol. Antibioticum terughoudend (overweeg bij ernstig ziek/risicogroep). Terug bij adem- of slikproblemen, trismus of uitblijven verbetering.",
+        "icpc_code": "R76",
+        "icpc_titel": "Acute tonsillitis"
+      }
+    },
+    {
+      "id": "seed_r81_pneumonie",
+      "soep": {
+        "S": "Sinds 4 dgn hoesten met groen sputum, koorts 39, pijn bij ademen rechts en kortademigheid. Wordt zieker.",
+        "O": "Temp 39,0. Ademfrequentie 24, saturatie 93%. Rechts basaal crepitaties en demping. Pols 104.",
+        "E": "Community-acquired pneumonie rechts.",
+        "P": "Start antibioticum volgens richtlijn (amoxicilline 1e keus). Adequate pijnstilling, vocht. Controle 48 u; directe herbeoordeling/verwijzing bij verslechtering, saturatie <92% of verwardheid (CRB-65).",
+        "icpc_code": "R81",
+        "icpc_titel": "Pneumonie"
+      }
+    },
+    {
+      "id": "seed_l92_schouderklachten",
+      "soep": {
+        "S": "Pijn rechterschouder sinds 3 wk, vooral bij heffen en 's nachts liggen op die zij. Geen trauma, geen tintelingen in de arm.",
+        "O": "Pijnlijke abductie 60-120° (painful arc). Weerstandstest abductie pijnlijk. Passieve mobiliteit behouden. Neurovasculair gb.",
+        "E": "Subacromiaal pijnsyndroom rechterschouder.",
+        "P": "Uitleg, relatieve rust en houdingadvies. Oefentherapie/fysiotherapie. NSAID zn. Bij onvoldoende effect na enkele weken corticosteroïdinjectie overwegen. Controle 4-6 wk.",
+        "icpc_code": "L92",
+        "icpc_titel": "Schoudersyndroom"
+      }
+    },
+    {
+      "id": "seed_p78_overspanning",
+      "soep": {
+        "S": "Sinds maanden uitgeput, prikkelbaar, slecht slapen en concentratieproblemen. Hoge werkdruk en zorgen thuis. Geen somberheid als kernsymptoom, geen suïcidaliteit.",
+        "O": "Gespannen, vermoeide indruk. Helder, geen psychotische kenmerken. Lichamelijk geen verklaring.",
+        "E": "Overspanning/surmenage. DD depressieve episode, angststoornis.",
+        "P": "Uitleg stress-belastingmodel, activering en dagstructuur. Eventueel verwijzing POH-GGZ. Werkbelasting bespreken (bedrijfsarts). Vangnetafspraken. Controle 2 wk.",
+        "icpc_code": "P78",
+        "icpc_titel": "Neurasthenie/surmenage"
+      }
+    },
+    {
+      "id": "seed_h81_cerumen",
+      "soep": {
+        "S": "Sinds enkele dagen verstopt gevoel en verminderd gehoor rechts. Geen pijn, geen oorsuizen, geen loopoor.",
+        "O": "Gehoorgang rechts geheel gevuld met cerumen, trommelvlies niet zichtbaar. Links normaal, trommelvlies intact.",
+        "E": "Cerumenprop rechts.",
+        "P": "Oordruppels ter weking enkele dagen, daarna uitspuiten/uitzuigen. Geen wattenstaafjes. Terug bij pijn, otorroe of aanhoudend gehoorverlies na verwijdering.",
+        "icpc_code": "H81",
+        "icpc_titel": "Overmatig cerumen"
+      }
+    },
+    {
+      "id": "seed_x72_candidiasis_vaginalis",
+      "soep": {
+        "S": "Sinds 1 wk jeuk en branderig gevoel aan de vulva met witte brokkelige afscheiding. Geen koorts, geen buikpijn, geen risicocontact. Niet zwanger.",
+        "O": "Vulva rood met witte schilferende fluor. Inwendig onderzoek zo nodig.",
+        "E": "Vulvovaginale candidiasis.",
+        "P": "Lokaal of oraal antimycoticum (miconazol vaginaal of eenmalig fluconazol oraal). Hygiëne-adviezen. Terug bij recidief, zwangerschap of uitblijven effect.",
+        "icpc_code": "X72",
+        "icpc_titel": "Candidiasis genitalis vrouw"
+      }
+    },
+    {
+      "id": "seed_s88_contacteczeem",
+      "soep": {
+        "S": "Sinds 1 wk jeukende rode huid aan de handen. Werkt veel met schoonmaakmiddelen; verbetert in het weekend.",
+        "O": "Erytheem en schilfering handruggen en tussen vingers, kloofjes. Geen pustels of tekenen van infectie.",
+        "E": "Irritatief contacteczeem handen (werkgerelateerd).",
+        "P": "Irritantia vermijden, handschoenen, frequent indifferent vetten. Lokaal corticosteroïd klasse 2-3 kortdurend. Werkplekadvies. Controle bij onvoldoende effect.",
+        "icpc_code": "S88",
+        "icpc_titel": "Contacteczeem/andere dermatitis"
       }
     }
   ]
