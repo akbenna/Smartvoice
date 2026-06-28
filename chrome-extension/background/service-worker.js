@@ -31,7 +31,8 @@ async function callCloudAPI(base64Audio, mimeType) {
   if (config.llmProvider) formData.append('llm_provider', config.llmProvider);
 
   const headers = {};
-  if (config.apiKey) headers['X-API-Key'] = config.apiKey;
+  const apiKey = (config.apiKey || '').trim();
+  if (apiKey) headers['X-API-Key'] = apiKey;
 
   // Update state: processing
   await chrome.storage.local.set({
@@ -48,6 +49,13 @@ async function callCloudAPI(base64Audio, mimeType) {
 
   if (!response.ok) {
     const errText = await response.text();
+    if (response.status === 403) {
+      throw new Error('API-sleutel klopt niet. Controleer of de sleutel in de ' +
+        'extensie-instellingen exact overeenkomt met die op de server (Railway: API_KEYS).');
+    }
+    if (response.status === 401) {
+      throw new Error('API-sleutel ontbreekt. Vul de sleutel in bij de extensie-instellingen.');
+    }
     throw new Error('API fout (' + response.status + '): ' + errText.substring(0, 200));
   }
 
