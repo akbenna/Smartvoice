@@ -85,16 +85,29 @@ async function testConnection() {
     return;
   }
 
-  try {
-    var response = await fetch(apiUrl.replace(/\/$/, '') + '/health', {
-      method: 'GET',
-    });
+  var base = apiUrl.replace(/\/$/, '');
 
-    if (response.ok) {
-      var data = await response.json();
-      showToast('Verbinding OK! Status: ' + (data.status || 'healthy'));
+  try {
+    var response = await fetch(base + '/health', { method: 'GET' });
+    if (!response.ok) {
+      showToast('Server bereikbaar maar fout: ' + response.status + ' ' + response.statusText);
+      return;
+    }
+
+    // Server bereikbaar — test nu of de API-sleutel geaccepteerd wordt.
+    var apiKey = document.getElementById('apiKey').value.trim();
+    var headers = {};
+    if (apiKey) headers['X-API-Key'] = apiKey;
+
+    var auth = await fetch(base + '/api/v1/providers', { method: 'GET', headers: headers });
+    if (auth.ok) {
+      showToast('Verbinding én API-sleutel OK!');
+    } else if (auth.status === 403) {
+      showToast('Server OK, maar API-sleutel klopt niet (403). Vergelijk met API_KEYS op de server.');
+    } else if (auth.status === 401) {
+      showToast('Server OK, maar API-sleutel ontbreekt (401). Vul de sleutel in.');
     } else {
-      showToast('Fout: ' + response.status + ' ' + response.statusText);
+      showToast('Server OK, maar sleuteltest gaf: ' + auth.status + ' ' + auth.statusText);
     }
   } catch (err) {
     showToast('Verbindingsfout: ' + err.message);
