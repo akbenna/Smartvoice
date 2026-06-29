@@ -18,15 +18,18 @@ import structlog
 from . import llm_service, stt_service
 from .medical_vocabulary import correct_transcript_full, CorrectionStats
 from .prompts import (
-    DECISIEF_SYSTEM_PROMPT,
-    DECISIEF_USER_TEMPLATE,
-    DETECTION_SYSTEM_PROMPT,
-    DETECTION_USER_TEMPLATE,
+    NAZORG_SYSTEM_PROMPT,
+    NAZORG_USER_TEMPLATE,
     SOEP_SYSTEM_PROMPT,
     SOEP_USER_TEMPLATE,
 )
 
 logger = structlog.get_logger()
+
+# Output-token budgetten per call-type. Output is bij Claude 5x duurder dan
+# input, dus krap begroten waar het kan voorkomt onnodige kosten en runaway.
+SOEP_MAX_TOKENS = 900
+NAZORG_MAX_TOKENS = 700
 
 
 @dataclass
@@ -148,6 +151,7 @@ async def process_consultation(
             user_prompt=SOEP_USER_TEMPLATE.format(transcript=result.transcript),
             provider=llm_provider,
             json_mode=True,
+            max_tokens=SOEP_MAX_TOKENS,
         )
         soep_data = _parse_json_response(soep_response)
         result.soep = SOEPResult(
@@ -163,35 +167,13 @@ async def process_consultation(
         logger.error("pipeline.soep_error", error=str(e))
         result.soep = SOEPResult(s="Fout bij SOEP generatie.", e=str(e))
 
-    # ── Step 3: Decisief Regel ──
-    logger.info("pipeline.step", step="decisief")
+    # ── Step 3: Nazorg (decisief regel + rode vlaggen) in EEN call ──
+    # Beide taken werken op de SOEP; samenvoegen scheelt een derde LLM-call.
+    logger.info("pipeline.step", step="nazorg")
     try:
-        icpc_line = ""
-        if result.soep.icpc_code:
-            icpc_line = f"ICPC: {result.soep.icpc_code} - {result.soep.icpc_titel}"
-
-        decisief_response = await llm_service.complete(
-            system_prompt=DECISIEF_SYSTEM_PROMPT,
-            user_prompt=DECISIEF_USER_TEMPLATE.format(
-                s=result.soep.s,
-                o=result.soep.o,
-                e=result.soep.e,
-                p=result.soep.p,
-                icpc_line=icpc_line,
-            ),
-            provider=llm_provider,
-        )
-        result.decisief = decisief_response.strip().strip('"').strip("'")
-    except Exception as e:
-        logger.error("pipeline.decisief_error", error=str(e))
-        result.decisief = "Fout bij generatie decisief regel."
-
-    # ── Step 4: Red Flag Detection ──
-    logger.info("pipeline.step", step="detection")
-    try:
-        detection_response = await llm_service.complete(
-            system_prompt=DETECTION_SYSTEM_PROMPT,
-            user_prompt=DETECTION_USER_TEMPLATE.format(
+        nazorg_response = await llm_service.complete(
+            system_prompt=NAZORG_SYSTEM_PROMPT,
+            user_prompt=NAZORG_USER_TEMPLATE.format(
                 s=result.soep.s,
                 o=result.soep.o,
                 e=result.soep.e,
@@ -201,13 +183,16 @@ async def process_consultation(
             ),
             provider=llm_provider,
             json_mode=True,
+            max_tokens=NAZORG_MAX_TOKENS,
         )
-        detection_data = _parse_json_response(detection_response)
+        nazorg_data = _parse_json_response(nazorg_response)
+        result.decisief = str(nazorg_data.get("decisief", "")).strip().strip('"').strip("'")
         result.detection = DetectionResult(
-            rode_vlaggen=detection_data.get("rode_vlaggen", []),
-            ontbrekende_info=detection_data.get("ontbrekende_info", []),
+            rode_vlaggen=nazorg_data.get("rode_vlaggen", []),
+            ontbrekende_info=nazorg_data.get("ontbrekende_info", []),
         )
     except Exception as e:
-        logger.error("pipeline.detection_error", error=str(e))
+        logger.error("pipeline.nazorg_error", error=str(e))
+        result.decisief = "Fout bij generatie decisief regel."
 
     return result

@@ -4,7 +4,16 @@ Pipeline orchestrator tests with mocked services.
 
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from unittest.mock import AsyncMock, patch, MagicMock
+
+
+def _mock_audio_info(duration_secs: float = 8.0):
+    """Fake AudioInfo voor de gemockte audio-preprocessing-stap."""
+    info = MagicMock()
+    info.duration_secs = duration_secs
+    info.needs_conversion = False
+    return (Path("/fake/processed.wav"), info)
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -72,13 +81,15 @@ async def test_pipeline_process_consult_success(db: AsyncSession, test_user: Use
     mock_instruction = "Neem paracetamol en rust uit."
 
     # Patch services
-    with patch.object(pipeline.transcription_service, 'transcribe', new_callable=AsyncMock) as mock_trans, \
+    with patch.object(pipeline.audio_preprocessor, 'process', new_callable=AsyncMock) as mock_prep, \
+         patch.object(pipeline.transcription_service, 'transcribe', new_callable=AsyncMock) as mock_trans, \
          patch.object(pipeline.extraction_service, 'extract', new_callable=AsyncMock) as mock_extract, \
          patch.object(pipeline.extraction_service, 'generate_soep', new_callable=AsyncMock) as mock_soep_gen, \
          patch.object(pipeline.extraction_service, 'detect_flags', new_callable=AsyncMock) as mock_detect, \
          patch.object(pipeline.extraction_service, 'generate_patient_instruction', new_callable=AsyncMock) as mock_instr, \
          patch('services.pipeline.orchestrator.redis_client') as mock_redis:
 
+        mock_prep.return_value = _mock_audio_info(mock_transcript_result.duration_secs)
         mock_trans.return_value = mock_transcript_result
         mock_extract.return_value = mock_extraction
         mock_soep_gen.return_value = mock_soep
@@ -163,13 +174,15 @@ async def test_pipeline_status_transitions(db: AsyncSession, test_user: User):
         model_version="test",
     )
 
-    with patch.object(pipeline.transcription_service, 'transcribe', new_callable=AsyncMock) as mock_trans, \
+    with patch.object(pipeline.audio_preprocessor, 'process', new_callable=AsyncMock) as mock_prep, \
+         patch.object(pipeline.transcription_service, 'transcribe', new_callable=AsyncMock) as mock_trans, \
          patch.object(pipeline.extraction_service, 'extract', new_callable=AsyncMock) as mock_extract, \
          patch.object(pipeline.extraction_service, 'generate_soep', new_callable=AsyncMock) as mock_soep_gen, \
          patch.object(pipeline.extraction_service, 'detect_flags', new_callable=AsyncMock) as mock_detect, \
          patch.object(pipeline.extraction_service, 'generate_patient_instruction', new_callable=AsyncMock) as mock_instr, \
          patch('services.pipeline.orchestrator.redis_client') as mock_redis:
 
+        mock_prep.return_value = _mock_audio_info(mock_transcript_result.duration_secs)
         mock_trans.return_value = mock_transcript_result
         mock_extract.return_value = {"klachten": []}
         mock_soep_gen.return_value = {"S": "", "O": "", "E": "", "P": ""}
@@ -203,8 +216,12 @@ async def test_pipeline_failure_marks_failed(db: AsyncSession, test_user: User):
 
     pipeline = PipelineOrchestrator()
 
-    # Mock transcription to fail
+    # Mock transcription to fail (audio-preprocessing slaagt, transcriptie faalt)
     with patch.object(
+        pipeline.audio_preprocessor, 'process', new_callable=AsyncMock,
+        return_value=_mock_audio_info(),
+    ), \
+         patch.object(
         pipeline.transcription_service,
         'transcribe',
         new_callable=AsyncMock,
