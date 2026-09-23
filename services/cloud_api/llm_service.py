@@ -257,3 +257,68 @@ async def _complete_gemini(
 
     parts = candidates[0].get("content", {}).get("parts", [])
     return parts[0].get("text", "") if parts else ""
+
+
+async def stream_anthropic(
+    system_prompt: str,
+    user_content,
+    max_tokens: int,
+    quality: bool = False,
+):
+    """Stream Claude's answer as text deltas (letters: text appears while written).
+
+    user_content: a string, or a list of content blocks (text and images).
+    quality: the stronger model (letters to third parties, image reading);
+    otherwise the fast model (referral letters).
+    """
+    config = get_config()
+    api_key = config.llm.anthropic_api_key
+    if not api_key:
+        raise ValueError("ANTHROPIC_API_KEY niet geconfigureerd.")
+    model = config.llm.anthropic_soep_model if quality else config.llm.anthropic_model
+    body = {
+        "model": model,
+        "max_tokens": max_tokens,
+        "stream": True,
+        "system": system_prompt,
+        "messages": [{"role": "user", "content": user_content}],
+    }
+    if _MODERN_CLAUDE.match(model):
+        body["max_tokens"] = max(max_tokens, MODERN_MIN_MAX_TOKENS)
+        body["output_config"] = {"effort": config.llm.anthropic_effort}
+    else:
+        body["temperature"] = config.llm.temperature
+    logger.info("llm.anthropic.stream", model=model)
+
+    import json as _json
+    async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=15.0)) as client:
+        async with client.stream(
+            "POST",
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "Content-Type": "application/json",
+            },
+            json=body,
+        ) as response:
+            if response.status_code >= 400:
+                detail = (await response.aread()).decode("utf-8", "replace")[:500]
+                logger.error("llm.anthropic.error", status=response.status_code, body=detail)
+                raise ValueError(f"Taalmodel gaf fout {response.status_code}.")
+            async for line in response.aiter_lines():
+                if not line.startswith("data: "):
+                    continue
+                try:
+                    event = _json.loads(line[6:])
+                except ValueError:
+                    continue
+                if event.get("type") == "content_block_delta":
+                    delta = event.get("delta", {})
+                    if delta.get("type") == "text_delta" and delta.get("text"):
+                        yield delta["text"]
+                elif event.get("type") == "message_delta":
+                    if event.get("delta", {}).get("stop_reason") == "refusal":
+                        raise ValueError("Het taalmodel weigerde dit verzoek.")
+                elif event.get("type") == "error":
+                    raise ValueError(event.get("error", {}).get("message", "Onbekende fout"))

@@ -130,6 +130,3 @@ textarea:focus { outline: 2px solid var(--brand); outline-offset: -1px; }
 }
 .soep-check ul { margin: 4px 0 0 16px; padding: 0; }
 .soep-check li { margin: 2px 0; }
-@media (prefers-color-scheme: dark) {
-  .soep-check { background: #3a2f17; border-color: #6b5320; color: #f3dca6; }
-}

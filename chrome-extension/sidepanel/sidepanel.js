@@ -172,9 +172,11 @@ async function insertOrCopy(text) {
   try {
     await sendToTarget(text);
     setStatus('Ingevoegd.');
+    return { ok: true };
   } catch (err) {
     await navigator.clipboard.writeText(text).catch(function () {});
     setStatus(err.message + '\nTekst is gekopieerd; plak met Ctrl+V.', true);
+    return { ok: false, error: err.message };
   }
 }
 

@@ -3,17 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SmartVoice Dicteren</title>
+  <title>SmartVoice</title>
   <link rel="stylesheet" href="sidepanel.css">
+  <link rel="stylesheet" href="letters.css">
 </head>
 <body>
   <header class="header">
     <div class="brand">
       <img class="logo" src="../icons/icon48.png" alt="SmartVoice">
-      <h1>Dicteren</h1>
+      <h1>SmartVoice</h1>
     </div>
     <span id="conn" class="conn" title="Verbinding">klaar</span>
   </header>
+
+  <nav class="views" role="tablist">
+    <button class="view-tab active" data-view="dictate" role="tab">Dicteren &amp; SOEP</button>
+    <button class="view-tab" data-view="letters" role="tab">Brieven</button>
+  </nav>
+
+  <div id="view-dictate" class="view">
 
   <section class="target" id="target">
     <span class="target-label">Doelveld</span>
@@ -84,6 +92,117 @@
   </section>
 
   <p id="status" class="status" role="status"></p>
+  </div>
+
+  <div id="view-letters" class="view hidden">
+    <section class="lt-card">
+      <h2><span class="lt-step">1</span> Dossier</h2>
+      <div class="seg" id="lt-src">
+        <button class="seg-btn active" data-src="bricks">Bricks</button>
+        <button class="seg-btn" data-src="shot">Schermafdruk</button>
+        <button class="seg-btn" data-src="pdf">PDF</button>
+      </div>
+      <div class="lt-src-pane" data-pane="bricks">
+        <button id="lt-scrape" class="btn primary">Ophalen uit Bricks</button>
+        <p class="lt-hint">Open de patiënt en de onderdelen die mee moeten (journaal, medicatie, voorgeschiedenis, lab).</p>
+      </div>
+      <div class="lt-src-pane hidden" data-pane="shot">
+        <div class="lt-drop" id="lt-shot-drop" tabindex="0">Klik hier en plak een schermafdruk (Ctrl+V / ⌘V)</div>
+        <img id="lt-shot-img" class="lt-shot hidden" alt="">
+        <button id="lt-shot-read" class="btn primary hidden">Lees schermafdruk</button>
+        <p class="lt-hint">De schermafdruk gaat naar de server om te lezen; naam, BSN en adres worden daarbij weggelaten.</p>
+      </div>
+      <div class="lt-src-pane hidden" data-pane="pdf">
+        <div class="lt-drop" id="lt-pdf-drop" tabindex="0">Sleep een PDF-export hierheen of klik om te kiezen</div>
+        <input type="file" id="lt-pdf-file" accept="application/pdf" hidden>
+      </div>
+
+      <div id="lt-dossier" class="hidden">
+        <div class="lt-name" id="lt-name"></div>
+        <div id="lt-sections" class="lt-sections"></div>
+        <label class="lt-check"><input type="checkbox" id="lt-keep-dates"> Consultdatums meesturen <span class="muted">(geboortedatum gaat nooit mee)</span></label>
+        <details class="lt-preview">
+          <summary>Toon precies wat er verstuurd wordt</summary>
+          <pre id="lt-preview"></pre>
+        </details>
+        <button id="lt-clear" class="btn ghost small">Dossier wissen</button>
+      </div>
+    </section>
+
+    <section class="lt-card">
+      <h2><span class="lt-step">2</span> Brief</h2>
+      <div class="seg" id="lt-kind">
+        <button class="seg-btn active" data-kind="informatiebrief">Informatiebrief</button>
+        <button class="seg-btn" data-kind="verwijzing">Verwijzing</button>
+      </div>
+
+      <div id="lt-info">
+        <label class="lt-label">Aanvrager</label>
+        <div class="chips" id="lt-aanvrager">
+          <button class="chip active" data-v="advocaat">Advocaat</button>
+          <button class="chip" data-v="sma">SMA</button>
+          <button class="chip" data-v="gemeente">Gemeente</button>
+          <button class="chip" data-v="verzekeraar">Verzekeraar</button>
+          <button class="chip" data-v="uwv">UWV</button>
+          <button class="chip" data-v="overig">Overig</button>
+        </div>
+        <label class="lt-label" for="lt-vraag">Vraag van de aanvrager</label>
+        <textarea id="lt-vraag" rows="4" placeholder="Plak de vragen, of laad ze uit een PDF of schermafdruk."></textarea>
+        <div class="lt-row">
+          <button id="lt-vraag-pdf" class="btn small">Uit PDF</button>
+          <button id="lt-vraag-shot" class="btn small" title="Kopieer eerst een schermafdruk, klik dan hier">Uit schermafdruk (klembord)</button>
+          <input type="file" id="lt-vraag-file" accept="application/pdf" hidden>
+        </div>
+        <label class="lt-check lt-consent"><input type="checkbox" id="lt-consent"> Er is een gerichte vraag én schriftelijke toestemming van de patiënt</label>
+        <p class="lt-hint">De brief geeft alleen feitelijke gegevens en geen oordeel over beperkingen, arbeidsgeschiktheid of causaliteit (KNMG).</p>
+      </div>
+
+      <div id="lt-verw" class="hidden">
+        <label class="lt-label">Specialisme</label>
+        <div class="chips" id="lt-spec">
+          <button class="chip active" data-v="cardioloog">Cardiologie</button>
+          <button class="chip" data-v="neuroloog">Neurologie</button>
+          <button class="chip" data-v="orthopedisch chirurg">Orthopedie</button>
+          <button class="chip" data-v="internist">Interne</button>
+          <button class="chip" data-v="dermatoloog">Dermatologie</button>
+          <button class="chip" data-v="longarts">Longziekten</button>
+          <button class="chip" data-v="chirurg">Chirurgie</button>
+          <button class="chip" data-v="psychiater">Psychiatrie</button>
+          <button class="chip" data-v="GGZ">GGZ</button>
+          <button class="chip" data-v="">Anders…</button>
+        </div>
+        <input type="text" id="lt-spec-free" class="lt-input hidden" placeholder="Bijv. uroloog, reumatoloog, KNO-arts">
+        <label class="lt-label" for="lt-reden">Reden en vraagstelling</label>
+        <textarea id="lt-reden" rows="3" placeholder="Bijv. graag beoordeling persisterende knieklachten re ondanks NSAID; MRI-indicatie?"></textarea>
+        <div class="lt-row" id="lt-dictate-reason-row">
+          <button id="lt-reden-from-dictate" class="btn small" title="Neem de tekst uit Dicteren over">Neem dictaat over</button>
+        </div>
+        <label class="lt-label">Urgentie</label>
+        <div class="chips" id="lt-urg">
+          <button class="chip active" data-v="regulier">Regulier</button>
+          <button class="chip" data-v="semi-spoed">Semi-spoed</button>
+          <button class="chip" data-v="spoed">Spoed</button>
+        </div>
+      </div>
+
+      <label class="lt-label" for="lt-extra">Aanwijzing <span class="muted">(optioneel)</span></label>
+      <textarea id="lt-extra" rows="2" placeholder="Bijv. alleen periode 2023-2025; vraag 2 en 3."></textarea>
+      <button id="lt-generate" class="btn primary lt-go">Schrijf informatiebrief</button>
+    </section>
+
+    <section id="lt-output" class="lt-card hidden">
+      <h2>Concept</h2>
+      <div id="lt-out" class="lt-out" contenteditable="true" spellcheck="true"></div>
+      <div class="lt-row">
+        <button id="lt-copy" class="btn primary">Kopieer</button>
+        <button id="lt-insert" class="btn">Invoegen in veld</button>
+        <button id="lt-new" class="btn ghost">Nieuw</button>
+      </div>
+      <p class="note">Concept: controleer en vul [Naam huisarts] en eventuele [aanvullen] in voordat je verstuurt.</p>
+    </section>
+
+    <p id="lt-status" class="status" role="status"></p>
+  </div>
 
   <footer class="footer">
     <a href="#" id="open-rules">Snelteksten &amp; correcties</a>
@@ -93,9 +212,14 @@
     <a href="#" id="open-settings">Instellingen</a>
     <span class="sep">·</span>
     <a href="#" id="run-diag">Diagnose</a>
+    <span class="sep">·</span>
+    <a href="../privacy/avg.html" target="_blank" id="open-avg">AVG</a>
   </footer>
 
   <script src="../lib/textrules.js"></script>
+  <script src="../lib/privacy.js"></script>
+  <script src="../lib/pdfjs/pdf.min.js"></script>
   <script src="sidepanel.js"></script>
+  <script src="letters.js"></script>
 </body>
 </html>

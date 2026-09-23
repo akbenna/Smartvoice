@@ -34,6 +34,7 @@ from pydantic import BaseModel, Field
 from .auth import verify_api_key
 from .config import get_config
 from .dictation import relay_dictation
+from .letters import router as letters_router
 from . import llm_service
 from .medical_vocabulary import (
     add_custom_correction,
@@ -197,6 +198,9 @@ async def process_consult(
 DICTAAT_OPSCHONEN_MAX_TOKENS = 1200
 DICTAAT_SOEP_MAX_TOKENS = 900
 DICTAAT_MAX_CHARS = 20000
+
+
+app.include_router(letters_router)
 
 
 @app.websocket("/api/v1/dictation/stream")
