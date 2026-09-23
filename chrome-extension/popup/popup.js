@@ -397,3 +397,14 @@ async function init() {
 }
 
 init();
+
+// ── Dictation side panel ──
+// sidePanel.open must be called directly in the click, so resolve the window first.
+var currentWindowId = null;
+chrome.windows.getCurrent(function (w) { currentWindowId = w.id; });
+
+document.getElementById('btn-dictate').addEventListener('click', function () {
+  if (currentWindowId === null) return;
+  chrome.sidePanel.open({ windowId: currentWindowId });
+  window.close();
+});

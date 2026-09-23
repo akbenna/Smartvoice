@@ -12,15 +12,29 @@ import os
 import tempfile
 import time
 from pathlib import Path
+from typing import Literal, Optional
 
+import httpx
 import structlog
 import uvicorn
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+    WebSocket,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from pydantic import BaseModel, Field
 
 from .auth import verify_api_key
 from .config import get_config
+from .dictation import relay_dictation
+from . import llm_service
 from .medical_vocabulary import (
     add_custom_correction,
     correct_transcript_full,
@@ -28,7 +42,13 @@ from .medical_vocabulary import (
     load_custom_vocabulary,
     save_custom_vocabulary,
 )
-from .pipeline import process_consultation
+from .pipeline import _parse_json_response, process_consultation
+from .prompts import (
+    DICTAAT_OPSCHONEN_SYSTEM_PROMPT,
+    DICTAAT_OPSCHONEN_USER_TEMPLATE,
+    DICTAAT_SOEP_SYSTEM_PROMPT,
+    DICTAAT_SOEP_USER_TEMPLATE,
+)
 
 logger = structlog.get_logger()
 
@@ -167,6 +187,71 @@ async def process_consult(
             audio_path.unlink(missing_ok=True)
         except OSError:
             pass
+
+
+# ── Live dictation (side panel) ──
+
+# Output-budgetten: een dictaat is kort, dus ruim genoeg maar begrensd.
+DICTAAT_OPSCHONEN_MAX_TOKENS = 1200
+DICTAAT_SOEP_MAX_TOKENS = 900
+DICTAAT_MAX_CHARS = 20000
+
+
+@app.websocket("/api/v1/dictation/stream")
+async def dictation_stream(ws: WebSocket):
+    """Live dictation: audio in, transcript text out while speaking."""
+    await relay_dictation(ws)
+
+
+class DictationProcessRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=DICTAAT_MAX_CHARS)
+    mode: Literal["clean", "soep"]
+    llm_provider: Optional[str] = None
+
+
+@app.post("/api/v1/dictation/process")
+async def process_dictation(
+    body: DictationProcessRequest,
+    _api_key: str = Depends(verify_api_key),
+):
+    """Dictaat licht opschonen (clean) of omzetten naar een SOEP-regel (soep)."""
+    text = body.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Leeg dictaat.")
+
+    start_time = time.time()
+    try:
+        if body.mode == "clean":
+            cleaned = await llm_service.complete(
+                system_prompt=DICTAAT_OPSCHONEN_SYSTEM_PROMPT,
+                user_prompt=DICTAAT_OPSCHONEN_USER_TEMPLATE.format(dictaat=text),
+                provider=body.llm_provider,
+                max_tokens=DICTAAT_OPSCHONEN_MAX_TOKENS,
+            )
+            result = {"mode": "clean", "text": cleaned.strip()}
+        else:
+            raw = await llm_service.complete(
+                system_prompt=DICTAAT_SOEP_SYSTEM_PROMPT,
+                user_prompt=DICTAAT_SOEP_USER_TEMPLATE.format(dictaat=text),
+                provider=body.llm_provider,
+                json_mode=True,
+                max_tokens=DICTAAT_SOEP_MAX_TOKENS,
+            )
+            data = _parse_json_response(raw)
+            result = {
+                "mode": "soep",
+                "soep": {
+                    key: str(data.get(key) or "").strip()
+                    for key in ("s", "o", "e", "p", "icpc_code", "icpc_titel")
+                },
+            }
+    except (ValueError, httpx.HTTPError) as exc:
+        # Missing provider key, provider error or unparseable model output.
+        logger.error("dictation.process_error", mode=body.mode, error=str(exc))
+        raise HTTPException(status_code=502, detail=f"Verwerking mislukt: {exc}")
+
+    result["processing_time_secs"] = round(time.time() - start_time, 2)
+    return result
 
 
 # ── Provider info endpoint ──

@@ -1,13 +1,15 @@
 {
   "manifest_version": 3,
   "name": "SmartVoice — AI Consultassistent",
-  "version": "1.1.0",
-  "description": "Neem consulten op en genereer automatisch SOEP-notities voor Bricks Huisarts",
+  "version": "1.2.0",
+  "description": "Dicteer of neem consulten op en maak SOEP-notities voor Bricks Huisarts",
+  "minimum_chrome_version": "116",
   "permissions": [
     "activeTab",
     "storage",
     "tabs",
-    "offscreen"
+    "offscreen",
+    "sidePanel"
   ],
   "host_permissions": [
     "https://*.bfrcloud.com/*",
@@ -24,6 +26,18 @@
     "default_popup": "popup/popup.html",
     "default_title": "SmartVoice — AI Consultassistent"
   },
+  "side_panel": {
+    "default_path": "sidepanel/sidepanel.html"
+  },
+  "commands": {
+    "toggle-dictation": {
+      "suggested_key": {
+        "default": "Alt+Shift+D",
+        "mac": "Alt+Shift+D"
+      },
+      "description": "Dicteren starten/stoppen"
+    }
+  },
   "background": {
     "service_worker": "background/service-worker.js"
   },
@@ -39,8 +53,29 @@
         "https://*.bfrw-online.nl/*",
         "http://localhost:8002/*"
       ],
-      "js": ["content/bricks.js"],
-      "css": ["content/bricks.css"],
+      "js": [
+        "content/bricks.js"
+      ],
+      "css": [
+        "content/bricks.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://*.bfrcloud.com/*",
+        "https://*.bfrnet.nl/*",
+        "https://*.bricks-huisarts.nl/*",
+        "https://*.bfrw.nl/*",
+        "https://*.bfrw.cloud/*",
+        "https://*.brickshuisarts.nl/*",
+        "https://*.bfrw-online.nl/*",
+        "http://localhost:8002/*"
+      ],
+      "js": [
+        "content/dictation-target.js"
+      ],
+      "all_frames": true,
       "run_at": "document_idle"
     }
   ],

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmartVoice Dicteren</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <header class="header">
+    <div class="brand">
+      <div class="logo">SV</div>
+      <h1>Dicteren</h1>
+    </div>
+    <span id="conn" class="conn" title="Verbinding">klaar</span>
+  </header>
+
+  <section class="target" id="target">
+    <span class="target-label">Doelveld</span>
+    <span id="target-name" class="target-name muted">Klik in Bricks in een veld</span>
+  </section>
+
+  <section class="controls">
+    <button id="btn-mic" class="mic" title="Start/stop dicteren (Alt+Shift+D)">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+        <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+      </svg>
+    </button>
+    <div class="mic-meta">
+      <span id="timer" class="timer">00:00</span>
+      <span class="hint">Alt+Shift+D</span>
+    </div>
+    <label class="switch" title="Tekst verschijnt direct in het gekozen veld terwijl je spreekt">
+      <input type="checkbox" id="live-insert">
+      <span>Live in veld</span>
+    </label>
+  </section>
+
+  <section class="editor">
+    <textarea id="text" spellcheck="true" placeholder="Wat je dicteert verschijnt hier. Zeg &quot;nieuwe regel&quot; voor een regelafbreking."></textarea>
+    <div id="interim" class="interim"></div>
+  </section>
+
+  <section class="actions">
+    <button id="btn-insert" class="btn primary">Invoegen in veld</button>
+    <button id="btn-copy" class="btn">Kopieer</button>
+    <button id="btn-clean" class="btn ai" title="Haperingen en herhalingen weghalen; inhoud blijft gelijk">Opschonen</button>
+    <button id="btn-soep" class="btn ai" title="Dictaat omzetten naar een SOEP-regel">Maak SOEP</button>
+    <button id="btn-clear" class="btn ghost">Wissen</button>
+  </section>
+
+  <section id="soep" class="soep hidden">
+    <div class="soep-head">
+      <h2>SOEP</h2>
+      <span id="icpc" class="icpc"></span>
+    </div>
+    <div class="soep-rows" id="soep-rows"></div>
+    <div class="soep-actions">
+      <button id="btn-soep-insert" class="btn primary">Alles invoegen</button>
+      <button id="btn-soep-copy" class="btn">Kopieer alles</button>
+    </div>
+    <p class="note">Controleer altijd voor opslaan. Alleen wat je gedicteerd hebt wordt opgenomen.</p>
+  </section>
+
+  <p id="status" class="status" role="status"></p>
+
+  <footer class="footer">
+    <a href="#" id="open-settings">Instellingen</a>
+  </footer>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>

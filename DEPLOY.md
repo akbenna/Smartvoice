@@ -147,3 +147,31 @@ Plus STT/LLM API kosten afhankelijk van gebruik (~$5-20/maand voor kleine prakti
 - [ ] Wachtwoorden gewijzigd na eerste login
 - [ ] STT API key (Deepgram) geconfigureerd
 - [ ] LLM API key (Mistral) geconfigureerd
+
+---
+
+## Live dicteren (zijpaneel)
+
+De Chrome-extensie heeft een dicteerpaneel naast Bricks (knop in de popup of **Alt+Shift+D**).
+De tekst verschijnt terwijl je spreekt en gaat naar het Bricks-veld waarin je het laatst klikte.
+
+**Railway-variabelen:**
+
+```
+DEEPGRAM_API_KEY=<je Deepgram API key>      # ook gebruikt voor live dicteren
+LLM_PROVIDER=anthropic                      # voor "Opschonen" en "Maak SOEP"
+ANTHROPIC_API_KEY=<je Anthropic API key>
+# Optioneel (standaardwaarden):
+DICTATION_DEEPGRAM_URL=wss://api.eu.deepgram.com/v1/listen   # EU-verwerking
+DICTATION_DEEPGRAM_MODEL=nova-3
+DICTATION_MAX_SECONDS=600
+```
+
+Kies bij Railway een EU-regio voor de service, zodat audio de EU niet verlaat en de vertraging laag blijft.
+
+**Eerste gebruik:** bij de eerste start opent een tabblad dat eenmalig om microfoontoestemming vraagt
+(Chrome kan dat niet vanuit het zijpaneel zelf). Na een update van de extensie: ververs het Bricks-tabblad.
+
+**Endpoints:**
+- `WS /api/v1/dictation/stream`: audio in, tekst terug (eerste bericht: `{"type":"auth","api_key":"..."}`)
+- `POST /api/v1/dictation/process`: `{"text": "...", "mode": "clean" | "soep"}`
