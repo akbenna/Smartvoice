@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=440">
+<title>Huisarts Brief Assistent</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<div class="shell">
+
+  <header>
+    <div class="logo">
+      <span class="cross">✚</span>
+      <div>
+        <h1>Brief<strong>Assistent</strong></h1>
+        <p>Bricks · AVG-conform · v4</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <span id="statusBadge" class="badge">verbinden...</span>
+      <button class="avg-btn" id="avgBtn">⚖ AVG</button>
+    </div>
+  </header>
+
+  <!-- Niet op Bricks waarschuwing -->
+  <div id="notBricks" class="alert warn" style="display:none">
+    ⚠ Geen Bricks-pagina open. Dossier ophalen werkt alleen vanuit Bricks.
+    U kunt wel een Screenshot of PDF invoeren.
+  </div>
+
+  <!-- ═══ HOOFDTABS ═══ -->
+  <div class="hoofd-tabs">
+    <button class="htab active" id="htab-brief">✉️ Informatiebrief</button>
+    <button class="htab" id="htab-verwijzing">🏥 Verwijzing</button>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- PAGINA 1: INFORMATIEBRIEF (bestaand)                      -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div id="page-brief">
+
+    <!-- ═══ STAP 1: DOSSIER ═══ -->
+    <div class="step-label"><span class="stepnum">01</span> DOSSIER INVOEREN</div>
+
+    <!-- Methode tabs -->
+    <div class="method-tabs">
+      <button class="mtab active" id="tab-bricks">🏥 Bricks</button>
+      <button class="mtab" id="tab-screenshot">🖥 Screenshot</button>
+      <button class="mtab" id="tab-pdf-dossier">📄 PDF</button>
+    </div>
+
+    <!-- TAB: Bricks ophalen -->
+    <div id="pane-bricks" class="tab-pane active">
+      <div class="scrape-card" id="scrapeCard">
+        <div id="scrapeIdle">
+          <p class="card-icon">📋</p>
+          <p class="card-title">Dossier ophalen uit Bricks</p>
+          <p class="card-sub">Open het patiëntdossier in Bricks.<br>Klik door de tabs: Journaal · Medicatie · VG · Lab<br>Dan op de knop hieronder.</p>
+        </div>
+        <div id="scrapeDone" style="display:none">
+          <p class="card-icon">✅</p>
+          <p class="card-title green" id="scrapeTitle">Dossier opgehaald</p>
+          <p class="card-sub" id="scrapeMeta"></p>
+        </div>
+      </div>
+      <div class="row-btns">
+        <button class="btn primary" id="scrapeBtn">↓ Ophalen uit Bricks</button>
+        <button class="btn ghost" id="clearScrapeBtn" style="display:none">Wis</button>
+      </div>
+      <div id="scrapeDebug" class="debug-box" style="display:none"></div>
+    </div>
+
+    <!-- TAB: Screenshot -->
+    <div id="pane-screenshot" class="tab-pane" style="display:none">
+      <div class="screenshot-area" id="screenshotArea">
+        <p class="card-icon">🖥️</p>
+        <p class="card-title">Screenshot plakken</p>
+        <p class="card-sub">
+          1. Maak screenshot van Bricks scherm<br>
+          &nbsp;&nbsp;&nbsp;(PrintScreen of Knipprogramma)<br>
+          2. Klik in dit vak<br>
+          3. Druk <strong>Ctrl+V</strong>
+        </p>
+        <div id="screenshotPreview"></div>
+      </div>
+      <div class="row-btns" style="margin-top:6px">
+        <button class="btn primary" id="analyseScreenshotBtn" style="display:none">
+          🔍 Analyseer screenshot
+        </button>
+        <button class="btn ghost" id="clearScreenshotBtn" style="display:none">Wis</button>
+      </div>
+      <div id="screenshotStatus" class="card-sub" style="margin-top:5px;text-align:center"></div>
+    </div>
+
+    <!-- TAB: PDF dossier -->
+    <div id="pane-pdf-dossier" class="tab-pane" style="display:none">
+      <div class="drop-zone" id="dropDossier">
+        <input type="file" id="fileDossier" accept=".pdf" style="display:none">
+        <span id="dropDossierLabel">📄 Sleep Medicom/Bricks PDF export hier<br><small>of klik om te bladeren</small></span>
+      </div>
+      <div id="dossierPill" class="file-pill" style="display:none">
+        <span id="dossierPillText"></span><button id="clearDossierPDFBtn">✕</button>
+      </div>
+    </div>
+
+    <!-- Transparantie paneel -->
+    <div id="transparantiePaneel" style="display:none">
+      <div class="tp-header">
+        <span>🛡 U bepaalt wat naar de AI gaat</span>
+        <button class="preview-toggle" id="previewToggleBtn">👁 Toon preview</button>
+      </div>
+      <div class="tp-naam" id="tpNaam"></div>
+      <div id="sectieToggles"></div>
+      <div id="previewContent" style="display:none">
+        <pre id="previewText" class="preview-text"></pre>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- ═══ STAP 2: VRAAG AANVRAGER ═══ -->
+    <div class="step-label"><span class="stepnum">02</span> BRIEF / VRAAG AANVRAGER <span class="optioneel">optioneel</span></div>
+
+    <!-- Vraag methode tabs -->
+    <div class="vraag-tabs">
+      <button class="vtab active" id="vtab-pdf">📄 PDF uploaden</button>
+      <button class="vtab" id="vtab-screenshot">🖥 Screenshot</button>
+    </div>
+
+    <!-- Vraag TAB: PDF -->
+    <div id="vpane-pdf" class="tab-pane">
+      <div class="drop-zone" id="dropVraag">
+        <input type="file" id="fileVraag" accept=".pdf" style="display:none">
+        <span id="dropVraagLabel">📩 Sleep vraag-PDF hier<br><small>Advocaat / SMA / Gemeente / UWV — of klik</small></span>
+      </div>
+      <div class="file-pill" id="vraagPill" style="display:none">
+        <span id="vraagPillText"></span><button id="clearVraagBtn">✕</button>
+      </div>
+    </div>
+
+    <!-- Vraag TAB: Screenshot -->
+    <div id="vpane-screenshot" class="tab-pane" style="display:none">
+      <div class="screenshot-area" id="vraagScreenshotArea">
+        <p class="card-icon">📸</p>
+        <p class="card-title">Screenshot van brief plakken</p>
+        <p class="card-sub">
+          1. Maak screenshot van de brief/vraag<br>
+          &nbsp;&nbsp;&nbsp;(PrintScreen of Knipprogramma)<br>
+          2. Klik in dit vak<br>
+          3. Druk <strong>Ctrl+V</strong>
+        </p>
+        <div id="vraagScreenshotPreview"></div>
+      </div>
+      <div class="row-btns" style="margin-top:6px">
+        <button class="btn primary" id="analyseVraagScreenshotBtn" style="display:none">
+          🔍 Analyseer screenshot
+        </button>
+        <button class="btn ghost" id="clearVraagScreenshotBtn" style="display:none">Wis</button>
+      </div>
+      <div id="vraagScreenshotStatus" class="card-sub" style="margin-top:5px;text-align:center"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- ═══ STAP 3: BRIEFTYPE ═══ -->
+    <div class="step-label"><span class="stepnum">03</span> BRIEFTYPE</div>
+    <div class="type-grid" id="typeGrid">
+      <div class="type-btn active" data-type="advocaat">⚖️ Advocaat</div>
+      <div class="type-btn" data-type="sma">🏥 SMA</div>
+      <div class="type-btn" data-type="gemeente">🏛️ Gemeente</div>
+      <div class="type-btn" data-type="verzekeraar">📋 Verzekeraar</div>
+      <div class="type-btn" data-type="uwv">💼 UWV</div>
+      <div class="type-btn" data-type="overig">✉️ Overig</div>
+    </div>
+
+    <!-- ═══ STAP 4: INSTRUCTIE ═══ -->
+    <div class="step-label" style="margin-top:10px"><span class="stepnum">04</span> EXTRA INSTRUCTIE</div>
+    <textarea id="extraInstructie" placeholder="Bijv: focus op 2022-2024 · beantwoord vraag 2 en 3 · benadruk prognose..."></textarea>
+
+    <!-- Genereer -->
+    <button class="btn gen" id="genBtn">✦ Genereer informatiebrief</button>
+
+  </div><!-- /page-brief -->
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- PAGINA 2: VERWIJZING (nieuw)                              -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div id="page-verwijzing" style="display:none">
+
+    <!-- Dossier status -->
+    <div id="verwDossierStatus" class="alert warn">
+      ⚠ Laad eerst een dossier via de Informatiebrief-tab (Bricks / Screenshot / PDF).
+    </div>
+    <div id="verwDossierOk" class="scrape-card" style="display:none">
+      <p class="card-icon">✅</p>
+      <p class="card-title green">Dossier geladen</p>
+      <p class="card-sub" id="verwDossierMeta"></p>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Specialisme -->
+    <div class="step-label"><span class="stepnum">01</span> SPECIALISME</div>
+    <div class="type-grid" id="specGrid">
+      <div class="type-btn active" data-spec="cardiologie">🫀 Cardiologie</div>
+      <div class="type-btn" data-spec="neurologie">🧠 Neurologie</div>
+      <div class="type-btn" data-spec="orthopedie">🦴 Orthopedie</div>
+      <div class="type-btn" data-spec="interne">🩺 Interne</div>
+      <div class="type-btn" data-spec="dermatologie">🔬 Dermatologie</div>
+      <div class="type-btn" data-spec="psychiatrie">🧩 Psychiatrie</div>
+      <div class="type-btn" data-spec="chirurgie">✂️ Chirurgie</div>
+      <div class="type-btn" data-spec="ggz">💬 GGZ</div>
+      <div class="type-btn" data-spec="overig">📋 Anders</div>
+    </div>
+
+    <!-- Vrij specialisme als "anders" geselecteerd -->
+    <div id="specAnders" style="display:none;margin-top:8px">
+      <input type="text" id="specVrij" class="api-input" placeholder="Bijv: urologie, longgeneeskunde, reumatologie..." style="width:100%">
+    </div>
+
+    <!-- Verwijsreden -->
+    <div class="step-label" style="margin-top:10px"><span class="stepnum">02</span> VERWIJSREDEN / VRAAGSTELLING</div>
+    <textarea id="verwReden" placeholder="Bijv: graag beoordeling knieklachten rechts, persisterende pijn sinds 3 maanden ondanks NSAID..."></textarea>
+
+    <!-- Urgentie -->
+    <div class="step-label" style="margin-top:10px"><span class="stepnum">03</span> URGENTIE</div>
+    <div class="urgentie-row" id="urgentieRow">
+      <button class="urg-btn active" data-urg="regulier">📅 Regulier</button>
+      <button class="urg-btn" data-urg="semi-spoed">⚡ Semi-spoed</button>
+      <button class="urg-btn" data-urg="spoed">🚨 Spoed</button>
+    </div>
+
+    <!-- Extra context -->
+    <div class="step-label" style="margin-top:10px"><span class="stepnum">04</span> EXTRA CONTEXT <span class="optioneel">optioneel</span></div>
+    <textarea id="verwExtra" placeholder="Bijv: patiënt heeft voorkeur voor locatie X · eerder gezien door dr. Y in 2023..."></textarea>
+
+    <!-- Kostenindicatie -->
+    <div class="cost-hint">
+      💡 Verwijzingen gebruiken Haiku (snel &amp; goedkoop) — ~10x voordeliger dan Informatiebrief
+    </div>
+
+    <!-- Genereer -->
+    <button class="btn gen verwijzing" id="genVerwBtn">✦ Genereer verwijsbrief</button>
+
+  </div><!-- /page-verwijzing -->
+
+  <!-- ═══ GEDEELD: API Key + Output ═══ -->
+
+  <!-- API Sleutel -->
+  <div id="apiSection" style="margin-top:10px">
+    <div class="step-label">API SLEUTEL (eenmalig)</div>
+    <div class="row-btns">
+      <input type="password" id="apiKey" class="api-input" placeholder="sk-ant-api03-..." autocomplete="off"/>
+      <button class="btn primary small" id="saveKeyBtn">Sla op</button>
+    </div>
+    <p class="hint">Opgeslagen lokaal in Edge. Nooit verstuurd naar derden.</p>
+  </div>
+  <div class="key-ok" id="keyOk" style="display:none">
+    🔑 API sleutel ingesteld · <button id="resetKeyBtn">Wijzig</button>
+  </div>
+
+  <!-- Foutmelding -->
+  <div class="alert error" id="errorBar" style="display:none"></div>
+
+  <!-- Output -->
+  <div id="outputWrap" style="display:none">
+    <div class="output-header">
+      <span id="outputTitle">✓ Brief gegenereerd</span>
+      <div>
+        <button id="copyBtn">Kopieer</button>
+        <button id="clearAllBtn">Nieuw</button>
+      </div>
+    </div>
+    <div class="output-body" id="outputBody"></div>
+  </div>
+
+</div>
+<script src="pdfjs/pdf.min.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>

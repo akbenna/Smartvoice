@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<title>AVG Verantwoording — BriefAssistent</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    max-width: 680px;
+    margin: 40px auto;
+    padding: 0 20px;
+    color: #1a1a1a;
+    line-height: 1.7;
+    font-size: 14px;
+  }
+  h1 { color: #1a5c38; font-size: 22px; border-bottom: 2px solid #1a5c38; padding-bottom: 8px; }
+  h2 { color: #1a5c38; font-size: 16px; margin-top: 24px; }
+  .shield { font-size: 40px; text-align: center; margin: 20px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #e0e4e8; font-size: 13px; }
+  th { background: #f4f6f7; font-weight: 600; }
+  .ja { color: #1a5c38; font-weight: 700; }
+  .nee { color: #c0392b; font-weight: 700; }
+  code { background: #f4f6f7; padding: 2px 6px; border-radius: 3px; font-size: 12px; }
+  .footer { margin-top: 30px; padding-top: 12px; border-top: 1px solid #e0e4e8; font-size: 11px; color: #888; }
+</style>
+</head>
+<body>
+
+<div class="shield">🛡️</div>
+<h1>AVG Verantwoording — BriefAssistent v4</h1>
+
+<p>Dit document beschrijft hoe BriefAssistent omgaat met medische patiëntgegevens conform de Algemene Verordening Gegevensbescherming (AVG/GDPR).</p>
+
+<h2>1. Gegevensverwerking</h2>
+<table>
+  <tr><th>Aspect</th><th>Beschrijving</th></tr>
+  <tr><td>Verwerkingsverantwoordelijke</td><td>De huisarts die de extensie gebruikt</td></tr>
+  <tr><td>Verwerker</td><td>Anthropic (Claude API) — verwerkt geanonimiseerde tekst</td></tr>
+  <tr><td>Grondslag</td><td>Gerechtvaardigd belang (efficiënte briefschrijving) + toestemming arts</td></tr>
+  <tr><td>Doel</td><td>Genereren van medische informatiebrieven</td></tr>
+</table>
+
+<h2>2. Privacy-maatregelen</h2>
+<table>
+  <tr><th>Maatregel</th><th>Status</th><th>Toelichting</th></tr>
+  <tr>
+    <td>Naam → initialen</td>
+    <td class="ja">✓ Actief</td>
+    <td>Volledige naam wordt <strong>nooit</strong> naar de API gestuurd. Alleen initialen.</td>
+  </tr>
+  <tr>
+    <td>BSN-filtering</td>
+    <td class="ja">✓ Actief</td>
+    <td>9-cijferige nummers worden vervangen door <code>[BSN]</code></td>
+  </tr>
+  <tr>
+    <td>Datum-filtering</td>
+    <td class="ja">✓ Actief</td>
+    <td>Geboortedatums en andere datums worden vervangen door <code>[DATUM]</code></td>
+  </tr>
+  <tr>
+    <td>Contactgegevens</td>
+    <td class="ja">✓ Actief</td>
+    <td>Telefoon, e-mail, postcode gefilterd</td>
+  </tr>
+  <tr>
+    <td>Sectie-controle</td>
+    <td class="ja">✓ Actief</td>
+    <td>Arts bepaalt per sectie welke data wordt verstuurd</td>
+  </tr>
+  <tr>
+    <td>Preview</td>
+    <td class="ja">✓ Actief</td>
+    <td>Arts kan exact zien wat naar de API gaat vóór verzending</td>
+  </tr>
+  <tr>
+    <td>Lokale opslag</td>
+    <td class="ja">✓ Actief</td>
+    <td>Alleen API-sleutel wordt lokaal opgeslagen. Geen patiëntdata.</td>
+  </tr>
+  <tr>
+    <td>Sessie-gebonden</td>
+    <td class="ja">✓ Actief</td>
+    <td>Alle patiëntdata verdwijnt bij sluiten van de popup</td>
+  </tr>
+</table>
+
+<h2>3. Gegevensstroom</h2>
+<p>
+  <strong>Bricks HIS / Screenshot / PDF</strong> → Extensie (lokaal in browser) →
+  Privacy-filter (naam, BSN, datums, contactgegevens verwijderd) →
+  Arts controleert via preview → Arts klikt "Genereer" →
+  Geanonimiseerde tekst → Anthropic Claude API (HTTPS) →
+  Gegenereerde brief terug → Weergave in extensie
+</p>
+
+<h2>4. Wat wordt NIET verstuurd</h2>
+<table>
+  <tr><td class="nee">✗</td><td>Volledige patiëntnaam</td></tr>
+  <tr><td class="nee">✗</td><td>BSN-nummer</td></tr>
+  <tr><td class="nee">✗</td><td>Geboortedatum</td></tr>
+  <tr><td class="nee">✗</td><td>Adres of postcode</td></tr>
+  <tr><td class="nee">✗</td><td>Telefoonnummer of e-mail</td></tr>
+  <tr><td class="nee">✗</td><td>Secties die de arts heeft uitgeschakeld</td></tr>
+</table>
+
+<h2>5. Aanbevelingen</h2>
+<ul>
+  <li>Controleer altijd de preview vóór het genereren</li>
+  <li>Schakel secties uit die niet relevant zijn voor de brief</li>
+  <li>Controleer de gegenereerde brief op juistheid vóór gebruik</li>
+  <li>Gebruik de extensie alleen op beveiligde werkstations</li>
+  <li>Deel uw API-sleutel niet met derden</li>
+</ul>
+
+<div class="footer">
+  BriefAssistent v4 — Ontwikkeld als hulpmiddel voor huisartsen.
+  De arts blijft te allen tijde verantwoordelijk voor de inhoud van verstuurde brieven.
+</div>
+
+</body>
+</html>
