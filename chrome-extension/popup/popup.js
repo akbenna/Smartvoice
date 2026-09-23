@@ -405,11 +405,14 @@ init();
 var currentWindowId = null;
 chrome.windows.getCurrent(function (w) { currentWindowId = w.id; });
 
-document.getElementById('btn-dictate').addEventListener('click', function () {
+function openPanel(view) {
   if (currentWindowId === null) return;
   chrome.sidePanel.open({ windowId: currentWindowId });
-  window.close();
-});
+  // The panel picks this up on load, or live when it is already open.
+  chrome.storage.session.set({ svOpenView: view }).finally(function () { window.close(); });
+}
+document.getElementById('btn-dictate').addEventListener('click', function () { openPanel('dictate'); });
+document.getElementById('btn-letters').addEventListener('click', function () { openPanel('letters'); });
 
 // Dictate straight into the clicked field, without the side panel.
 document.getElementById('btn-quick-dictate').addEventListener('click', function () {

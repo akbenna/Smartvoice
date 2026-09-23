@@ -49,6 +49,16 @@
     try { localStorage.setItem('svView', view); } catch (e) { /* ignore */ }
   }
   try { if (localStorage.getItem('svView') === 'letters') showView('letters'); } catch (e) { /* ignore */ }
+  // Popup buttons "Zijpaneel openen" / "Brief schrijven" choose the view.
+  function applyRequestedView(v) {
+    if (v !== 'letters' && v !== 'dictate') return;
+    showView(v);
+    chrome.storage.session.remove('svOpenView');
+  }
+  chrome.storage.session.get('svOpenView').then(function (r) { applyRequestedView(r.svOpenView); });
+  chrome.storage.onChanged.addListener(function (changes, area) {
+    if (area === 'session' && changes.svOpenView) applyRequestedView(changes.svOpenView.newValue);
+  });
 
   // ── Small UI helpers ──
   function segment(containerId, attr, onPick) {
