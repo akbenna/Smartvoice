@@ -408,3 +408,11 @@ document.getElementById('btn-dictate').addEventListener('click', function () {
   chrome.sidePanel.open({ windowId: currentWindowId });
   window.close();
 });
+
+// Dictate straight into the clicked field, without the side panel.
+document.getElementById('btn-quick-dictate').addEventListener('click', function () {
+  chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+    if (tabs[0]) chrome.runtime.sendMessage({ action: 'SV_QUICK_TOGGLE', tabId: tabs[0].id });
+    window.close();
+  });
+});

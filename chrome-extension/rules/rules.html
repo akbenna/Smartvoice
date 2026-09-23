@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmartVoice - Snelteksten &amp; correcties</title>
+  <link rel="stylesheet" href="rules.css">
+</head>
+<body>
+  <h1>Snelteksten &amp; correcties</h1>
+  <p class="subtitle">Wordt direct opgeslagen, alleen op deze computer. Bevat je eigen standaardteksten, geen patiëntgegevens.</p>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>Snelteksten</h2>
+      <button id="add-snippet" class="btn primary">+ Sneltekst</button>
+    </div>
+    <p class="hint">Zeg het commando tijdens het dicteren en de tekst verschijnt. Meerdere varianten mag, gescheiden door een komma
+      (bijv. <em>normaal longen, normale longen</em>), handig als de spraakherkenning het soms anders verstaat.</p>
+    <div id="snippets" class="list"></div>
+    <p id="snippets-empty" class="empty">Nog geen snelteksten. Voorbeeld: commando <em>normaal longen</em> &rarr;
+      <em>Pulm: VAG bdz, geen bijgeluiden.</em></p>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>Correcties</h2>
+      <button id="add-correction" class="btn primary">+ Correctie</button>
+    </div>
+    <p class="hint">Woorden die steeds verkeerd verstaan worden. Worden automatisch verbeterd en als hint aan de spraakherkenning meegegeven.</p>
+    <div id="corrections" class="list"></div>
+    <p id="corrections-empty" class="empty">Nog geen correcties. Tip: selecteer in het dicteerpaneel een fout woord en klik <em>Verbeter woord</em>.</p>
+  </section>
+
+  <section class="card">
+    <h2>Overzetten naar een andere computer</h2>
+    <p class="hint">Exporteer naar een bestand en importeer dat op de andere werkplek. Importeren vervangt de huidige lijst.</p>
+    <div class="row">
+      <button id="export" class="btn">Exporteren</button>
+      <label class="btn">Importeren<input type="file" id="import" accept="application/json" hidden></label>
+    </div>
+  </section>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="../lib/textrules.js"></script>
+  <script src="rules.js"></script>
+</body>
+</html>

@@ -204,16 +204,126 @@ chrome.runtime.onConnect.addListener((port) => {
   port.onDisconnect.addListener(() => sidePanelPorts.delete(port));
 });
 
-// Alt+Shift+D: toggle dictation; opens the panel (and starts) when closed.
+// Alt+Shift+D: with the side panel open it toggles the panel's dictation;
+// otherwise it dictates straight into the clicked field (quick mode).
 chrome.commands.onCommand.addListener((command, tab) => {
   if (command !== 'toggle-dictation') return;
   if (sidePanelPorts.size > 0) {
     sidePanelPorts.forEach((port) => port.postMessage({ action: 'SV_TOGGLE_DICTATION' }));
     return;
   }
-  // sidePanel.open must run synchronously inside the user gesture.
-  if (tab && tab.windowId !== undefined) {
-    chrome.sidePanel.open({ windowId: tab.windowId });
-    chrome.storage.session.set({ svAutoStart: true });
+  if (tab && tab.id !== undefined) quickToggle(tab.id);
+});
+
+// ── Quick dictation: no panel, text goes straight into the clicked field ──
+
+const OFFSCREEN_URL = 'offscreen/dictation.html';
+let quickTarget = null;           // { tabId, frameId } for the running session
+let quickInsertQueue = Promise.resolve();
+let quickInsertFailed = false;
+
+async function ensureOffscreen() {
+  if (await chrome.offscreen.hasDocument()) return;
+  await chrome.offscreen.createDocument({
+    url: OFFSCREEN_URL,
+    reasons: ['USER_MEDIA', 'CLIPBOARD'],
+    justification: 'Microfoon voor dicteren zonder zijpaneel; dictaat naar klembord als terugval.',
+  });
+}
+
+function toOffscreen(action, extra) {
+  return chrome.runtime.sendMessage({ target: 'sv-offscreen', action, ...extra }).catch(() => null);
+}
+
+function pill(tabId, state, text) {
+  if (tabId === undefined || tabId === null) return;
+  chrome.tabs.sendMessage(tabId, { action: 'SV_PILL', state, text: text || '' }, { frameId: 0 }).catch(() => {});
+}
+
+async function getQuickTarget() {
+  if (!quickTarget) quickTarget = (await chrome.storage.session.get('svQuickTarget')).svQuickTarget || null;
+  return quickTarget;
+}
+
+async function quickToggle(tabId) {
+  await ensureOffscreen();
+  const status = await toOffscreen('SV_QUICK_STATUS');
+  if (status && status.active) {
+    toOffscreen('SV_QUICK_STOP');
+    return;
   }
+  const { svTarget } = await chrome.storage.session.get('svTarget');
+  if (!svTarget || svTarget.tabId !== tabId) {
+    pill(tabId, 'error', 'Klik eerst in het veld waar de tekst moet komen, en druk dan Alt+Shift+D.');
+    return;
+  }
+  quickTarget = { tabId: svTarget.tabId, frameId: svTarget.frameId };
+  quickInsertFailed = false;
+  await chrome.storage.session.set({ svQuickTarget: quickTarget });
+  const sync = await chrome.storage.sync.get(['apiUrl', 'apiKey', 'micDevice']);
+  const local = await chrome.storage.local.get('svTextRules');
+  toOffscreen('SV_QUICK_START', {
+    config: {
+      apiUrl: (sync.apiUrl || 'http://localhost:8002').replace(/\/$/, ''),
+      apiKey: (sync.apiKey || '').trim(),
+      micDevice: sync.micDevice || '',
+    },
+    rules: local.svTextRules || null,
+  });
+}
+
+function quickInsert(target, text) {
+  quickInsertQueue = quickInsertQueue.then(async () => {
+    const res = await chrome.tabs.sendMessage(
+      target.tabId, { action: 'SV_INSERT_TEXT', text }, { frameId: target.frameId },
+    ).catch(() => null);
+    if (!res || !res.ok) {
+      quickInsertFailed = true;
+      pill(target.tabId, 'listening', 'Invoegen lukt niet; tekst gaat na stoppen naar het klembord.');
+    }
+  });
+}
+
+async function handleQuickEvent(msg) {
+  const target = await getQuickTarget();
+  const tabId = target ? target.tabId : null;
+  switch (msg.type) {
+    case 'state':
+      pill(tabId, msg.state);
+      break;
+    case 'interim':
+      pill(tabId, 'listening', msg.text);
+      break;
+    case 'final':
+      if (target) quickInsert(target, msg.text);
+      pill(tabId, 'listening', '');
+      break;
+    case 'error':
+      if (msg.code === 'mic-permission') {
+        chrome.tabs.create({ url: chrome.runtime.getURL('sidepanel/mic-permission.html') });
+      }
+      pill(tabId, 'error', msg.message);
+      break;
+    case 'stopped':
+      await quickInsertQueue;
+      if (quickInsertFailed && msg.text) {
+        pill(tabId, 'error', 'Het veld was niet bereikbaar. Het dictaat staat op het klembord: plak met Ctrl+V.');
+      } else {
+        pill(tabId, 'idle');
+      }
+      quickTarget = null;
+      chrome.storage.session.remove('svQuickTarget');
+      break;
+  }
+}
+
+chrome.runtime.onMessage.addListener((msg, sender) => {
+  if (msg.action === 'SV_QUICK_EVENT') {
+    handleQuickEvent(msg);
+  } else if (msg.action === 'SV_QUICK_TOGGLE') {
+    // From the status pill (sender.tab) or the popup (msg.tabId).
+    const tabId = msg.tabId !== undefined ? msg.tabId : sender.tab && sender.tab.id;
+    if (tabId !== undefined) quickToggle(tabId);
+  }
+  return false;
 });

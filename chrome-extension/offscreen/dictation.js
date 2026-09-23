@@ -1,0 +1,132 @@
+/**
+ * SmartVoice - Dictation without the side panel (offscreen document)
+ *
+ * Captures the microphone and streams it to the Cloud API, like the side
+ * panel does, but invisibly. Transcript events go to the service worker,
+ * which inserts them into the clicked field and updates the status pill.
+ * Only chrome.runtime is available here (no chrome.storage).
+ */
+
+var CHUNK_MS = 250;
+var STOP_TIMEOUT_MS = 6000;
+
+var session = null;  // { ws, stream, recorder, stopTimer, text }
+
+function emit(type, extra) {
+  var msg = { action: 'SV_QUICK_EVENT', type: type };
+  for (var k in extra || {}) msg[k] = extra[k];
+  chrome.runtime.sendMessage(msg).catch(function () {});
+}
+
+function copyToClipboard(text) {
+  // Offscreen documents have no focus, so navigator.clipboard is unavailable.
+  var clip = document.getElementById('clip');
+  clip.value = text;
+  clip.select();
+  document.execCommand('copy');
+  clip.value = '';
+}
+
+// Offscreen documents can only use chrome.runtime, so the service worker
+// passes settings and text rules along with the start message.
+async function start(config, rules) {
+  if (session) return;
+  rules = SVTextRules.normalize(rules);
+
+  var audio = { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+  if (config.micDevice) audio.deviceId = { exact: config.micDevice };
+  var stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: audio });
+  } catch (err) {
+    emit('error', {
+      code: err.name === 'NotAllowedError' ? 'mic-permission' : 'mic',
+      message: err.name === 'NotAllowedError'
+        ? 'Geef eenmalig toestemming voor de microfoon (tabblad geopend) en probeer opnieuw.'
+        : 'Microfoon niet beschikbaar: ' + err.message,
+    });
+    return;
+  }
+
+  var ws = new WebSocket(config.apiUrl.replace(/^http/, 'ws') + '/api/v1/dictation/stream');
+  session = { ws: ws, stream: stream, recorder: null, stopTimer: null, text: '', rules: rules };
+  emit('state', { state: 'connecting' });
+
+  ws.onopen = function () {
+    ws.send(JSON.stringify({ type: 'auth', api_key: config.apiKey, keyterms: SVTextRules.keyterms(rules) }));
+  };
+  ws.onmessage = function (msg) {
+    var event;
+    try { event = JSON.parse(msg.data); } catch (e) { return; }
+    if (event.type === 'ready') startRecorder();
+    else if (event.type === 'transcript') handleTranscript(event);
+    else if (event.type === 'error') emit('error', { message: event.message });
+    else if (event.type === 'closed') teardown();
+  };
+  ws.onerror = function () {
+    emit('error', { message: 'Kan de server niet bereiken op ' + config.apiUrl + '.' });
+  };
+  ws.onclose = function () { teardown(); };
+}
+
+function handleTranscript(event) {
+  if (!session) return;
+  if (event.is_final) {
+    var text = SVTextRules.applyRules(event.text, session.rules);
+    session.text += (session.text && !/\s$/.test(session.text) && !/^[\s.,;:!?)]/.test(text) ? ' ' : '') + text;
+    emit('final', { text: text });
+  } else {
+    emit('interim', { text: event.text });
+  }
+}
+
+function startRecorder() {
+  var mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
+  var recorder = new MediaRecorder(session.stream, { mimeType: mimeType, audioBitsPerSecond: 32000 });
+  recorder.ondataavailable = function (e) {
+    if (e.data && e.data.size > 0 && session && session.ws.readyState === WebSocket.OPEN) session.ws.send(e.data);
+  };
+  recorder.onstop = function () {
+    if (session && session.ws.readyState === WebSocket.OPEN) session.ws.send(JSON.stringify({ type: 'stop' }));
+  };
+  session.recorder = recorder;
+  recorder.start(CHUNK_MS);
+  emit('state', { state: 'listening' });
+}
+
+function stop() {
+  if (!session) return;
+  emit('state', { state: 'stopping' });
+  if (session.recorder && session.recorder.state !== 'inactive') session.recorder.stop();
+  else if (session.ws.readyState === WebSocket.OPEN) session.ws.send(JSON.stringify({ type: 'stop' }));
+  session.stream.getTracks().forEach(function (t) { t.stop(); });
+  session.stopTimer = setTimeout(teardown, STOP_TIMEOUT_MS);
+}
+
+function teardown() {
+  if (!session) return;
+  var s = session;
+  session = null;
+  clearTimeout(s.stopTimer);
+  if (s.recorder && s.recorder.state !== 'inactive') { s.recorder.onstop = null; s.recorder.stop(); }
+  s.stream.getTracks().forEach(function (t) { t.stop(); });
+  if (s.ws.readyState === WebSocket.OPEN || s.ws.readyState === WebSocket.CONNECTING) s.ws.close();
+  // Whole dictation also lands on the clipboard: a safety net when the field
+  // could not be reached (e.g. Bricks Classic outside Chrome).
+  if (s.text) copyToClipboard(s.text);
+  emit('stopped', { text: s.text });
+}
+
+chrome.runtime.onMessage.addListener(function (msg, _sender, sendResponse) {
+  if (msg.target !== 'sv-offscreen') return false;
+  if (msg.action === 'SV_QUICK_STATUS') {
+    sendResponse({ active: !!session });
+  } else if (msg.action === 'SV_QUICK_START') {
+    start(msg.config, msg.rules);
+    sendResponse({ ok: true });
+  } else if (msg.action === 'SV_QUICK_STOP') {
+    stop();
+    sendResponse({ ok: true });
+  }
+  return false;
+});

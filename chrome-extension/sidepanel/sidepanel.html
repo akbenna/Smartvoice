@@ -50,6 +50,21 @@
     <button id="btn-clear" class="btn ghost">Wissen</button>
   </section>
 
+  <section class="learn">
+    <span class="learn-hint">Selecteer tekst hierboven en:</span>
+    <button id="btn-fix" class="btn small" title="Leer een woord dat verkeerd verstaan wordt">Verbeter woord</button>
+    <button id="btn-snippet" class="btn small" title="Maak van de geselecteerde tekst een sneltekst">Maak sneltekst</button>
+  </section>
+
+  <section id="learn-form" class="learn-form hidden">
+    <p id="learn-label" class="learn-label"></p>
+    <input type="text" id="learn-input" autocomplete="off">
+    <div class="learn-actions">
+      <button id="learn-save" class="btn primary small">Opslaan</button>
+      <button id="learn-cancel" class="btn small">Annuleren</button>
+    </div>
+  </section>
+
   <section id="soep" class="soep hidden">
     <div class="soep-head">
       <h2>SOEP</h2>
@@ -66,9 +81,12 @@
   <p id="status" class="status" role="status"></p>
 
   <footer class="footer">
+    <a href="#" id="open-rules">Snelteksten &amp; correcties</a>
+    <span class="sep">·</span>
     <a href="#" id="open-settings">Instellingen</a>
   </footer>
 
+  <script src="../lib/textrules.js"></script>
   <script src="sidepanel.js"></script>
 </body>
 </html>

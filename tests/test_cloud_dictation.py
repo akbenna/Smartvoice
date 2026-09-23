@@ -58,6 +58,23 @@ def test_keyterms_skipped_for_nova2(monkeypatch):
     assert "keyterm" not in params
 
 
+def test_user_keyterms_come_first_and_are_capped():
+    user = [f"term{i}" for i in range(80)]
+    terms = dictation.build_keyterms(dictation.sanitize_user_keyterms(user))
+    assert terms[:50] == user[:50]
+    assert len(terms) == dictation.MAX_KEYTERMS
+
+
+@pytest.mark.parametrize("raw, expected", [
+    (None, []),
+    ("normaal longen", []),
+    (["normaal  longen", "Normaal longen", "", 42, "x" * 51, "diclofenac"],
+     ["normaal longen", "diclofenac"]),
+])
+def test_sanitize_user_keyterms(raw, expected):
+    assert dictation.sanitize_user_keyterms(raw) == expected
+
+
 def test_spoken_commands_become_line_breaks():
     text = "Keelpijn sinds drie dagen, nieuwe regel geen koorts. Nieuwe alinea plan paracetamol"
     assert dictation.apply_spoken_commands(text) == (
@@ -156,7 +173,7 @@ def test_relay_streams_audio_and_returns_transcript():
     client = TestClient(_relay_app(upstream, seen))
 
     with client.websocket_connect("/ws") as ws:
-        ws.send_text(json.dumps({"type": "auth", "api_key": "geheim"}))
+        ws.send_text(json.dumps({"type": "auth", "api_key": "geheim", "keyterms": ["normaal longen"]}))
         assert ws.receive_json() == {"type": "ready"}
         ws.send_bytes(b"chunk-1")
         ws.send_bytes(b"chunk-2")
@@ -166,6 +183,7 @@ def test_relay_streams_audio_and_returns_transcript():
     assert upstream.audio == [b"chunk-1", b"chunk-2"]
     assert upstream.closed
     assert seen[0][1] == "dg-test"
+    assert parse_qs(urlparse(seen[0][0]).query)["keyterm"][0] == "normaal longen"
     transcripts = [e for e in events if e["type"] == "transcript"]
     assert [t["is_final"] for t in transcripts] == [False, True]
     assert transcripts[-1]["text"] == "patiënt heeft hoofdpijn"

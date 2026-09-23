@@ -1,9 +1,13 @@
 /**
- * SmartVoice - Dictation target (runs in every Bricks frame)
+ * SmartVoice - Dictation target (runs in every frame of every page)
  *
  * Remembers the text field the doctor last clicked and inserts dictated text
- * at the cursor there. The side panel decides WHICH frame to talk to: each
- * focus is reported to the service worker together with its frameId.
+ * at the cursor there. The side panel / service worker decides WHICH frame to
+ * talk to: each focus is reported together with its frameId. Only reacts to
+ * focus on text fields; page content is never read or sent anywhere.
+ *
+ * The top frame also shows a small status pill while dictating without the
+ * side panel (Alt+Shift+D).
  */
 
 (function () {
@@ -31,9 +35,10 @@
   }
 
   function describe(el) {
-    var label = el.getAttribute('aria-label') || el.getAttribute('placeholder') || '';
+    var label = el.getAttribute('aria-label') || el.getAttribute('placeholder') || el.getAttribute('title') || '';
     if (!label && el.id) {
-      var lab = document.querySelector('label[for="' + CSS.escape(el.id) + '"]');
+      var root = el.getRootNode ? el.getRootNode() : document;
+      var lab = (root.querySelector ? root : document).querySelector('label[for="' + CSS.escape(el.id) + '"]');
       if (lab) label = lab.textContent;
     }
     if (!label && el.closest('label')) label = el.closest('label').textContent;
@@ -50,7 +55,10 @@
   }
 
   document.addEventListener('focusin', function (e) {
-    var el = e.target;
+    // composedPath()[0] reaches fields inside (open) shadow DOM, which modern
+    // web apps use for their editors; e.target would only be the host element.
+    var path = e.composedPath ? e.composedPath() : [];
+    var el = path.length ? path[0] : e.target;
     if (!isEditable(el)) return;
     target = el.isContentEditable ? editableRoot(el) : el;
     savedRange = null;
@@ -150,6 +158,72 @@
     if (target.isContentEditable) insertIntoEditable(target, text);
     else insertIntoField(target, text);
     sendResponse({ ok: true });
+    return false;
+  });
+
+  // ── Status pill (top frame only) ──
+
+  if (window.top !== window) return;
+
+  var pill = null;
+  var pillText = null;
+  var pillLabel = null;
+  var hideTimer = null;
+
+  function buildPill() {
+    var host = document.createElement('div');
+    host.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:2147483647;';
+    var shadow = host.attachShadow({ mode: 'closed' });
+    shadow.innerHTML =
+      '<style>' +
+      '.p{display:flex;align-items:center;gap:8px;max-width:420px;padding:8px 10px 8px 12px;' +
+      'background:#0f172a;color:#fff;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.25);' +
+      'font:13px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}' +
+      '.d{width:10px;height:10px;border-radius:50%;background:#dc2626;flex-shrink:0;animation:b 1.2s infinite}' +
+      '.p.err .d{background:#f59e0b;animation:none}.p.busy .d{background:#94a3b8;animation:none}' +
+      '@keyframes b{50%{opacity:.35}}' +
+      '.l{font-weight:600;white-space:nowrap}' +
+      '.t{color:#cbd5e1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-style:italic}' +
+      '.p.err{border-radius:12px;align-items:flex-start}.p.err .d{margin-top:4px}' +
+      '.p.err .t{white-space:normal;font-style:normal;color:#fff}' +
+      'button{margin-left:4px;border:0;border-radius:999px;padding:4px 10px;background:#dc2626;color:#fff;' +
+      'font:inherit;font-weight:600;cursor:pointer}.p.err button,.p.busy button{display:none}' +
+      '</style>' +
+      '<div class="p"><span class="d"></span><span class="l"></span><span class="t"></span>' +
+      '<button type="button" title="Stoppen (Alt+Shift+D)">Stop</button></div>';
+    pill = shadow.querySelector('.p');
+    pillLabel = shadow.querySelector('.l');
+    pillText = shadow.querySelector('.t');
+    shadow.querySelector('button').addEventListener('click', function () {
+      chrome.runtime.sendMessage({ action: 'SV_QUICK_TOGGLE' });
+    });
+    document.documentElement.appendChild(host);
+    pill.__host = host;
+  }
+
+  function showPill(state, text) {
+    if (!pill) buildPill();
+    clearTimeout(hideTimer);
+    pill.__host.style.display = '';
+    pill.className = 'p' + (state === 'error' ? ' err' : state === 'listening' ? '' : ' busy');
+    pillLabel.textContent = {
+      connecting: 'SmartVoice verbindt…',
+      listening: 'SmartVoice luistert',
+      stopping: 'Afronden…',
+      error: 'SmartVoice',
+    }[state] || 'SmartVoice';
+    pillText.textContent = text || '';
+    if (state === 'error') hideTimer = setTimeout(hidePill, 6000);
+  }
+
+  function hidePill() {
+    if (pill) pill.__host.style.display = 'none';
+  }
+
+  chrome.runtime.onMessage.addListener(function (msg) {
+    if (msg.action !== 'SV_PILL') return false;
+    if (msg.state === 'idle') hidePill();
+    else showPill(msg.state, msg.text);
     return false;
   });
 })();

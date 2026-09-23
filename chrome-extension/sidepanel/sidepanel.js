@@ -38,6 +38,8 @@ var timerInterval = null;
 var startedAt = 0;
 var insertQueue = Promise.resolve();
 var lastSoep = null;
+var rules = SVTextRules.emptyRules();   // snelteksten + correcties
+var learnMode = null;                   // { kind: 'fix'|'snippet', selection }
 
 // ── Helpers ──
 
@@ -181,10 +183,11 @@ function handleServerEvent(event) {
     startRecorder();
   } else if (event.type === 'transcript') {
     if (event.is_final) {
+      var finalText = SVTextRules.applyRules(event.text, rules);
       els.interim.textContent = '';
-      els.text.value = joinText(els.text.value, event.text);
+      els.text.value = joinText(els.text.value, finalText);
       els.text.scrollTop = els.text.scrollHeight;
-      if (els.live.checked) queueLiveInsert(event.text);
+      if (els.live.checked) queueLiveInsert(finalText);
     } else {
       els.interim.textContent = event.text;
     }
@@ -235,7 +238,7 @@ async function startDictation() {
   session = { ws: ws, stream: stream, recorder: null, stopTimer: null };
 
   ws.onopen = function () {
-    ws.send(JSON.stringify({ type: 'auth', api_key: config.apiKey }));
+    ws.send(JSON.stringify({ type: 'auth', api_key: config.apiKey, keyterms: SVTextRules.keyterms(rules) }));
   };
   ws.onmessage = function (msg) {
     try { handleServerEvent(JSON.parse(msg.data)); } catch (e) { /* ignore malformed */ }
@@ -269,7 +272,7 @@ function teardown() {
   s.stream.getTracks().forEach(function (t) { t.stop(); });
   if (s.ws.readyState === WebSocket.OPEN || s.ws.readyState === WebSocket.CONNECTING) s.ws.close();
   // Leftover interim text is kept so nothing that was said disappears.
-  var leftover = els.interim.textContent;
+  var leftover = SVTextRules.applyRules(els.interim.textContent, rules);
   if (leftover) {
     els.text.value = joinText(els.text.value, leftover);
     els.interim.textContent = '';
@@ -373,6 +376,62 @@ function soepAsText() {
   return lines.join('\n');
 }
 
+// ── Learning: corrections and snippets from selected text ──
+
+function selectedText() {
+  return els.text.value.slice(els.text.selectionStart, els.text.selectionEnd).trim();
+}
+
+function openLearnForm(kind) {
+  var selection = selectedText();
+  if (!selection) {
+    setStatus('Selecteer eerst tekst in het tekstvak.', true);
+    return;
+  }
+  learnMode = { kind: kind, selection: selection };
+  document.getElementById('learn-label').textContent = kind === 'fix'
+    ? 'Verkeerd verstaan: \u201c' + selection + '\u201d\nMoet zijn:'
+    : 'Tekst: \u201c' + selection + '\u201d\nAls ik zeg (meerdere mag, met komma):';
+  var input = document.getElementById('learn-input');
+  input.value = '';
+  input.placeholder = kind === 'fix' ? 'juiste schrijfwijze' : 'bijv. normaal longen';
+  document.getElementById('learn-form').classList.remove('hidden');
+  input.focus();
+}
+
+function closeLearnForm() {
+  learnMode = null;
+  document.getElementById('learn-form').classList.add('hidden');
+}
+
+async function saveLearnForm() {
+  if (!learnMode) return;
+  var value = document.getElementById('learn-input').value.trim();
+  if (!value) return;
+  var latest = await SVTextRules.load();
+  if (learnMode.kind === 'fix') {
+    var correction = { wrong: learnMode.selection, right: value };
+    latest.corrections = latest.corrections.filter(function (c) {
+      return c.wrong.toLowerCase() !== correction.wrong.toLowerCase();
+    });
+    latest.corrections.push(correction);
+    els.text.value = SVTextRules.applyCorrections(els.text.value, [correction]);
+    setStatus('Onthouden: \u201c' + correction.wrong + '\u201d wordt voortaan \u201c' + correction.right + '\u201d.');
+  } else {
+    latest.snippets.push({ triggers: value, text: learnMode.selection });
+    setStatus('Sneltekst opgeslagen. Zeg \u201c' + SVTextRules.splitTriggers(value)[0] + '\u201d om hem in te voegen.');
+  }
+  await SVTextRules.save(latest);
+  closeLearnForm();
+}
+
+SVTextRules.load().then(function (r) { rules = r; });
+chrome.storage.onChanged.addListener(function (changes, area) {
+  if (area === 'local' && changes[SVTextRules.STORAGE_KEY]) {
+    rules = SVTextRules.normalize(changes[SVTextRules.STORAGE_KEY].newValue);
+  }
+});
+
 // ── Wiring ──
 
 els.mic.addEventListener('click', toggleDictation);
@@ -397,6 +456,18 @@ els.soepInsert.addEventListener('click', function () { insertOrCopy(soepAsText()
 els.soepCopy.addEventListener('click', function () {
   navigator.clipboard.writeText(soepAsText()).then(function () { setStatus('SOEP gekopieerd.'); });
 });
+document.getElementById('btn-fix').addEventListener('click', function () { openLearnForm('fix'); });
+document.getElementById('btn-snippet').addEventListener('click', function () { openLearnForm('snippet'); });
+document.getElementById('learn-save').addEventListener('click', saveLearnForm);
+document.getElementById('learn-cancel').addEventListener('click', closeLearnForm);
+document.getElementById('learn-input').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') saveLearnForm();
+  if (e.key === 'Escape') closeLearnForm();
+});
+document.getElementById('open-rules').addEventListener('click', function (e) {
+  e.preventDefault();
+  chrome.tabs.create({ url: chrome.runtime.getURL('rules/rules.html') });
+});
 document.getElementById('open-settings').addEventListener('click', function (e) {
   e.preventDefault();
   chrome.runtime.openOptionsPage();
@@ -419,12 +490,5 @@ function connectPort() {
 }
 connectPort();
 
-// Opened by the shortcut while closed: start right away.
-chrome.storage.session.get('svAutoStart').then(function (r) {
-  if (r.svAutoStart) {
-    chrome.storage.session.remove('svAutoStart');
-    startDictation();
-  }
-});
 
 setState('idle');
