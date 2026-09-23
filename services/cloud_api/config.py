@@ -48,6 +48,18 @@ class LLMConfig:
 
 
 @dataclass(frozen=True)
+class DictationConfig:
+    """Live dictation (streaming STT) configuration."""
+
+    deepgram_url: str = "wss://api.eu.deepgram.com/v1/listen"
+    deepgram_model: str = "nova-3"
+    deepgram_language: str = "nl"
+    endpointing_ms: int = 300
+    keyterms_enabled: bool = True
+    max_seconds: int = 600
+
+
+@dataclass(frozen=True)
 class AppConfig:
     """Top-level application configuration."""
 
@@ -61,6 +73,7 @@ class AppConfig:
 
     stt: STTConfig = field(default_factory=STTConfig)
     llm: LLMConfig = field(default_factory=LLMConfig)
+    dictation: DictationConfig = field(default_factory=DictationConfig)
 
 
 @lru_cache(maxsize=1)
@@ -94,5 +107,13 @@ def get_config() -> AppConfig:
             gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
             temperature=float(os.getenv("LLM_TEMPERATURE", "0.1")),
             max_tokens=int(os.getenv("LLM_MAX_TOKENS", "2048")),
+        ),
+        dictation=DictationConfig(
+            deepgram_url=os.getenv("DICTATION_DEEPGRAM_URL", "wss://api.eu.deepgram.com/v1/listen"),
+            deepgram_model=os.getenv("DICTATION_DEEPGRAM_MODEL", "nova-3"),
+            deepgram_language=os.getenv("DICTATION_LANGUAGE", "nl"),
+            endpointing_ms=int(os.getenv("DICTATION_ENDPOINTING_MS", "300")),
+            keyterms_enabled=os.getenv("DICTATION_KEYTERMS", "true").lower() == "true",
+            max_seconds=int(os.getenv("DICTATION_MAX_SECONDS", "600")),
         ),
     )

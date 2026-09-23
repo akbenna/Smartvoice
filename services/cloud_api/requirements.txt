@@ -14,3 +14,6 @@ structlog>=23.1.0
 
 # Config
 python-dotenv>=1.0.0
+
+# Live dictation relay to Deepgram
+websockets>=13.0

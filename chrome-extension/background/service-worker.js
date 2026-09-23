@@ -173,3 +173,47 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       return false;
   }
 });
+
+// ── Dictation side panel ──
+
+// Remember the field the doctor last clicked, per tab and frame, so the side
+// panel can insert text there. Session storage: cleared when Chrome closes.
+chrome.runtime.onMessage.addListener((msg, sender) => {
+  if (msg.action !== 'SV_TARGET_FOCUS' || !sender.tab) return false;
+  chrome.storage.session.set({
+    svTarget: {
+      tabId: sender.tab.id,
+      frameId: sender.frameId || 0,
+      label: msg.label || 'veld',
+      ts: Date.now(),
+    },
+  });
+  return false;
+});
+
+chrome.tabs.onRemoved.addListener(async (tabId) => {
+  const { svTarget } = await chrome.storage.session.get('svTarget');
+  if (svTarget && svTarget.tabId === tabId) chrome.storage.session.remove('svTarget');
+});
+
+// Open side panels announce themselves over a port.
+const sidePanelPorts = new Set();
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== 'sv-sidepanel') return;
+  sidePanelPorts.add(port);
+  port.onDisconnect.addListener(() => sidePanelPorts.delete(port));
+});
+
+// Alt+Shift+D: toggle dictation; opens the panel (and starts) when closed.
+chrome.commands.onCommand.addListener((command, tab) => {
+  if (command !== 'toggle-dictation') return;
+  if (sidePanelPorts.size > 0) {
+    sidePanelPorts.forEach((port) => port.postMessage({ action: 'SV_TOGGLE_DICTATION' }));
+    return;
+  }
+  // sidePanel.open must run synchronously inside the user gesture.
+  if (tab && tab.windowId !== undefined) {
+    chrome.sidePanel.open({ windowId: tab.windowId });
+    chrome.storage.session.set({ svAutoStart: true });
+  }
+});

@@ -15,6 +15,12 @@ from .config import get_config
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
+def is_valid_api_key(api_key: str) -> bool:
+    """Check a key against API_KEYS. No keys configured = dev mode (allow all)."""
+    valid_keys = {k.strip() for k in get_config().api_keys.split(",") if k.strip()}
+    return not valid_keys or api_key in valid_keys
+
+
 async def verify_api_key(
     api_key: str = Security(api_key_header),
 ) -> str:
