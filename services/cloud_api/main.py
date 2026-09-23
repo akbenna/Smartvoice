@@ -34,6 +34,7 @@ from pydantic import BaseModel, Field
 from .auth import verify_api_key
 from .config import get_config
 from .dictation import relay_dictation
+from .letters import router as letters_router
 from . import llm_service
 from .medical_vocabulary import (
     add_custom_correction,
@@ -49,6 +50,7 @@ from .prompts import (
     DICTAAT_SOEP_SYSTEM_PROMPT,
     DICTAAT_SOEP_USER_TEMPLATE,
     SOEP_JSON_SCHEMA,
+    DICTAAT_SOEP_JSON_SCHEMA,
 )
 
 logger = structlog.get_logger()
@@ -198,6 +200,9 @@ DICTAAT_SOEP_MAX_TOKENS = 900
 DICTAAT_MAX_CHARS = 20000
 
 
+app.include_router(letters_router)
+
+
 @app.websocket("/api/v1/dictation/stream")
 async def dictation_stream(ws: WebSocket):
     """Live dictation: audio in, transcript text out while speaking."""
@@ -238,16 +243,18 @@ async def process_dictation(
                 json_mode=True,
                 max_tokens=DICTAAT_SOEP_MAX_TOKENS,
                 quality=True,
-                json_schema=SOEP_JSON_SCHEMA,
+                json_schema=DICTAAT_SOEP_JSON_SCHEMA,
             )
             data = _parse_json_response(raw)
-            result = {
-                "mode": "soep",
-                "soep": {
-                    key: str(data.get(key) or "").strip()
-                    for key in ("s", "o", "e", "p", "icpc_code", "icpc_titel")
-                },
+            soep = {
+                key: str(data.get(key) or "").strip()
+                for key in ("s", "o", "e", "p", "icpc_code", "icpc_titel")
             }
+            points = data.get("aandachtspunten")
+            soep["aandachtspunten"] = [
+                str(x).strip() for x in points if str(x or "").strip()
+            ][:4] if isinstance(points, list) else []
+            result = {"mode": "soep", "soep": soep}
     except (ValueError, httpx.HTTPError) as exc:
         # Missing provider key, provider error or unparseable model output.
         logger.error("dictation.process_error", mode=body.mode, error=str(exc))

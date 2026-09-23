@@ -90,6 +90,15 @@ ai-consultassistent/
 └── .env.example
 ```
 
+## Browserextensie (Chrome/Edge)
+
+De extensie in `chrome-extension/` bundelt twee functies in één zijpaneel:
+
+- **Dicteren & SOEP**: live dicteren in het aangeklikte Bricks-veld, en een dictaat laten redigeren tot een SOEP-regel met aandachtspunten.
+- **Brieven**: informatiebrieven aan derden en verwijsbrieven. Deze functie was eerder de losse extensie BriefAssistent. Het dossier komt uit Bricks, een schermafdruk of een PDF. De privacyfilter draait in de browser en daarna nog een keer op de server. Er staat geen AI-sleutel in de browser. De server-endpoints staan in `services/cloud_api/letters.py`.
+
+Laden: `edge://extensions` → Ontwikkelaarsmodus → "Uitgepakte extensie laden" → map `chrome-extension`. In Instellingen vul je de server-URL en de API-sleutel in. Voor brieven moet op de server `ANTHROPIC_API_KEY` gezet zijn.
+
 ## MVP Fasen
 
 - **Fase 1 (6 weken):** Handmatige upload -> transcriptie -> SOEP-concept

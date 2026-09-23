@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "BriefAssistent",
+  "description": "Huisarts informatiebrief assistent — Bricks HIS integratie, AVG-conform",
+  "version": "4.0",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://api.anthropic.com/*",
+    "*://*.brickshuisarts.nl/*",
+    "*://*.bricks-his.nl/*",
+    "*://*.bricks.nl/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.brickshuisarts.nl/*",
+        "*://*.bricks-his.nl/*",
+        "*://*.bricks.nl/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["pdfjs/*", "avg-verantwoording.html"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "icons": {
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}

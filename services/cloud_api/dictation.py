@@ -37,8 +37,13 @@ from .medical_vocabulary import MEDICATION_CORRECTIONS, correct_transcript_full
 
 logger = structlog.get_logger()
 
-# Deepgram accepts at most 100 keyterms per request.
+# Deepgram accepts at most 100 keyterms per request and at most 500 tokens
+# across all keyterms; above that the handshake is refused (HTTP 400).
+# Dutch medical words measure about 2.1 characters per token, so the
+# estimate below (len/2 + 1) stays safely under the real count.
 MAX_KEYTERMS = 100
+MAX_KEYTERM_TOKENS = 450
+KEYTERM_RETRY_BUDGETS = (MAX_KEYTERM_TOKENS, 200, 0)
 MAX_USER_KEYTERMS = 50
 MAX_KEYTERM_LENGTH = 50
 AUTH_TIMEOUT_SECS = 10.0
@@ -74,7 +79,7 @@ def sanitize_user_keyterms(raw: Any) -> List[str]:
 # frequent GP diagnoses and exam terms, then the most prescribed drugs.
 CORE_MEDICAL_TERMS: List[str] = [
     # diagnoses / klachten
-    "hypertensie", "diabetes mellitus", "COPD", "astma", "atriumfibrilleren",
+    "hypertensie", "diabetes mellitus", "COPD", "astma", "atriumfibrilleren", "dyspnoe",
     "hartfalen", "angina pectoris", "pneumonie", "bronchitis", "sinusitis",
     "otitis media", "otitis externa", "tonsillitis", "faryngitis", "cystitis",
     "pyelonefritis", "urineweginfectie", "gastro-enteritis", "refluxziekte",
@@ -104,20 +109,36 @@ CORE_MEDICATIONS: List[str] = [
 ]
 
 
-def build_keyterms(user_terms: Optional[List[str]] = None) -> List[str]:
+def estimate_keyterm_tokens(term: str) -> int:
+    """Conservative token estimate for Deepgram's keyterm budget."""
+    return len(term) // 2 + 1
+
+
+def build_keyterms(user_terms: Optional[List[str]] = None,
+                   token_budget: int = MAX_KEYTERM_TOKENS) -> List[str]:
     """The doctor's own words first, then the curated medical terms and drugs,
-    then the remaining vocabulary medication names; capped at Deepgram's limit."""
+    then the remaining vocabulary medication names; capped at Deepgram's
+    limits on count and on total tokens."""
     terms: List[str] = []
     seen = set()
+    budget = token_budget
     extra = sorted({name for name in MEDICATION_CORRECTIONS.values() if name})
     for term in list(user_terms or []) + CORE_MEDICAL_TERMS + CORE_MEDICATIONS + extra:
-        if term.lower() not in seen:
-            terms.append(term)
-            seen.add(term.lower())
-    return terms[:MAX_KEYTERMS]
+        if term.lower() in seen:
+            continue
+        cost = estimate_keyterm_tokens(term)
+        if cost > budget:
+            continue   # a shorter term further on may still fit
+        terms.append(term)
+        seen.add(term.lower())
+        budget -= cost
+        if len(terms) >= MAX_KEYTERMS:
+            break
+    return terms
 
 
-def build_deepgram_url(cfg: AppConfig, user_terms: Optional[List[str]] = None) -> str:
+def build_deepgram_url(cfg: AppConfig, user_terms: Optional[List[str]] = None,
+                       token_budget: int = MAX_KEYTERM_TOKENS) -> str:
     """Streaming URL with low-latency settings for single-speaker dictation."""
     params: List[tuple] = [
         ("model", cfg.dictation.deepgram_model),
@@ -128,8 +149,9 @@ def build_deepgram_url(cfg: AppConfig, user_terms: Optional[List[str]] = None) -
         ("endpointing", str(cfg.dictation.endpointing_ms)),
     ]
     # Keyterm prompting is a Nova-3 feature and billed as an add-on.
-    if cfg.dictation.keyterms_enabled and cfg.dictation.deepgram_model.startswith("nova-3"):
-        params.extend(("keyterm", term) for term in build_keyterms(user_terms))
+    if (token_budget > 0 and cfg.dictation.keyterms_enabled
+            and cfg.dictation.deepgram_model.startswith("nova-3")):
+        params.extend(("keyterm", term) for term in build_keyterms(user_terms, token_budget))
     return f"{cfg.dictation.deepgram_url}?{urlencode(params)}"
 
 
@@ -223,12 +245,23 @@ async def relay_dictation(
         await ws.close(code=4500)
         return
 
-    try:
-        user_terms = sanitize_user_keyterms(auth.get("keyterms"))
-        upstream = await connect(build_deepgram_url(cfg, user_terms), cfg.stt.deepgram_api_key)
-    except Exception as exc:  # handshake rejected, network, bad model/language
-        logger.error("dictation.upstream_connect_failed", error=str(exc))
-        await _send_json(ws, {"type": "error", "message": f"Kan spraakherkenning niet bereiken: {exc}"})
+    user_terms = sanitize_user_keyterms(auth.get("keyterms"))
+    upstream = None
+    last_exc: Optional[Exception] = None
+    # Deepgram counts keyterm tokens with its own tokenizer; codes and unusual
+    # words cost more than our estimate. If the handshake is refused, retry
+    # with a smaller keyterm set and finally without, so dictation still starts.
+    for budget in KEYTERM_RETRY_BUDGETS:
+        try:
+            upstream = await connect(build_deepgram_url(cfg, user_terms, budget), cfg.stt.deepgram_api_key)
+            break
+        except Exception as exc:  # handshake rejected, network, bad model/language
+            last_exc = exc
+            logger.warning("dictation.upstream_connect_failed", error=str(exc), keyterm_budget=budget)
+            if "400" not in str(exc):
+                break   # network or auth trouble: fewer keyterms won't help
+    if upstream is None:
+        await _send_json(ws, {"type": "error", "message": f"Kan spraakherkenning niet bereiken: {last_exc}"})
         await ws.close(code=4502)
         return
 

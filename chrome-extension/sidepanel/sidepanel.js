@@ -172,9 +172,11 @@ async function insertOrCopy(text) {
   try {
     await sendToTarget(text);
     setStatus('Ingevoegd.');
+    return { ok: true };
   } catch (err) {
     await navigator.clipboard.writeText(text).catch(function () {});
     setStatus(err.message + '\nTekst is gekopieerd; plak met Ctrl+V.', true);
+    return { ok: false, error: err.message };
   }
 }
 
@@ -260,19 +262,11 @@ async function startDictation() {
   setStatus('');
   var config = await getConfig();
 
-  var stream;
-  try {
-    stream = await openMicrophone(config.micDevice);
-  } catch (err) {
-    setState('idle');
-    setStatus(err.message, true);
-    return;
-  }
-
+  // Open the server connection while the microphone starts: both take a few
+  // hundred milliseconds, so doing them side by side shortens the start.
   var ws = new WebSocket(wsUrl(config.apiUrl));
-  session = { ws: ws, stream: stream, recorder: null, stopTimer: null, ready: false, pending: [] };
-  // Record from the first moment; audio is buffered until the server is ready.
-  startRecorder();
+  session = { ws: ws, stream: null, recorder: null, stopTimer: null, ready: false, pending: [] };
+  var s = session;
 
   ws.onopen = function () {
     ws.send(JSON.stringify({ type: 'auth', api_key: config.apiKey, keyterms: SVTextRules.keyterms(rules) }));
@@ -284,6 +278,22 @@ async function startDictation() {
     setStatus('Kan de server niet bereiken op ' + config.apiUrl + '. Controleer Instellingen.', true);
   };
   ws.onclose = function () { teardown(); };
+
+  var stream;
+  try {
+    stream = await openMicrophone(config.micDevice);
+  } catch (err) {
+    teardown();
+    setStatus(err.message, true);
+    return;
+  }
+  if (session !== s) {   // connection failed while the microphone was opening
+    stream.getTracks().forEach(function (t) { t.stop(); });
+    return;
+  }
+  session.stream = stream;
+  // Record from the first moment; audio is buffered until the server is ready.
+  startRecorder();
 }
 
 function stopDictation() {
@@ -291,7 +301,7 @@ function stopDictation() {
   setState('stopping');
   stopTimer();
   if (session.recorder && session.recorder.state !== 'inactive') session.recorder.stop();
-  session.stream.getTracks().forEach(function (t) { t.stop(); });
+  if (session.stream) session.stream.getTracks().forEach(function (t) { t.stop(); });
   // Do not wait forever for the last words.
   session.stopTimer = setTimeout(teardown, STOP_TIMEOUT_MS);
 }
@@ -306,7 +316,7 @@ function teardown() {
     s.recorder.onstop = null;
     s.recorder.stop();
   }
-  s.stream.getTracks().forEach(function (t) { t.stop(); });
+  if (s.stream) s.stream.getTracks().forEach(function (t) { t.stop(); });
   if (s.ws.readyState === WebSocket.OPEN || s.ws.readyState === WebSocket.CONNECTING) s.ws.close();
   // Leftover interim text is kept so nothing that was said disappears.
   var leftover = SVTextRules.applyRules(els.interim.textContent, rules);
@@ -397,6 +407,16 @@ function renderSoep(soep) {
     els.soepRows.appendChild(row);
   });
   els.icpc.textContent = soep.icpc_code ? soep.icpc_code + (soep.icpc_titel ? ' · ' + soep.icpc_titel : '') : '';
+  // Clinically relevant items the doctor did not dictate: shown, never inserted.
+  var points = Array.isArray(soep.aandachtspunten) ? soep.aandachtspunten : [];
+  var list = document.getElementById('soep-check-list');
+  list.textContent = '';
+  points.forEach(function (p) {
+    var li = document.createElement('li');
+    li.textContent = p;
+    list.appendChild(li);
+  });
+  document.getElementById('soep-check').classList.toggle('hidden', points.length === 0);
   els.soep.classList.remove('hidden');
 }
 

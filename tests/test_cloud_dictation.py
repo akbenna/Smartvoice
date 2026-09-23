@@ -62,14 +62,48 @@ def test_user_keyterms_come_first_and_are_capped():
     user = [f"term{i}" for i in range(80)]
     terms = dictation.build_keyterms(dictation.sanitize_user_keyterms(user))
     assert terms[:50] == user[:50]
-    assert len(terms) == dictation.MAX_KEYTERMS
+    assert len(terms) <= dictation.MAX_KEYTERMS
+
+
+def test_keyterms_stay_within_deepgram_token_budget():
+    # Deepgram refuses the handshake above 500 keyterm tokens (HTTP 400).
+    for user in ([], [f"lang medisch begrip nummer {i}" for i in range(50)]):
+        terms = dictation.build_keyterms(dictation.sanitize_user_keyterms(user))
+        used = sum(dictation.estimate_keyterm_tokens(t) for t in terms)
+        assert used <= dictation.MAX_KEYTERM_TOKENS
+        assert sum(len(t) for t in terms) < 1000
+
+
+def test_relay_retries_with_fewer_keyterms_after_400():
+    upstream = FakeUpstream([_results("hoofdpijn", speech_final=True)])
+    seen = []
+    app = FastAPI()
+
+    async def picky_connect(url, api_key):
+        seen.append(url)
+        if len(seen) == 1:
+            raise OSError("server rejected WebSocket connection: HTTP 400")
+        return upstream
+
+    @app.websocket("/ws")
+    async def ws_route(ws: WebSocket):
+        await dictation.relay_dictation(ws, connect=picky_connect)
+
+    with TestClient(app).websocket_connect("/ws") as ws:
+        ws.send_text(json.dumps({"type": "auth", "api_key": "geheim"}))
+        assert ws.receive_json() == {"type": "ready"}
+        ws.send_text(json.dumps({"type": "stop"}))
+        _receive_until_closed(ws)
+
+    assert len(seen) == 2
+    assert len(parse_qs(urlparse(seen[1]).query)["keyterm"]) < len(parse_qs(urlparse(seen[0]).query)["keyterm"])
 
 
 def test_core_medical_terms_are_sent_before_other_drugs():
     terms = dictation.build_keyterms()
     assert terms[0] == "hypertensie"
     assert "atriumfibrilleren" in terms and "amoxicilline" in terms
-    assert len(terms) == dictation.MAX_KEYTERMS
+    assert len(terms) <= dictation.MAX_KEYTERMS
     assert len({t.lower() for t in terms}) == len(terms)
 
 
@@ -262,6 +296,30 @@ def test_process_soep_returns_all_fields(api):
     assert body["icpc_titel"] == ""
     assert llm.await_args.kwargs["json_mode"] is True
     assert llm.await_args.kwargs["provider"] == "anthropic"
+    assert body["aandachtspunten"] == []   # model gaf er geen: lege lijst
+
+
+def test_process_soep_passes_attention_points_capped(api):
+    soep = {"s": "2w hoesten, sinds gisteren koorts", "o": "", "e": "pneumonie",
+            "p": "amoxicilline 3dd 500 mg 7d", "icpc_code": "R81", "icpc_titel": "Pneumonie",
+            "aandachtspunten": ["Temperatuur?", " ", "Allergie voor penicilline?", "a", "b", "c"]}
+    with patch.object(main.llm_service, "complete", AsyncMock(return_value=json.dumps(soep))) as llm:
+        resp = api.post(
+            "/api/v1/dictation/process",
+            json={"text": "hoesten koorts amoxicilline", "mode": "soep"},
+            headers={"X-API-Key": "geheim"},
+        )
+    body = resp.json()["soep"]
+    assert body["aandachtspunten"] == ["Temperatuur?", "Allergie voor penicilline?", "a", "b"]
+    schema = llm.await_args.kwargs["json_schema"]
+    assert "aandachtspunten" in schema["required"]
+
+
+def test_dictation_soep_prompt_forbids_inventing_but_asks_to_restructure():
+    from services.cloud_api import prompts
+    p = prompts.DICTAAT_SOEP_SYSTEM_PROMPT
+    assert "NOOIT feiten toe" in p and "[?]" in p and "aandachtspunten" in p
+    assert "aandachtspunten" not in prompts.SOEP_JSON_SCHEMA["properties"]
 
 
 def test_process_soep_bad_json_is_502(api):
