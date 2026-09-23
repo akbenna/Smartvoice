@@ -60,8 +60,14 @@
     var path = e.composedPath ? e.composedPath() : [];
     var el = path.length ? path[0] : e.target;
     if (!isEditable(el)) return;
-    target = el.isContentEditable ? editableRoot(el) : el;
-    savedRange = null;
+    var newTarget = el.isContentEditable ? editableRoot(el) : el;
+    // Refocusing the same field (also done by our own inserts) keeps the
+    // provisional text; it is still reported so another tab can't steal it.
+    if (newTarget !== target) {
+      target = newTarget;
+      savedRange = null;
+      prov = null;
+    }
     try {
       chrome.runtime.sendMessage({ action: 'SV_TARGET_FOCUS', label: describe(target) });
     } catch (err) { /* extension reloaded; page needs refresh */ }
@@ -148,15 +154,246 @@
     savedRange = sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
   }
 
+  // ── Provisional (interim) text ──
+  // While the doctor speaks, the recognizer's interim guess is shown in the
+  // field right away and rewritten in place; the final text replaces it.
+  // prov: { el, prefix, text, start } for input/textarea,
+  //       { el, prefix, text, node } for rich-text (contenteditable).
+  var prov = null;
+
+  function provStillThere() {
+    if (!prov || prov.el !== target || !target.isConnected) return false;
+    if (prov.node) return prov.node.isConnected && prov.node.data === prov.text;
+    return target.value.substr(prov.start, prov.text.length) === prov.text;
+  }
+
+  function caretAfter(node) {
+    var sel = window.getSelection();
+    var r = document.createRange();
+    r.setStartAfter(node);
+    r.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(r);
+    savedRange = r.cloneRange();
+  }
+
+  function startProvisional(text) {
+    var prefix = withSpacing(target, text).slice(0, -text.length || undefined);
+    if (text === '') prefix = '';
+    var full = prefix + text;
+    if (target.isContentEditable) {
+      target.focus();
+      var sel = window.getSelection();
+      var range;
+      if (savedRange) {
+        range = savedRange.cloneRange();
+      } else {
+        range = document.createRange();
+        range.selectNodeContents(target);
+        range.collapse(false);
+      }
+      range.deleteContents();
+      var node = document.createTextNode(full);
+      range.insertNode(node);
+      caretAfter(node);
+      target.dispatchEvent(new Event('input', { bubbles: true }));
+      prov = { el: target, prefix: prefix, text: full, node: node };
+    } else {
+      var start = target.selectionStart == null ? target.value.length : target.selectionStart;
+      insertIntoField(target, full);
+      prov = { el: target, prefix: prefix, text: full, start: start };
+    }
+  }
+
+  function rewriteProvisional(full) {
+    if (full === prov.text) return;
+    if (prov.node) {
+      if (full.indexOf('\n') === -1) {
+        prov.node.data = full;
+        caretAfter(prov.node);
+      } else {
+        // Line breaks in rich text need <br> elements.
+        var frag = document.createDocumentFragment();
+        var last = null;
+        full.split('\n').forEach(function (part, i) {
+          if (i > 0) { last = document.createElement('br'); frag.appendChild(last); }
+          if (part) { last = document.createTextNode(part); frag.appendChild(last); }
+        });
+        var anchor = last;
+        prov.node.replaceWith(frag);
+        if (anchor) caretAfter(anchor);
+        prov.node = null;
+      }
+      target.dispatchEvent(new Event('input', { bubbles: true }));
+    } else {
+      var el = target;
+      el.focus();
+      el.setSelectionRange(prov.start, prov.start + prov.text.length);
+      var before = el.value;
+      var ok = false;
+      try { ok = document.execCommand('insertText', false, full); } catch (e) { ok = false; }
+      if (!ok || el.value === before) {
+        el.setRangeText(full, prov.start, prov.start + prov.text.length, 'end');
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    }
+    prov.text = full;
+  }
+
+  function prefixFor(text) {
+    return /^[\s.,;:!?)]/.test(text) ? '' : prov.prefix;
+  }
+
   chrome.runtime.onMessage.addListener(function (msg, _sender, sendResponse) {
-    if (msg.action !== 'SV_INSERT_TEXT') return false;
+    if (msg.action !== 'SV_INSERT_TEXT' && msg.action !== 'SV_PROVISIONAL') return false;
     if (!target || !target.isConnected) {
+      prov = null;
       sendResponse({ ok: false, error: 'Het gekozen veld bestaat niet meer. Klik opnieuw in een veld.' });
       return false;
     }
-    var text = msg.raw ? msg.text : withSpacing(target, msg.text);
-    if (target.isContentEditable) insertIntoEditable(target, text);
-    else insertIntoField(target, text);
+    // If the doctor edited around the provisional text, stop tracking it.
+    if (prov && !provStillThere()) prov = null;
+
+    if (msg.action === 'SV_PROVISIONAL') {
+      if (prov) rewriteProvisional(prefixFor(msg.text) + msg.text);
+      else if (msg.text) startProvisional(msg.text);
+      sendResponse({ ok: true });
+      return false;
+    }
+
+    // Final text: replace the provisional guess, or insert normally.
+    if (prov) {
+      rewriteProvisional(prefixFor(msg.text) + msg.text);
+      prov = null;
+    } else {
+      var text = msg.raw ? msg.text : withSpacing(target, msg.text);
+      if (target.isContentEditable) insertIntoEditable(target, text);
+      else insertIntoField(target, text);
+    }
+    sendResponse({ ok: true });
+    return false;
+  });
+
+  // ── Field mapping: remember the S/O/E/P fields by pointing at them ──
+  // A descriptor locates a field again later: the frame's origin plus a CSS
+  // selector per shadow-DOM level (host selectors, then the field itself).
+
+  var calibrating = false;
+
+  function quoteAttr(v) {
+    return '"' + String(v).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+  }
+
+  function uniqueIn(root, sel) {
+    try { return root.querySelectorAll(sel).length === 1; } catch (e) { return false; }
+  }
+
+  function selectorWithin(el, root) {
+    var tag = el.tagName.toLowerCase();
+    // Ids with long digit runs are usually generated per page load.
+    if (el.id && !/\d{4,}/.test(el.id) && uniqueIn(root, '#' + CSS.escape(el.id))) return '#' + CSS.escape(el.id);
+    var attrs = ['name', 'aria-label', 'placeholder', 'formcontrolname', 'data-field', 'data-testid', 'title'];
+    for (var i = 0; i < attrs.length; i++) {
+      var v = el.getAttribute(attrs[i]);
+      if (!v) continue;
+      var sel = tag + '[' + attrs[i] + '=' + quoteAttr(v) + ']';
+      if (uniqueIn(root, sel)) return sel;
+    }
+    // Stable-looking class names (no generated hashes or numbers).
+    var classes = Array.prototype.filter.call(el.classList || [], function (c) {
+      return /^[a-zA-Z][\w-]*$/.test(c) && !/\d/.test(c) && c.length < 40;
+    });
+    if (classes.length) {
+      var csel = tag + '.' + classes.map(function (c) { return CSS.escape(c); }).join('.');
+      if (uniqueIn(root, csel)) return csel;
+    }
+    // Structural path up to the root (or an ancestor with a stable id).
+    var parts = [];
+    var node = el;
+    while (node && node.nodeType === 1 && node !== root) {
+      if (node !== el && node.id && !/\d{4,}/.test(node.id) && uniqueIn(root, '#' + CSS.escape(node.id))) {
+        parts.unshift('#' + CSS.escape(node.id));
+        break;
+      }
+      var n = 1;
+      var sib = node;
+      while ((sib = sib.previousElementSibling)) if (sib.tagName === node.tagName) n++;
+      parts.unshift(node.tagName.toLowerCase() + ':nth-of-type(' + n + ')');
+      node = node.parentElement;
+    }
+    return parts.join(' > ');
+  }
+
+  function buildDescriptor(el) {
+    var chain = [];
+    var node = el;
+    while (node) {
+      var root = node.getRootNode();
+      chain.unshift(selectorWithin(node, root));
+      node = root instanceof ShadowRoot ? root.host : null;
+    }
+    return { origin: location.origin, chain: chain, label: describe(el) };
+  }
+
+  function resolveDescriptor(desc) {
+    if (!desc || desc.origin !== location.origin) return null;
+    var root = document;
+    var el = null;
+    for (var i = 0; i < desc.chain.length; i++) {
+      try { el = root.querySelector(desc.chain[i]); } catch (e) { return null; }
+      if (!el) return null;
+      if (i < desc.chain.length - 1) {
+        root = el.shadowRoot;
+        if (!root) return null;
+      }
+    }
+    return el && isEditable(el) ? el : null;
+  }
+
+  function appendToField(el, text) {
+    // Fill at the end of the field, keeping what is already there.
+    target = el.isContentEditable ? editableRoot(el) : el;
+    prov = null;
+    savedRange = null;
+    if (target.isContentEditable) {
+      insertIntoEditable(target, withSpacing(target, text));
+    } else {
+      target.focus();
+      var end = target.value.length;
+      target.setSelectionRange(end, end);
+      insertIntoField(target, withSpacing(target, text));
+    }
+  }
+
+  document.addEventListener('focusin', function (e) {
+    if (!calibrating) return;
+    var path = e.composedPath ? e.composedPath() : [];
+    var el = path.length ? path[0] : e.target;
+    if (!isEditable(el)) return;
+    el = el.isContentEditable ? editableRoot(el) : el;
+    try {
+      chrome.runtime.sendMessage({ action: 'SV_CALIBRATE_PICK', desc: buildDescriptor(el) });
+    } catch (err) { /* extension reloaded */ }
+  }, true);
+
+  chrome.runtime.onMessage.addListener(function (msg, _sender, sendResponse) {
+    if (msg.action === 'SV_CALIBRATE') {
+      calibrating = !!msg.active;
+      return false;
+    }
+    if (msg.action !== 'SV_FILL_SOEP') return false;
+    var filled = [];
+    Object.keys(msg.values || {}).forEach(function (key) {
+      var value = msg.values[key];
+      var el = value ? resolveDescriptor((msg.mapping || {})[key]) : null;
+      if (!el) return;
+      appendToField(el, value);
+      filled.push(key);
+    });
+    if (filled.length) {
+      try { chrome.runtime.sendMessage({ action: 'SV_FILL_REPORT', requestId: msg.requestId, filled: filled }); }
+      catch (err) { /* ignore */ }
+    }
     sendResponse({ ok: true });
     return false;
   });
@@ -169,6 +406,7 @@
   var pillText = null;
   var pillLabel = null;
   var hideTimer = null;
+  var pillButton = null;
 
   function buildPill() {
     var host = document.createElement('div');
@@ -186,6 +424,9 @@
       '.t{color:#cbd5e1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-style:italic}' +
       '.p.err{border-radius:12px;align-items:flex-start}.p.err .d{margin-top:4px}' +
       '.p.err .t{white-space:normal;font-style:normal;color:#fff}' +
+      '.p.cal .d{background:#0ea5e9;animation:none}.p.ok .d{background:#10b981;animation:none}' +
+      '.p.cal .t,.p.ok .t{font-style:normal;color:#fff}.p.cal button{background:#475569}.p.ok button{display:none}' +
+      '.p.ok{border-radius:12px;align-items:flex-start}.p.ok .d{margin-top:4px}.p.ok .t{white-space:normal}' +
       'button{margin-left:4px;border:0;border-radius:999px;padding:4px 10px;background:#dc2626;color:#fff;' +
       'font:inherit;font-weight:600;cursor:pointer}.p.err button,.p.busy button{display:none}' +
       '</style>' +
@@ -194,26 +435,29 @@
     pill = shadow.querySelector('.p');
     pillLabel = shadow.querySelector('.l');
     pillText = shadow.querySelector('.t');
-    shadow.querySelector('button').addEventListener('click', function () {
-      chrome.runtime.sendMessage({ action: 'SV_QUICK_TOGGLE' });
+    pillButton = shadow.querySelector('button');
+    pillButton.addEventListener('click', function () {
+      chrome.runtime.sendMessage({ action: pillButton.dataset.action || 'SV_QUICK_TOGGLE' });
     });
     document.documentElement.appendChild(host);
     pill.__host = host;
   }
 
-  function showPill(state, text) {
+  function showPill(state, text, button) {
     if (!pill) buildPill();
     clearTimeout(hideTimer);
     pill.__host.style.display = '';
-    pill.className = 'p' + (state === 'error' ? ' err' : state === 'listening' ? '' : ' busy');
+    pill.className = 'p' + ({ error: ' err', listening: '', calibrate: ' cal', info: ' ok' }[state] || ' busy');
     pillLabel.textContent = {
       connecting: 'SmartVoice verbindt…',
       listening: 'SmartVoice luistert',
       stopping: 'Afronden…',
-      error: 'SmartVoice',
+      calibrate: 'Velden koppelen',
     }[state] || 'SmartVoice';
     pillText.textContent = text || '';
-    if (state === 'error') hideTimer = setTimeout(hidePill, 6000);
+    pillButton.textContent = (button && button.label) || 'Stop';
+    pillButton.dataset.action = (button && button.action) || 'SV_QUICK_TOGGLE';
+    if (state === 'error' || state === 'info') hideTimer = setTimeout(hidePill, 6000);
   }
 
   function hidePill() {
@@ -223,7 +467,7 @@
   chrome.runtime.onMessage.addListener(function (msg) {
     if (msg.action !== 'SV_PILL') return false;
     if (msg.state === 'idle') hidePill();
-    else showPill(msg.state, msg.text);
+    else showPill(msg.state, msg.text, msg.button);
     return false;
   });
 })();

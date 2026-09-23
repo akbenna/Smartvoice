@@ -134,6 +134,18 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             return;
           }
 
+          // Prefer the fields the doctor pointed at (Velden koppelen).
+          const soep = stored.sv_data.soep || {};
+          const values = { s: soep.s, o: soep.o, e: soep.e, p: soep.p };
+          if (soep.icpc_code && values.e && values.e.indexOf(soep.icpc_code) === -1) {
+            values.e += ' (' + soep.icpc_code + ')';
+          }
+          const filledResult = await fillSoep(tabs[0].id, values);
+          if (filledResult.mapped && filledResult.filled.length) {
+            sendResponse({ success: true, filled: filledResult.filled, missing: filledResult.missing });
+            return;
+          }
+
           const response = await chrome.tabs.sendMessage(tabs[0].id, {
             action: 'INJECT_SOEP',
             data: stored.sv_data,
@@ -180,6 +192,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 // panel can insert text there. Session storage: cleared when Chrome closes.
 chrome.runtime.onMessage.addListener((msg, sender) => {
   if (msg.action !== 'SV_TARGET_FOCUS' || !sender.tab) return false;
+  // Warm up the recorder document now, so Alt+Shift+D starts instantly.
+  ensureOffscreen().catch(() => {});
   chrome.storage.session.set({
     svTarget: {
       tabId: sender.tab.id,
@@ -221,6 +235,8 @@ const OFFSCREEN_URL = 'offscreen/dictation.html';
 let quickTarget = null;           // { tabId, frameId } for the running session
 let quickInsertQueue = Promise.resolve();
 let quickInsertFailed = false;
+let latestInterim = null;         // newest interim text not yet sent
+let interimScheduled = false;
 
 async function ensureOffscreen() {
   if (await chrome.offscreen.hasDocument()) return;
@@ -235,9 +251,9 @@ function toOffscreen(action, extra) {
   return chrome.runtime.sendMessage({ target: 'sv-offscreen', action, ...extra }).catch(() => null);
 }
 
-function pill(tabId, state, text) {
+function pill(tabId, state, text, button) {
   if (tabId === undefined || tabId === null) return;
-  chrome.tabs.sendMessage(tabId, { action: 'SV_PILL', state, text: text || '' }, { frameId: 0 }).catch(() => {});
+  chrome.tabs.sendMessage(tabId, { action: 'SV_PILL', state, text: text || '', button }, { frameId: 0 }).catch(() => {});
 }
 
 async function getQuickTarget() {
@@ -272,7 +288,25 @@ async function quickToggle(tabId) {
   });
 }
 
+// Interim text is shown in the field right away. Only the newest interim is
+// sent; older ones still waiting in the queue are skipped.
+function quickInterim(target, text) {
+  latestInterim = text;
+  if (interimScheduled) return;
+  interimScheduled = true;
+  quickInsertQueue = quickInsertQueue.then(async () => {
+    interimScheduled = false;
+    const t = latestInterim;
+    latestInterim = null;
+    if (t === null) return;
+    await chrome.tabs.sendMessage(
+      target.tabId, { action: 'SV_PROVISIONAL', text: t }, { frameId: target.frameId },
+    ).catch(() => null);
+  });
+}
+
 function quickInsert(target, text) {
+  latestInterim = null;   // the final supersedes any pending interim
   quickInsertQueue = quickInsertQueue.then(async () => {
     const res = await chrome.tabs.sendMessage(
       target.tabId, { action: 'SV_INSERT_TEXT', text }, { frameId: target.frameId },
@@ -292,11 +326,10 @@ async function handleQuickEvent(msg) {
       pill(tabId, msg.state);
       break;
     case 'interim':
-      pill(tabId, 'listening', msg.text);
+      if (target) quickInterim(target, msg.text);
       break;
     case 'final':
       if (target) quickInsert(target, msg.text);
-      pill(tabId, 'listening', '');
       break;
     case 'error':
       if (msg.code === 'mic-permission') {
@@ -324,6 +357,109 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
     // From the status pill (sender.tab) or the popup (msg.tabId).
     const tabId = msg.tabId !== undefined ? msg.tabId : sender.tab && sender.tab.id;
     if (tabId !== undefined) quickToggle(tabId);
+  }
+  return false;
+});
+
+// ── S/O/E/P field mapping ──
+// The doctor points at the S, O, E and P fields once per HIS (host); after
+// that a SOEP result is filled field by field. Stored per host in
+// chrome.storage.local (field locations only, no patient data).
+
+const SOEP_STEPS = [
+  { key: 's', label: 'Klik in het S-veld (Subjectief)' },
+  { key: 'o', label: 'Klik in het O-veld (Objectief)' },
+  { key: 'e', label: 'Klik in het E-veld (Evaluatie)' },
+  { key: 'p', label: 'Klik in het P-veld (Plan)' },
+];
+let calib = null;   // { tabId, host, step, result }
+
+async function hostOfTab(tabId) {
+  try { return new URL((await chrome.tabs.get(tabId)).url).host; } catch (e) { return null; }
+}
+
+async function getFieldMap(host) {
+  const { svSoepFields } = await chrome.storage.local.get('svSoepFields');
+  return (svSoepFields && host && svSoepFields[host]) || null;
+}
+
+function broadcastCalibrate(tabId, active) {
+  chrome.tabs.sendMessage(tabId, { action: 'SV_CALIBRATE', active }).catch(() => {});
+}
+
+function calibPrompt() {
+  const step = SOEP_STEPS[calib.step];
+  pill(calib.tabId, 'calibrate', step.label, { label: 'Overslaan', action: 'SV_CALIBRATE_SKIP' });
+}
+
+async function calibAdvance() {
+  calib.step += 1;
+  if (calib.step < SOEP_STEPS.length) { calibPrompt(); return; }
+  const { tabId, host, result } = calib;
+  calib = null;
+  broadcastCalibrate(tabId, false);
+  const { svSoepFields } = await chrome.storage.local.get('svSoepFields');
+  const all = svSoepFields || {};
+  all[host] = result;
+  await chrome.storage.local.set({ svSoepFields: all });
+  const n = Object.keys(result).length;
+  pill(tabId, 'info', n ? `${n} velden gekoppeld. "Alles invoegen" vult ze voortaan per veld.` : 'Geen velden gekoppeld.');
+}
+
+async function startCalibration(tabId) {
+  const host = await hostOfTab(tabId);
+  if (!host) return { ok: false, error: 'Open eerst Bricks in dit tabblad.' };
+  calib = { tabId, host, step: 0, result: {} };
+  broadcastCalibrate(tabId, true);
+  calibPrompt();
+  return { ok: true };
+}
+
+// Fill S/O/E/P into the mapped fields of a tab. Every frame fills what it can
+// find and reports back; results are collected for a short moment.
+const fillWaiters = new Map();
+
+async function fillSoep(tabId, values) {
+  const host = await hostOfTab(tabId);
+  const mapping = await getFieldMap(host);
+  const wanted = Object.keys(values).filter((k) => values[k]);
+  if (!mapping) return { mapped: false, filled: [], missing: wanted };
+  const requestId = Math.random().toString(36).slice(2);
+  const filled = new Set();
+  fillWaiters.set(requestId, filled);
+  await chrome.tabs.sendMessage(tabId, { action: 'SV_FILL_SOEP', requestId, mapping, values }).catch(() => {});
+  await new Promise((r) => setTimeout(r, 400));
+  fillWaiters.delete(requestId);
+  return { mapped: true, filled: [...filled], missing: wanted.filter((k) => !filled.has(k)) };
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  switch (msg.action) {
+    case 'SV_CALIBRATE_START':
+      startCalibration(msg.tabId).then(sendResponse);
+      return true;
+    case 'SV_CALIBRATE_PICK':
+      if (calib && sender.tab && sender.tab.id === calib.tabId) {
+        calib.result[SOEP_STEPS[calib.step].key] = msg.desc;
+        calibAdvance();
+      }
+      return false;
+    case 'SV_CALIBRATE_SKIP':
+      if (calib) calibAdvance();
+      return false;
+    case 'SV_FILL_REPORT': {
+      const set = fillWaiters.get(msg.requestId);
+      if (set) (msg.filled || []).forEach((k) => set.add(k));
+      return false;
+    }
+    case 'SV_FILL_SOEP_REQUEST': {
+      const tabId = msg.tabId !== undefined ? msg.tabId : sender.tab && sender.tab.id;
+      fillSoep(tabId, msg.values).then(sendResponse);
+      return true;
+    }
+    case 'SV_FIELD_MAP_STATUS':
+      hostOfTab(msg.tabId).then(getFieldMap).then((m) => sendResponse({ mapped: !!m, keys: m ? Object.keys(m) : [] }));
+      return true;
   }
   return false;
 });

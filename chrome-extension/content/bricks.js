@@ -375,11 +375,26 @@ function createWidget() {
     stopRecording();
   });
 
-  document.getElementById('sv-btn-inject').addEventListener('click', function() {
-    if (lastResult) {
-      var ok = injectSOEP(lastResult);
-      showNotification(ok ? 'SOEP ingevoegd in Bricks!' : 'Kon geen velden vinden. Tekst gekopieerd.');
-      if (!ok) navigator.clipboard.writeText(formatSOEPText(lastResult));
+  document.getElementById('sv-btn-inject').addEventListener('click', async function() {
+    if (!lastResult) return;
+    if (!extensionAlive()) { showNotification(STALE_PAGE_MESSAGE); return; }
+    // First the S/O/E/P fields the doctor pointed at ("Velden koppelen").
+    var soep = lastResult.soep || {};
+    var values = { s: soep.s, o: soep.o, e: soep.e, p: soep.p };
+    if (soep.icpc_code && values.e && values.e.indexOf(soep.icpc_code) === -1) values.e += ' (' + soep.icpc_code + ')';
+    var res = await chrome.runtime.sendMessage({ action: 'SV_FILL_SOEP_REQUEST', values: values }).catch(function() { return null; });
+    if (res && res.mapped && res.filled.length) {
+      showNotification(res.missing.length
+        ? 'Deels ingevuld; niet gevonden: ' + res.missing.join(', ').toUpperCase() + '. Is het consult open?'
+        : 'SOEP per veld ingevuld in Bricks!');
+      return;
+    }
+    var ok = injectSOEP(lastResult);
+    if (ok) {
+      showNotification('SOEP ingevoegd in Bricks!');
+    } else {
+      navigator.clipboard.writeText(formatSOEPText(lastResult));
+      showNotification('Velden niet gevonden; tekst gekopieerd. Tip: SmartVoice-icoon \u2192 "S/O/E/P-velden koppelen".');
     }
   });
 

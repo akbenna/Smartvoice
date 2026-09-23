@@ -7,7 +7,8 @@
  * Only chrome.runtime is available here (no chrome.storage).
  */
 
-var CHUNK_MS = 250;
+// Deepgram advises 20-100 ms per chunk for the lowest latency.
+var CHUNK_MS = 100;
 var STOP_TIMEOUT_MS = 6000;
 
 var session = null;  // { ws, stream, recorder, stopTimer, text }
@@ -49,8 +50,11 @@ async function start(config, rules) {
   }
 
   var ws = new WebSocket(config.apiUrl.replace(/^http/, 'ws') + '/api/v1/dictation/stream');
-  session = { ws: ws, stream: stream, recorder: null, stopTimer: null, text: '', rules: rules };
-  emit('state', { state: 'connecting' });
+  session = { ws: ws, stream: stream, recorder: null, stopTimer: null, text: '', rules: rules,
+              ready: false, pending: [] };
+  // Record from the first moment; audio is buffered until the server is
+  // connected, so the first words are never lost or delayed.
+  startRecorder();
 
   ws.onopen = function () {
     ws.send(JSON.stringify({ type: 'auth', api_key: config.apiKey, keyterms: SVTextRules.keyterms(rules) }));
@@ -58,7 +62,7 @@ async function start(config, rules) {
   ws.onmessage = function (msg) {
     var event;
     try { event = JSON.parse(msg.data); } catch (e) { return; }
-    if (event.type === 'ready') startRecorder();
+    if (event.type === 'ready') flushPending();
     else if (event.type === 'transcript') handleTranscript(event);
     else if (event.type === 'error') emit('error', { message: event.message });
     else if (event.type === 'closed') teardown();
@@ -80,14 +84,28 @@ function handleTranscript(event) {
   }
 }
 
+function sendOrBuffer(data) {
+  if (!session) return;
+  if (session.ready && session.ws.readyState === WebSocket.OPEN) session.ws.send(data);
+  else session.pending.push(data);
+}
+
+function flushPending() {
+  if (!session) return;
+  session.ready = true;
+  var queued = session.pending;
+  session.pending = [];
+  queued.forEach(function (d) { session.ws.send(d); });
+}
+
 function startRecorder() {
   var mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
   var recorder = new MediaRecorder(session.stream, { mimeType: mimeType, audioBitsPerSecond: 32000 });
   recorder.ondataavailable = function (e) {
-    if (e.data && e.data.size > 0 && session && session.ws.readyState === WebSocket.OPEN) session.ws.send(e.data);
+    if (e.data && e.data.size > 0) sendOrBuffer(e.data);
   };
   recorder.onstop = function () {
-    if (session && session.ws.readyState === WebSocket.OPEN) session.ws.send(JSON.stringify({ type: 'stop' }));
+    sendOrBuffer(JSON.stringify({ type: 'stop' }));
   };
   session.recorder = recorder;
   recorder.start(CHUNK_MS);
@@ -98,7 +116,7 @@ function stop() {
   if (!session) return;
   emit('state', { state: 'stopping' });
   if (session.recorder && session.recorder.state !== 'inactive') session.recorder.stop();
-  else if (session.ws.readyState === WebSocket.OPEN) session.ws.send(JSON.stringify({ type: 'stop' }));
+  else sendOrBuffer(JSON.stringify({ type: 'stop' }));
   session.stream.getTracks().forEach(function (t) { t.stop(); });
   session.stopTimer = setTimeout(teardown, STOP_TIMEOUT_MS);
 }

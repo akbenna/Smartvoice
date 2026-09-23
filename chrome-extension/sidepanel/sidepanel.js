@@ -7,7 +7,8 @@
  * light cleanup, or conversion to a SOEP line.
  */
 
-var CHUNK_MS = 250;
+// Deepgram advises 20-100 ms per chunk for the lowest latency.
+var CHUNK_MS = 100;
 var STOP_TIMEOUT_MS = 6000;
 
 var els = {
@@ -134,7 +135,29 @@ async function sendToTarget(text) {
   if (!res || !res.ok) throw new Error((res && res.error) || 'Invoegen mislukt.');
 }
 
+// Only the newest interim is sent to the field; stale ones are skipped.
+var latestInterim = null;
+var interimScheduled = false;
+
+function queueLiveInterim(text) {
+  latestInterim = text;
+  if (interimScheduled) return;
+  interimScheduled = true;
+  insertQueue = insertQueue.then(function () {
+    interimScheduled = false;
+    var t = latestInterim;
+    latestInterim = null;
+    if (t === null) return;
+    return chrome.storage.session.get('svTarget').then(function (r) {
+      if (!r.svTarget) return;
+      return chrome.tabs.sendMessage(r.svTarget.tabId, { action: 'SV_PROVISIONAL', text: t },
+        { frameId: r.svTarget.frameId }).catch(function () {});
+    });
+  });
+}
+
 function queueLiveInsert(text) {
+  latestInterim = null;
   insertQueue = insertQueue.then(function () {
     return sendToTarget(text);
   }).catch(function (err) {
@@ -180,7 +203,7 @@ async function openMicrophone(micDevice) {
 
 function handleServerEvent(event) {
   if (event.type === 'ready') {
-    startRecorder();
+    flushPending();
   } else if (event.type === 'transcript') {
     if (event.is_final) {
       var finalText = SVTextRules.applyRules(event.text, rules);
@@ -190,6 +213,7 @@ function handleServerEvent(event) {
       if (els.live.checked) queueLiveInsert(finalText);
     } else {
       els.interim.textContent = event.text;
+      if (els.live.checked) queueLiveInterim(event.text);
     }
   } else if (event.type === 'error') {
     setStatus(event.message, true);
@@ -198,19 +222,29 @@ function handleServerEvent(event) {
   }
 }
 
+function sendOrBuffer(data) {
+  if (!session) return;
+  if (session.ready && session.ws.readyState === WebSocket.OPEN) session.ws.send(data);
+  else session.pending.push(data);
+}
+
+function flushPending() {
+  if (!session) return;
+  session.ready = true;
+  var queued = session.pending;
+  session.pending = [];
+  queued.forEach(function (d) { session.ws.send(d); });
+}
+
 function startRecorder() {
   var mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
   var recorder = new MediaRecorder(session.stream, { mimeType: mimeType, audioBitsPerSecond: 32000 });
   recorder.ondataavailable = function (e) {
-    if (e.data && e.data.size > 0 && session && session.ws.readyState === WebSocket.OPEN) {
-      session.ws.send(e.data);
-    }
+    if (e.data && e.data.size > 0) sendOrBuffer(e.data);
   };
   recorder.onstop = function () {
-    // Last chunk has been sent by now; ask the server to flush and close.
-    if (session && session.ws.readyState === WebSocket.OPEN) {
-      session.ws.send(JSON.stringify({ type: 'stop' }));
-    }
+    // Last chunk has been queued by now; ask the server to flush and close.
+    sendOrBuffer(JSON.stringify({ type: 'stop' }));
   };
   session.recorder = recorder;
   recorder.start(CHUNK_MS);
@@ -235,7 +269,9 @@ async function startDictation() {
   }
 
   var ws = new WebSocket(wsUrl(config.apiUrl));
-  session = { ws: ws, stream: stream, recorder: null, stopTimer: null };
+  session = { ws: ws, stream: stream, recorder: null, stopTimer: null, ready: false, pending: [] };
+  // Record from the first moment; audio is buffered until the server is ready.
+  startRecorder();
 
   ws.onopen = function () {
     ws.send(JSON.stringify({ type: 'auth', api_key: config.apiKey, keyterms: SVTextRules.keyterms(rules) }));
@@ -363,6 +399,64 @@ function renderSoep(soep) {
   els.soep.classList.remove('hidden');
 }
 
+// ── S/O/E/P into separate Bricks fields ──
+
+async function currentTabId() {
+  var r = await chrome.storage.session.get('svTarget');
+  if (r.svTarget) return r.svTarget.tabId;
+  var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+  return tabs[0] ? tabs[0].id : null;
+}
+
+function soepValues() {
+  var values = {};
+  els.soepRows.querySelectorAll('.soep-text').forEach(function (node) {
+    values[node.dataset.key] = node.innerText.trim();
+  });
+  if (lastSoep && lastSoep.icpc_code && values.e && values.e.indexOf(lastSoep.icpc_code) === -1) {
+    values.e += ' (' + lastSoep.icpc_code + ')';
+  }
+  return values;
+}
+
+var FIELD_NAMES = { s: 'S', o: 'O', e: 'E', p: 'P' };
+
+async function insertSoepPerField() {
+  var tabId = await currentTabId();
+  var res = tabId === null ? null : await chrome.runtime.sendMessage({
+    action: 'SV_FILL_SOEP_REQUEST', tabId: tabId, values: soepValues(),
+  }).catch(function () { return null; });
+
+  if (res && res.mapped && res.filled.length) {
+    var done = res.filled.map(function (k) { return FIELD_NAMES[k]; }).join(', ');
+    if (res.missing.length) {
+      setStatus('Ingevuld: ' + done + '. Niet gevonden: ' +
+        res.missing.map(function (k) { return FIELD_NAMES[k]; }).join(', ') +
+        '. Is het consult open? Anders opnieuw koppelen.', true);
+    } else {
+      setStatus('SOEP per veld ingevuld (' + done + ').');
+    }
+    return;
+  }
+  // No mapping (or fields not on this page): everything into the clicked field.
+  await insertOrCopy(soepAsText());
+  var hint = res && res.mapped
+    ? 'De gekoppelde velden staan niet op deze pagina; alles is in het aangeklikte veld gezet.'
+    : 'Tip: klik op "Velden koppelen" om S, O, E en P voortaan elk in hun eigen veld te zetten.';
+  setStatus(els.status.textContent + '\n' + hint, els.status.classList.contains('error'));
+}
+
+async function startFieldMapping() {
+  var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tabs[0]) return;
+  var res = await chrome.runtime.sendMessage({ action: 'SV_CALIBRATE_START', tabId: tabs[0].id }).catch(function () { return null; });
+  if (res && res.ok) {
+    setStatus('Klik in Bricks achter elkaar in het S-, O-, E- en P-veld. Het label rechtsonder in Bricks wijst de weg.');
+  } else {
+    setStatus((res && res.error) || 'Koppelen kon niet starten. Ververs het Bricks-tabblad en probeer opnieuw.', true);
+  }
+}
+
 function soepAsText() {
   var lines = [];
   els.soepRows.querySelectorAll('.soep-text').forEach(function (node) {
@@ -452,7 +546,12 @@ els.clear.addEventListener('click', function () {
   lastSoep = null;
   setStatus('');
 });
-els.soepInsert.addEventListener('click', function () { insertOrCopy(soepAsText()); });
+els.soepInsert.addEventListener('click', insertSoepPerField);
+document.getElementById('btn-map-fields').addEventListener('click', startFieldMapping);
+document.getElementById('map-fields-link').addEventListener('click', function (e) {
+  e.preventDefault();
+  startFieldMapping();
+});
 els.soepCopy.addEventListener('click', function () {
   navigator.clipboard.writeText(soepAsText()).then(function () { setStatus('SOEP gekopieerd.'); });
 });

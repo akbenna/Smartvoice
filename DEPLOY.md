@@ -177,6 +177,11 @@ extensie-icoon en dan "Dicteer in veld"). Een label rechtsonder toont dat SmartV
 Alt+Shift+D of "Stop" beëindigt het. Lukt invoegen niet, dan staat het dictaat op het klembord.
 Met het zijpaneel open bedient dezelfde sneltoets het paneel.
 
+**S/O/E/P per veld:** klik eenmalig op "S/O/E/P-velden koppelen" (popup of zijpaneel) en klik in Bricks
+achter elkaar in het S-, O-, E- en P-veld. Daarna vult "Alles invoegen" (zijpaneel), "Push naar Bricks"
+(popup) en de invoegknop in Bricks elke regel in het eigen veld. Bestaande tekst blijft staan. Opnieuw
+koppelen kan altijd, bijvoorbeeld als Bricks van opmaak verandert.
+
 **Snelteksten & correcties:** via de link onderaan het paneel. Een commando ("normaal longen") wordt
 vervangen door je standaardtekst; correcties verbeteren woorden die verkeerd verstaan worden en gaan als
 hint mee naar Deepgram. Opgeslagen per computer (Chrome, lokaal); overzetten via Exporteren/Importeren.
