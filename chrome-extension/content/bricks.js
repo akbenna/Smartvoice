@@ -132,7 +132,20 @@ function updateTimer() {
 
 /* ── Recording ── */
 
+// After the extension is updated or reloaded, scripts already running in an
+// open page lose their connection to it until the page is refreshed.
+var STALE_PAGE_MESSAGE = 'SmartVoice is bijgewerkt. Ververs deze pagina (F5) en probeer opnieuw.';
+
+function extensionAlive() {
+  try { return !!(chrome.runtime && chrome.runtime.id); } catch (e) { return false; }
+}
+
 async function startRecording() {
+  if (!extensionAlive()) {
+    showNotification(STALE_PAGE_MESSAGE);
+    return;
+  }
+
   // Pre-check microfoontoestemming
   try {
     var permResult = await navigator.permissions.query({ name: 'microphone' });
@@ -152,7 +165,9 @@ async function startRecording() {
     });
   } catch (err) {
     var errMsg = err.message || '';
-    if (errMsg.toLowerCase().includes('dismiss')) {
+    if (errMsg.includes('Extension context invalidated')) {
+      showNotification(STALE_PAGE_MESSAGE);
+    } else if (errMsg.toLowerCase().includes('dismiss')) {
       showNotification('Microfoontoegang geweigerd (dismissed). Klik op het slot-icoon in de adresbalk om microfoontoegang in te schakelen.');
     } else {
       showNotification('Microfoon niet beschikbaar: ' + errMsg);
@@ -243,6 +258,11 @@ async function sendAudioToAPI(blob, mimeType) {
     if (errorMsg === 'Failed to fetch') {
       errorMsg = 'Kan de API niet bereiken op: ' + apiUrl +
         '. Controleer de API URL in SmartVoice Instellingen.';
+    } else if (errorMsg.includes('Extension context invalidated')) {
+      errorMsg = STALE_PAGE_MESSAGE;
+    } else if (errorMsg.indexOf('API fout (403)') === 0) {
+      errorMsg = 'API-sleutel klopt niet. Controleer de sleutel in SmartVoice Instellingen ' +
+        '(klik Opslaan) en ververs daarna deze pagina (F5).';
     }
 
     setWidgetState('error');
