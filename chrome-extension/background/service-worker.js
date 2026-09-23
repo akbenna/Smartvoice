@@ -180,6 +180,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 // panel can insert text there. Session storage: cleared when Chrome closes.
 chrome.runtime.onMessage.addListener((msg, sender) => {
   if (msg.action !== 'SV_TARGET_FOCUS' || !sender.tab) return false;
+  // Warm up the recorder document now, so Alt+Shift+D starts instantly.
+  ensureOffscreen().catch(() => {});
   chrome.storage.session.set({
     svTarget: {
       tabId: sender.tab.id,
@@ -221,6 +223,8 @@ const OFFSCREEN_URL = 'offscreen/dictation.html';
 let quickTarget = null;           // { tabId, frameId } for the running session
 let quickInsertQueue = Promise.resolve();
 let quickInsertFailed = false;
+let latestInterim = null;         // newest interim text not yet sent
+let interimScheduled = false;
 
 async function ensureOffscreen() {
   if (await chrome.offscreen.hasDocument()) return;
@@ -272,7 +276,25 @@ async function quickToggle(tabId) {
   });
 }
 
+// Interim text is shown in the field right away. Only the newest interim is
+// sent; older ones still waiting in the queue are skipped.
+function quickInterim(target, text) {
+  latestInterim = text;
+  if (interimScheduled) return;
+  interimScheduled = true;
+  quickInsertQueue = quickInsertQueue.then(async () => {
+    interimScheduled = false;
+    const t = latestInterim;
+    latestInterim = null;
+    if (t === null) return;
+    await chrome.tabs.sendMessage(
+      target.tabId, { action: 'SV_PROVISIONAL', text: t }, { frameId: target.frameId },
+    ).catch(() => null);
+  });
+}
+
 function quickInsert(target, text) {
+  latestInterim = null;   // the final supersedes any pending interim
   quickInsertQueue = quickInsertQueue.then(async () => {
     const res = await chrome.tabs.sendMessage(
       target.tabId, { action: 'SV_INSERT_TEXT', text }, { frameId: target.frameId },
@@ -292,11 +314,10 @@ async function handleQuickEvent(msg) {
       pill(tabId, msg.state);
       break;
     case 'interim':
-      pill(tabId, 'listening', msg.text);
+      if (target) quickInterim(target, msg.text);
       break;
     case 'final':
       if (target) quickInsert(target, msg.text);
-      pill(tabId, 'listening', '');
       break;
     case 'error':
       if (msg.code === 'mic-permission') {

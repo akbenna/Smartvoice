@@ -60,8 +60,14 @@
     var path = e.composedPath ? e.composedPath() : [];
     var el = path.length ? path[0] : e.target;
     if (!isEditable(el)) return;
-    target = el.isContentEditable ? editableRoot(el) : el;
-    savedRange = null;
+    var newTarget = el.isContentEditable ? editableRoot(el) : el;
+    // Refocusing the same field (also done by our own inserts) keeps the
+    // provisional text; it is still reported so another tab can't steal it.
+    if (newTarget !== target) {
+      target = newTarget;
+      savedRange = null;
+      prov = null;
+    }
     try {
       chrome.runtime.sendMessage({ action: 'SV_TARGET_FOCUS', label: describe(target) });
     } catch (err) { /* extension reloaded; page needs refresh */ }
@@ -148,15 +154,122 @@
     savedRange = sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
   }
 
+  // ── Provisional (interim) text ──
+  // While the doctor speaks, the recognizer's interim guess is shown in the
+  // field right away and rewritten in place; the final text replaces it.
+  // prov: { el, prefix, text, start } for input/textarea,
+  //       { el, prefix, text, node } for rich-text (contenteditable).
+  var prov = null;
+
+  function provStillThere() {
+    if (!prov || prov.el !== target || !target.isConnected) return false;
+    if (prov.node) return prov.node.isConnected && prov.node.data === prov.text;
+    return target.value.substr(prov.start, prov.text.length) === prov.text;
+  }
+
+  function caretAfter(node) {
+    var sel = window.getSelection();
+    var r = document.createRange();
+    r.setStartAfter(node);
+    r.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(r);
+    savedRange = r.cloneRange();
+  }
+
+  function startProvisional(text) {
+    var prefix = withSpacing(target, text).slice(0, -text.length || undefined);
+    if (text === '') prefix = '';
+    var full = prefix + text;
+    if (target.isContentEditable) {
+      target.focus();
+      var sel = window.getSelection();
+      var range;
+      if (savedRange) {
+        range = savedRange.cloneRange();
+      } else {
+        range = document.createRange();
+        range.selectNodeContents(target);
+        range.collapse(false);
+      }
+      range.deleteContents();
+      var node = document.createTextNode(full);
+      range.insertNode(node);
+      caretAfter(node);
+      target.dispatchEvent(new Event('input', { bubbles: true }));
+      prov = { el: target, prefix: prefix, text: full, node: node };
+    } else {
+      var start = target.selectionStart == null ? target.value.length : target.selectionStart;
+      insertIntoField(target, full);
+      prov = { el: target, prefix: prefix, text: full, start: start };
+    }
+  }
+
+  function rewriteProvisional(full) {
+    if (full === prov.text) return;
+    if (prov.node) {
+      if (full.indexOf('\n') === -1) {
+        prov.node.data = full;
+        caretAfter(prov.node);
+      } else {
+        // Line breaks in rich text need <br> elements.
+        var frag = document.createDocumentFragment();
+        var last = null;
+        full.split('\n').forEach(function (part, i) {
+          if (i > 0) { last = document.createElement('br'); frag.appendChild(last); }
+          if (part) { last = document.createTextNode(part); frag.appendChild(last); }
+        });
+        var anchor = last;
+        prov.node.replaceWith(frag);
+        if (anchor) caretAfter(anchor);
+        prov.node = null;
+      }
+      target.dispatchEvent(new Event('input', { bubbles: true }));
+    } else {
+      var el = target;
+      el.focus();
+      el.setSelectionRange(prov.start, prov.start + prov.text.length);
+      var before = el.value;
+      var ok = false;
+      try { ok = document.execCommand('insertText', false, full); } catch (e) { ok = false; }
+      if (!ok || el.value === before) {
+        el.setRangeText(full, prov.start, prov.start + prov.text.length, 'end');
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    }
+    prov.text = full;
+  }
+
+  function prefixFor(text) {
+    return /^[\s.,;:!?)]/.test(text) ? '' : prov.prefix;
+  }
+
   chrome.runtime.onMessage.addListener(function (msg, _sender, sendResponse) {
-    if (msg.action !== 'SV_INSERT_TEXT') return false;
+    if (msg.action !== 'SV_INSERT_TEXT' && msg.action !== 'SV_PROVISIONAL') return false;
     if (!target || !target.isConnected) {
+      prov = null;
       sendResponse({ ok: false, error: 'Het gekozen veld bestaat niet meer. Klik opnieuw in een veld.' });
       return false;
     }
-    var text = msg.raw ? msg.text : withSpacing(target, msg.text);
-    if (target.isContentEditable) insertIntoEditable(target, text);
-    else insertIntoField(target, text);
+    // If the doctor edited around the provisional text, stop tracking it.
+    if (prov && !provStillThere()) prov = null;
+
+    if (msg.action === 'SV_PROVISIONAL') {
+      if (prov) rewriteProvisional(prefixFor(msg.text) + msg.text);
+      else if (msg.text) startProvisional(msg.text);
+      sendResponse({ ok: true });
+      return false;
+    }
+
+    // Final text: replace the provisional guess, or insert normally.
+    if (prov) {
+      rewriteProvisional(prefixFor(msg.text) + msg.text);
+      prov = null;
+    } else {
+      var text = msg.raw ? msg.text : withSpacing(target, msg.text);
+      if (target.isContentEditable) insertIntoEditable(target, text);
+      else insertIntoField(target, text);
+    }
     sendResponse({ ok: true });
     return false;
   });
