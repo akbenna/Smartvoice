@@ -73,6 +73,15 @@
     </div>
   </section>
 
+  <section id="mw" class="mw hidden">
+    <div class="mw-head">
+      <h2>Meetwaarden</h2>
+      <button id="mw-copy" class="btn small">Kopieer alle</button>
+    </div>
+    <div id="mw-rows" class="mw-rows"></div>
+    <p class="note">Herkend in je dictaat, zonder AI. Klik in Bricks in het meetwaardeveld en kies "invoegen".</p>
+  </section>
+
   <section id="soep" class="soep hidden">
     <div class="soep-head">
       <h2>SOEP</h2>
@@ -80,13 +89,38 @@
     </div>
     <div class="soep-rows" id="soep-rows"></div>
     <div id="soep-check" class="soep-check hidden">
-      <strong>Niet gedicteerd — aanvullen?</strong>
+      <strong>Onvolledig in de verslaglegging</strong>
       <ul id="soep-check-list"></ul>
     </div>
     <div class="soep-actions">
       <button id="btn-soep-insert" class="btn primary">Alles invoegen</button>
       <button id="btn-soep-copy" class="btn">Kopieer alles</button>
+      <button id="btn-patient" class="btn ai" title="Uitleg voor de patiënt in eenvoudige taal, optioneel vertaald">Patiëntinstructie</button>
       <button id="btn-map-fields" class="btn ghost" title="Wijs eenmalig de S-, O-, E- en P-velden in Bricks aan">Velden koppelen</button>
+    </div>
+    <div id="pi" class="pi hidden">
+      <div class="lt-row">
+        <label for="pi-taal" class="lt-label">Ook in</label>
+        <select id="pi-taal" class="lt-input" style="width:auto">
+          <option value="">alleen Nederlands (B1)</option>
+          <option value="ar">Arabisch</option>
+          <option value="tr">Turks</option>
+          <option value="en">Engels</option>
+          <option value="pl">Pools</option>
+          <option value="uk">Oekraïens</option>
+          <option value="fr">Frans</option>
+          <option value="de">Duits</option>
+          <option value="es">Spaans</option>
+        </select>
+        <button id="pi-go" class="btn primary small">Maak</button>
+      </div>
+      <textarea id="pi-nl" class="pi-text hidden" rows="8" spellcheck="true"></textarea>
+      <textarea id="pi-tr" class="pi-text hidden" rows="8" dir="auto"></textarea>
+      <div class="lt-row pi-actions hidden">
+        <button id="pi-copy" class="btn small">Kopieer</button>
+        <button id="pi-print" class="btn small">Afdrukken</button>
+      </div>
+      <p class="note">Concept op basis van jouw E en P; er wordt niets toegevoegd. Een vertaling kun je zelf niet altijd controleren: geef hem mee naast de Nederlandse tekst.</p>
     </div>
     <p class="note">Controleer altijd voor opslaan. De tekst is geredigeerd en geordend; er is niets bijverzonnen. Twijfel staat als [?].</p>
   </section>
@@ -221,5 +255,8 @@
   <script src="../lib/pdfjs/pdf.min.js"></script>
   <script src="sidepanel.js"></script>
   <script src="letters.js"></script>
+  <script src="../lib/meetwaarden.js"></script>
+  <script src="meetwaarden-ui.js"></script>
+  <script src="patient-ui.js"></script>
 </body>
 </html>

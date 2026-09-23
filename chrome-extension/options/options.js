@@ -94,6 +94,18 @@ async function testConnection() {
       return;
     }
 
+    // Show where the server sends data (set by the practice on the server).
+    try {
+      var policy = (await response.clone().json()).data_policy;
+      var info = document.getElementById('policy-info');
+      if (policy && info) {
+        info.textContent = 'Deze server: patiëntgegevens naar ' + policy.patient_data_llm +
+          (policy.patient_data_llm_in_eu ? ' (EU)' : ' (BUITEN DE EU)') +
+          ', brieven naar ' + policy.letters_llm + ', spraak naar ' + policy.stt +
+          ' (EU, zonder training). Klinische suggesties: ' + (policy.clinical_decision_support ? 'aan' : 'uit') + '.';
+      }
+    } catch (e) { /* older server */ }
+
     // Server bereikbaar — test nu of de API-sleutel geaccepteerd wordt.
     var apiKey = document.getElementById('apiKey').value.trim();
     var headers = {};

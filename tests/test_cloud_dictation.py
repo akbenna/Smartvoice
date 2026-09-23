@@ -295,7 +295,8 @@ def test_process_soep_returns_all_fields(api):
     assert body["o"] == ""
     assert body["icpc_titel"] == ""
     assert llm.await_args.kwargs["json_mode"] is True
-    assert llm.await_args.kwargs["provider"] == "anthropic"
+    # AVG: patient text goes to the EU model, whatever the browser asks for
+    assert llm.await_args.kwargs["provider"] == "mistral"
     assert body["aandachtspunten"] == []   # model gaf er geen: lege lijst
 
 
@@ -319,6 +320,7 @@ def test_dictation_soep_prompt_forbids_inventing_but_asks_to_restructure():
     from services.cloud_api import prompts
     p = prompts.DICTAAT_SOEP_SYSTEM_PROMPT
     assert "NOOIT feiten toe" in p and "[?]" in p and "aandachtspunten" in p
+    assert "VOLLEDIGHEID VAN DE VERSLAGLEGGING" in p   # no clinical advice (MDR)
     assert "aandachtspunten" not in prompts.SOEP_JSON_SCHEMA["properties"]
 
 
@@ -409,3 +411,32 @@ async def test_refusal_raises_clear_error(monkeypatch):
     with patch.object(llm_service.httpx, "AsyncClient", return_value=client):
         with pytest.raises(ValueError):
             await llm_service.complete("sys", "usr", provider="anthropic", quality=True)
+
+
+# === Gegevensbeleid (AVG) ===
+
+def test_policy_defaults(monkeypatch):
+    from services.cloud_api import data_policy
+    for k in ("PHI_LLM_PROVIDER", "LETTERS_LLM_PROVIDER", "ALLOWED_STT_PROVIDERS", "CLINICAL_DECISION_SUPPORT"):
+        monkeypatch.delenv(k, raising=False)
+    assert data_policy.phi_llm_provider("anthropic") == "mistral"
+    assert data_policy.letters_llm_provider() == "anthropic"
+    assert data_policy.stt_provider("openai") == "deepgram"
+    assert data_policy.clinical_decision_support() is False
+
+
+def test_deepgram_stream_opts_out_of_training():
+    params = parse_qs(urlparse(dictation.build_deepgram_url(get_config())).query)
+    assert params["mip_opt_out"] == ["true"]
+    assert urlparse(dictation.build_deepgram_url(get_config())).hostname == "api.eu.deepgram.com"
+
+
+@pytest.mark.parametrize("spoken,expected", [
+    ("koorts komma hoesten punt", "koorts, hoesten."),
+    ("temp 38 komma 5", "temp 38,5"),
+    ("drukpijn McBurney punt rechts", "drukpijn McBurney punt rechts"),
+    ("S dubbele punt hoofdpijn puntkomma misselijk", "S: hoofdpijn; misselijk"),
+    ("wat is de klacht vraagteken", "wat is de klacht?"),
+])
+def test_spoken_punctuation(spoken, expected):
+    assert dictation.apply_spoken_commands(spoken) == expected

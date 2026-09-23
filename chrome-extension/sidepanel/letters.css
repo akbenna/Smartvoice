@@ -66,3 +66,17 @@
 .lt-out:focus { border-color: var(--brand); }
 #view-letters textarea { min-height: 3.2em; }
 #lt-vraag { min-height: 6em; }
+
+/* Meetwaarden */
+.mw { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; }
+.mw-head { display: flex; align-items: center; justify-content: space-between; }
+.mw-head h2 { font-size: 14px; margin: 0; }
+.mw-rows { display: flex; flex-direction: column; gap: 3px; margin-top: 6px; }
+.mw-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.mw-row .mw-label { color: var(--muted); min-width: 110px; }
+.mw-row .mw-val { font-weight: 600; }
+.mw-row .btn { margin-left: auto; }
+
+/* Patiëntinstructie */
+.pi { border-top: 1px dashed var(--border); margin-top: 8px; padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.pi-text { min-height: 0 !important; font-size: 13px; }

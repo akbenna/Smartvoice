@@ -27,6 +27,8 @@ async function callCloudAPI(base64Audio, mimeType) {
   const ext = mimeType.includes('webm') ? 'webm' : 'wav';
   const formData = new FormData();
   formData.append('audio', blob, 'consult.' + ext);
+  // Recording only starts after the consent box is ticked (popup / widget).
+  formData.append('consent', 'true');
   if (config.sttProvider) formData.append('stt_provider', config.sttProvider);
   if (config.llmProvider) formData.append('llm_provider', config.llmProvider);
 

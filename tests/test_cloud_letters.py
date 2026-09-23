@@ -27,9 +27,10 @@ DOSSIER = "PATIËNT: J.J.\n== JOURNAAL ==\nLage rugpijn sinds 3 mnd, fysiotherap
 
 
 def fake_stream(pieces, seen=None):
-    async def _stream(system, user, max_tokens, quality=False):
+    async def _stream(provider, system, user, max_tokens, quality=False):
         if seen is not None:
-            seen.append({"system": system, "user": user, "quality": quality, "max_tokens": max_tokens})
+            seen.append({"provider": provider, "system": system, "user": user,
+                         "quality": quality, "max_tokens": max_tokens})
         for p in pieces:
             yield p
     return _stream
@@ -53,7 +54,7 @@ def test_informatiebrief_requires_consent(api):
 
 def test_informatiebrief_streams_and_follows_knmg(api):
     seen = []
-    with patch.object(letters.llm_service, "stream_anthropic", fake_stream(["Geachte ", "collega,"], seen)):
+    with patch.object(letters.llm_service, "stream_llm", fake_stream(["Geachte ", "collega,"], seen)):
         resp = api.post("/api/v1/letters/generate", headers=H, json={
             "kind": "informatiebrief", "aanvrager": "uwv", "toestemming": True,
             "dossier": DOSSIER + " BSN 123456789", "vraag": "1. Welke diagnose?",
@@ -72,7 +73,7 @@ def test_verwijzing_uses_fast_model_and_needs_reason(api):
                     json={"kind": "verwijzing", "dossier": DOSSIER, "specialisme": "orthopeed"})
     assert resp.status_code == 400
     seen = []
-    with patch.object(letters.llm_service, "stream_anthropic", fake_stream(["Geachte collega,"], seen)):
+    with patch.object(letters.llm_service, "stream_llm", fake_stream(["Geachte collega,"], seen)):
         resp = api.post("/api/v1/letters/generate", headers=H, json={
             "kind": "verwijzing", "dossier": DOSSIER, "specialisme": "orthopedisch chirurg",
             "urgentie": "regulier", "reden": "Graag beoordeling persisterende rugpijn",
@@ -83,21 +84,25 @@ def test_verwijzing_uses_fast_model_and_needs_reason(api):
 
 
 def test_provider_error_before_stream_gives_502(api):
-    async def failing(system, user, max_tokens, quality=False):
+    async def failing(provider, system, user, max_tokens, quality=False):
         raise ValueError("ANTHROPIC_API_KEY niet geconfigureerd.")
         yield ""  # pragma: no cover
-    with patch.object(letters.llm_service, "stream_anthropic", failing):
+    with patch.object(letters.llm_service, "stream_llm", failing):
         resp = api.post("/api/v1/letters/generate", headers=H, json={
             "kind": "verwijzing", "dossier": DOSSIER, "reden": "x"})
     assert resp.status_code == 502
 
 
 def test_extract_reads_image_and_filters(api):
-    with patch.object(letters.llm_service, "stream_anthropic", fake_stream(["Journaal\nBSN 123456789 hoofdpijn"])):
+    seen = []
+    with patch.object(letters.llm_service, "stream_llm", fake_stream(["Journaal\nBSN 123456789 hoofdpijn"], seen)):
         resp = api.post("/api/v1/letters/extract", headers=H,
                         json={"kind": "dossier", "media_type": "image/png", "data": "iVBORw0KGgoAAAANS"})
     assert resp.status_code == 200
     assert "123456789" not in resp.json()["text"] and "hoofdpijn" in resp.json()["text"]
+    # screenshots can identify the patient: EU model, in Mistral's image format
+    assert seen[0]["provider"] == "mistral"
+    assert seen[0]["user"][0]["type"] == "image_url"
 
 
 def test_letters_require_api_key(api):

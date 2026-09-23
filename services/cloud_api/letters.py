@@ -22,7 +22,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from . import llm_service
+from . import audit, data_policy, llm_service
 from .auth import verify_api_key
 
 logger = structlog.get_logger()
@@ -207,35 +207,43 @@ def build_letter_prompts(req: GenerateRequest) -> "tuple[str, str, bool, int]":
 # ── Endpoints ──
 
 @router.post("/extract")
-async def extract_from_image(body: ExtractRequest, _api_key: str = Depends(verify_api_key)):
+async def extract_from_image(body: ExtractRequest, user: str = Depends(verify_api_key)):
     """Read a screenshot (dossier or request letter) into plain text."""
     if body.media_type not in IMAGE_TYPES:
         raise HTTPException(status_code=400, detail="Alleen PNG, JPEG, WebP of GIF.")
+    # A screenshot can show name, BSN and address: EU model only.
+    provider = data_policy.phi_llm_provider()
     content = [
-        {"type": "image", "source": {"type": "base64", "media_type": body.media_type, "data": body.data}},
-        {"type": "text", "text": _EXTRACT_PROMPTS[body.kind]},
+        llm_service.image_part(provider, body.media_type, body.data),
+        llm_service.text_part(provider, _EXTRACT_PROMPTS[body.kind]),
     ]
     chunks: List[str] = []
     try:
-        async for piece in llm_service.stream_anthropic(
-            "Je zet schermafdrukken nauwkeurig om naar platte tekst.", content,
+        async for piece in llm_service.stream_llm(
+            provider, "Je zet schermafdrukken nauwkeurig om naar platte tekst.", content,
             max_tokens=4000, quality=True,
         ):
             chunks.append(piece)
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
     text = privacy_safety_net("".join(chunks).strip())
-    logger.info("letters.extract", kind=body.kind, chars=len(text))
+    logger.info("letters.extract", kind=body.kind, chars=len(text), provider=provider)
+    audit.log_event(user, "letters.extract", kind=body.kind, provider=provider)
     return {"text": text}
 
 
 @router.post("/generate")
-async def generate_letter(body: GenerateRequest, _api_key: str = Depends(verify_api_key)):
+async def generate_letter(body: GenerateRequest, user_name: str = Depends(verify_api_key)):
     """Write the letter; the text streams back as it is written."""
     system, user, quality, max_tokens = build_letter_prompts(body)
+    audit.log_event(user_name, "letters.generate", kind=body.kind,
+                    aanvrager=body.aanvrager or "", consent=bool(body.toestemming),
+                    provider=data_policy.letters_llm_provider())
     logger.info("letters.generate", kind=body.kind, dossier_chars=len(body.dossier))
 
-    stream = llm_service.stream_anthropic(system, user, max_tokens=max_tokens, quality=quality)
+    stream = llm_service.stream_llm(
+        data_policy.letters_llm_provider(), system, user, max_tokens=max_tokens, quality=quality,
+    )
     # Fail before the 200 is sent when the provider rejects the call outright.
     try:
         first = await stream.__anext__()

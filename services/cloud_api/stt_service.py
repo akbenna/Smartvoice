@@ -12,6 +12,8 @@ Compatible with Python 3.9+.
 
 from __future__ import annotations
 
+import os
+
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List
@@ -135,7 +137,8 @@ async def _transcribe_deepgram(audio_path: Path) -> TranscriptResult:
         )
 
         response = await client.post(
-            "https://api.deepgram.com/v1/listen",
+            # EU endpoint: processing stays in the EU.
+            os.getenv("DEEPGRAM_URL", "https://api.eu.deepgram.com/v1/listen"),
             headers={
                 "Authorization": f"Token {api_key}",
                 "Content-Type": content_type,
@@ -147,6 +150,8 @@ async def _transcribe_deepgram(audio_path: Path) -> TranscriptResult:
                 "diarize": "true",
                 "smart_format": "true",
                 "utterances": "true",
+                # AVG: not kept, not used for training.
+                "mip_opt_out": "true",
             },
             content=audio_data,
         )
