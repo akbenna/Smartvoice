@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SmartVoice — AI Consultassistent",
-  "version": "1.7.1",
+  "version": "1.8.0",
   "description": "Dicteer of neem consulten op en maak SOEP-notities voor Bricks Huisarts",
   "icons": {
     "16": "icons/icon16.png",

@@ -34,27 +34,12 @@ async function start(config, rules) {
   if (session) return;
   rules = SVTextRules.normalize(rules);
 
-  var audio = { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true };
-  if (config.micDevice) audio.deviceId = { exact: config.micDevice };
-  var stream;
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: audio });
-  } catch (err) {
-    emit('error', {
-      code: err.name === 'NotAllowedError' ? 'mic-permission' : 'mic',
-      message: err.name === 'NotAllowedError'
-        ? 'Geef eenmalig toestemming voor de microfoon (tabblad geopend) en probeer opnieuw.'
-        : 'Microfoon niet beschikbaar: ' + err.message,
-    });
-    return;
-  }
-
+  // Open the server connection while the microphone starts: both take a few
+  // hundred milliseconds, so doing them side by side shortens the start.
   var ws = new WebSocket(config.apiUrl.replace(/^http/, 'ws') + '/api/v1/dictation/stream');
-  session = { ws: ws, stream: stream, recorder: null, stopTimer: null, text: '', rules: rules,
+  session = { ws: ws, stream: null, recorder: null, stopTimer: null, text: '', rules: rules,
               ready: false, pending: [] };
-  // Record from the first moment; audio is buffered until the server is
-  // connected, so the first words are never lost or delayed.
-  startRecorder();
+  var s = session;
 
   ws.onopen = function () {
     ws.send(JSON.stringify({ type: 'auth', api_key: config.apiKey, keyterms: SVTextRules.keyterms(rules) }));
@@ -71,6 +56,31 @@ async function start(config, rules) {
     emit('error', { message: 'Kan de server niet bereiken op ' + config.apiUrl + '.' });
   };
   ws.onclose = function () { teardown(); };
+
+  var audio = { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+  if (config.micDevice) audio.deviceId = { exact: config.micDevice };
+  var stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: audio });
+  } catch (err) {
+    emit('error', {
+      code: err.name === 'NotAllowedError' ? 'mic-permission' : 'mic',
+      message: err.name === 'NotAllowedError'
+        ? 'Geef eenmalig toestemming voor de microfoon (tabblad geopend) en probeer opnieuw.'
+        : 'Microfoon niet beschikbaar: ' + err.message,
+    });
+    s.silent = true;   // keep the microphone error visible in the pill
+    teardown();
+    return;
+  }
+  if (session !== s) {   // stopped or failed while the microphone was opening
+    stream.getTracks().forEach(function (t) { t.stop(); });
+    return;
+  }
+  session.stream = stream;
+  // Record from the first moment; audio is buffered until the server is
+  // connected, so the first words are never lost or delayed.
+  startRecorder();
 }
 
 function handleTranscript(event) {
@@ -117,7 +127,7 @@ function stop() {
   emit('state', { state: 'stopping' });
   if (session.recorder && session.recorder.state !== 'inactive') session.recorder.stop();
   else sendOrBuffer(JSON.stringify({ type: 'stop' }));
-  session.stream.getTracks().forEach(function (t) { t.stop(); });
+  if (session.stream) session.stream.getTracks().forEach(function (t) { t.stop(); });
   session.stopTimer = setTimeout(teardown, STOP_TIMEOUT_MS);
 }
 
@@ -127,12 +137,12 @@ function teardown() {
   session = null;
   clearTimeout(s.stopTimer);
   if (s.recorder && s.recorder.state !== 'inactive') { s.recorder.onstop = null; s.recorder.stop(); }
-  s.stream.getTracks().forEach(function (t) { t.stop(); });
+  if (s.stream) s.stream.getTracks().forEach(function (t) { t.stop(); });
   if (s.ws.readyState === WebSocket.OPEN || s.ws.readyState === WebSocket.CONNECTING) s.ws.close();
   // Whole dictation also lands on the clipboard: a safety net when the field
   // could not be reached (e.g. Bricks Classic outside Chrome).
   if (s.text) copyToClipboard(s.text);
-  emit('stopped', { text: s.text });
+  if (!s.silent) emit('stopped', { text: s.text });
 }
 
 chrome.runtime.onMessage.addListener(function (msg, _sender, sendResponse) {
