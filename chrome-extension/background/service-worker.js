@@ -478,3 +478,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   return false;
 });
+
+
+// ── After install/update: bring the field script back into open tabs ──
+// Scripts already running in open pages are cut off by an update; re-inject
+// so the doctor doesn't have to refresh Bricks (only where we have access).
+chrome.runtime.onInstalled.addListener(async () => {
+  const tabs = await chrome.tabs.query({});
+  for (const tab of tabs) {
+    if (!tab.id || !/^https?:/.test(tab.url || '')) continue;
+    chrome.scripting.executeScript({
+      target: { tabId: tab.id, allFrames: true },
+      files: ['content/dictation-target.js'],
+    }).catch(() => { /* no access to this tab: fine */ });
+  }
+});
