@@ -399,6 +399,64 @@ function renderSoep(soep) {
   els.soep.classList.remove('hidden');
 }
 
+// ── S/O/E/P into separate Bricks fields ──
+
+async function currentTabId() {
+  var r = await chrome.storage.session.get('svTarget');
+  if (r.svTarget) return r.svTarget.tabId;
+  var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+  return tabs[0] ? tabs[0].id : null;
+}
+
+function soepValues() {
+  var values = {};
+  els.soepRows.querySelectorAll('.soep-text').forEach(function (node) {
+    values[node.dataset.key] = node.innerText.trim();
+  });
+  if (lastSoep && lastSoep.icpc_code && values.e && values.e.indexOf(lastSoep.icpc_code) === -1) {
+    values.e += ' (' + lastSoep.icpc_code + ')';
+  }
+  return values;
+}
+
+var FIELD_NAMES = { s: 'S', o: 'O', e: 'E', p: 'P' };
+
+async function insertSoepPerField() {
+  var tabId = await currentTabId();
+  var res = tabId === null ? null : await chrome.runtime.sendMessage({
+    action: 'SV_FILL_SOEP_REQUEST', tabId: tabId, values: soepValues(),
+  }).catch(function () { return null; });
+
+  if (res && res.mapped && res.filled.length) {
+    var done = res.filled.map(function (k) { return FIELD_NAMES[k]; }).join(', ');
+    if (res.missing.length) {
+      setStatus('Ingevuld: ' + done + '. Niet gevonden: ' +
+        res.missing.map(function (k) { return FIELD_NAMES[k]; }).join(', ') +
+        '. Is het consult open? Anders opnieuw koppelen.', true);
+    } else {
+      setStatus('SOEP per veld ingevuld (' + done + ').');
+    }
+    return;
+  }
+  // No mapping (or fields not on this page): everything into the clicked field.
+  await insertOrCopy(soepAsText());
+  var hint = res && res.mapped
+    ? 'De gekoppelde velden staan niet op deze pagina; alles is in het aangeklikte veld gezet.'
+    : 'Tip: klik op "Velden koppelen" om S, O, E en P voortaan elk in hun eigen veld te zetten.';
+  setStatus(els.status.textContent + '\n' + hint, els.status.classList.contains('error'));
+}
+
+async function startFieldMapping() {
+  var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tabs[0]) return;
+  var res = await chrome.runtime.sendMessage({ action: 'SV_CALIBRATE_START', tabId: tabs[0].id }).catch(function () { return null; });
+  if (res && res.ok) {
+    setStatus('Klik in Bricks achter elkaar in het S-, O-, E- en P-veld. Het label rechtsonder in Bricks wijst de weg.');
+  } else {
+    setStatus((res && res.error) || 'Koppelen kon niet starten. Ververs het Bricks-tabblad en probeer opnieuw.', true);
+  }
+}
+
 function soepAsText() {
   var lines = [];
   els.soepRows.querySelectorAll('.soep-text').forEach(function (node) {
@@ -488,7 +546,12 @@ els.clear.addEventListener('click', function () {
   lastSoep = null;
   setStatus('');
 });
-els.soepInsert.addEventListener('click', function () { insertOrCopy(soepAsText()); });
+els.soepInsert.addEventListener('click', insertSoepPerField);
+document.getElementById('btn-map-fields').addEventListener('click', startFieldMapping);
+document.getElementById('map-fields-link').addEventListener('click', function (e) {
+  e.preventDefault();
+  startFieldMapping();
+});
 els.soepCopy.addEventListener('click', function () {
   navigator.clipboard.writeText(soepAsText()).then(function () { setStatus('SOEP gekopieerd.'); });
 });

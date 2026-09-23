@@ -418,3 +418,12 @@ document.getElementById('btn-quick-dictate').addEventListener('click', function 
     window.close();
   });
 });
+
+// Point at the S/O/E/P fields once; the popup closes so the doctor can click in Bricks.
+document.getElementById('link-map-fields').addEventListener('click', function (e) {
+  e.preventDefault();
+  chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+    if (tabs[0]) chrome.runtime.sendMessage({ action: 'SV_CALIBRATE_START', tabId: tabs[0].id });
+    window.close();
+  });
+});
