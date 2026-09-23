@@ -172,6 +172,10 @@ Kies bij Railway een EU-regio voor de service, zodat audio de EU niet verlaat en
 **Eerste gebruik:** bij de eerste start opent een tabblad dat eenmalig om microfoontoestemming vraagt
 (Chrome kan dat niet vanuit het zijpaneel zelf). Na een update van de extensie: ververs het Bricks-tabblad.
 
+**Snelteksten & correcties:** via de link onderaan het paneel. Een commando ("normaal longen") wordt
+vervangen door je standaardtekst; correcties verbeteren woorden die verkeerd verstaan worden en gaan als
+hint mee naar Deepgram. Opgeslagen per computer (Chrome, lokaal); overzetten via Exporteren/Importeren.
+
 **Endpoints:**
 - `WS /api/v1/dictation/stream`: audio in, tekst terug (eerste bericht: `{"type":"auth","api_key":"..."}`)
 - `POST /api/v1/dictation/process`: `{"text": "...", "mode": "clean" | "soep"}`

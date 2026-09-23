@@ -5,7 +5,9 @@ Relays microphone audio from the side panel to Deepgram's streaming API and
 sends transcript text back while the doctor is still speaking.
 
 Client protocol (WebSocket /api/v1/dictation/stream):
-  client -> server  {"type": "auth", "api_key": "..."}   first message
+  client -> server  {"type": "auth", "api_key": "...", "keyterms": [...]}
+                                                          first message; keyterms
+                                                          are optional user words
   client -> server  <binary audio chunks, webm/opus>
   client -> server  {"type": "stop"}                     flush and close
   server -> client  {"type": "ready"}
@@ -37,6 +39,8 @@ logger = structlog.get_logger()
 
 # Deepgram accepts at most 100 keyterms per request.
 MAX_KEYTERMS = 100
+MAX_USER_KEYTERMS = 50
+MAX_KEYTERM_LENGTH = 50
 AUTH_TIMEOUT_SECS = 10.0
 UPSTREAM_CLOSE_TIMEOUT_SECS = 5.0
 
@@ -46,13 +50,37 @@ _SPOKEN_COMMANDS = [
 ]
 
 
-def build_keyterms() -> List[str]:
-    """Medication names to bias recognition towards, capped at Deepgram's limit."""
-    terms = sorted({name for name in MEDICATION_CORRECTIONS.values() if name})
+def sanitize_user_keyterms(raw: Any) -> List[str]:
+    """Accept only short strings from the client, deduplicated, capped."""
+    if not isinstance(raw, list):
+        return []
+    terms: List[str] = []
+    seen = set()
+    for item in raw:
+        if not isinstance(item, str):
+            continue
+        term = " ".join(item.split())
+        if not term or len(term) > MAX_KEYTERM_LENGTH or term.lower() in seen:
+            continue
+        seen.add(term.lower())
+        terms.append(term)
+        if len(terms) >= MAX_USER_KEYTERMS:
+            break
+    return terms
+
+
+def build_keyterms(user_terms: Optional[List[str]] = None) -> List[str]:
+    """The doctor's own words first, then medication names, capped at Deepgram's limit."""
+    terms = list(user_terms or [])
+    seen = {t.lower() for t in terms}
+    for name in sorted({name for name in MEDICATION_CORRECTIONS.values() if name}):
+        if name.lower() not in seen:
+            terms.append(name)
+            seen.add(name.lower())
     return terms[:MAX_KEYTERMS]
 
 
-def build_deepgram_url(cfg: AppConfig) -> str:
+def build_deepgram_url(cfg: AppConfig, user_terms: Optional[List[str]] = None) -> str:
     """Streaming URL with low-latency settings for single-speaker dictation."""
     params: List[tuple] = [
         ("model", cfg.dictation.deepgram_model),
@@ -64,7 +92,7 @@ def build_deepgram_url(cfg: AppConfig) -> str:
     ]
     # Keyterm prompting is a Nova-3 feature and billed as an add-on.
     if cfg.dictation.keyterms_enabled and cfg.dictation.deepgram_model.startswith("nova-3"):
-        params.extend(("keyterm", term) for term in build_keyterms())
+        params.extend(("keyterm", term) for term in build_keyterms(user_terms))
     return f"{cfg.dictation.deepgram_url}?{urlencode(params)}"
 
 
@@ -118,15 +146,18 @@ async def _default_connect(url: str, api_key: str):
     )
 
 
-async def _authenticate(ws: WebSocket) -> bool:
+async def _authenticate(ws: WebSocket) -> Optional[Dict[str, Any]]:
+    """Return the auth message if the key is valid, else None."""
     try:
         first = await asyncio.wait_for(ws.receive_text(), timeout=AUTH_TIMEOUT_SECS)
         message = json.loads(first)
     except (asyncio.TimeoutError, ValueError, KeyError, WebSocketDisconnect):
-        return False
-    if message.get("type") != "auth":
-        return False
-    return is_valid_api_key(str(message.get("api_key") or ""))
+        return None
+    if not isinstance(message, dict) or message.get("type") != "auth":
+        return None
+    if not is_valid_api_key(str(message.get("api_key") or "")):
+        return None
+    return message
 
 
 async def _send_json(ws: WebSocket, payload: Dict[str, Any]) -> None:
@@ -144,7 +175,8 @@ async def relay_dictation(
     await ws.accept()
     cfg = get_config()
 
-    if not await _authenticate(ws):
+    auth = await _authenticate(ws)
+    if auth is None:
         await _send_json(ws, {"type": "error", "message": "Ongeldige of ontbrekende API-sleutel."})
         await ws.close(code=4401)
         return
@@ -155,7 +187,8 @@ async def relay_dictation(
         return
 
     try:
-        upstream = await connect(build_deepgram_url(cfg), cfg.stt.deepgram_api_key)
+        user_terms = sanitize_user_keyterms(auth.get("keyterms"))
+        upstream = await connect(build_deepgram_url(cfg, user_terms), cfg.stt.deepgram_api_key)
     except Exception as exc:  # handshake rejected, network, bad model/language
         logger.error("dictation.upstream_connect_failed", error=str(exc))
         await _send_json(ws, {"type": "error", "message": f"Kan spraakherkenning niet bereiken: {exc}"})
