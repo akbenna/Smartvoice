@@ -490,12 +490,5 @@ function connectPort() {
 }
 connectPort();
 
-// Opened by the shortcut while closed: start right away.
-chrome.storage.session.get('svAutoStart').then(function (r) {
-  if (r.svAutoStart) {
-    chrome.storage.session.remove('svAutoStart');
-    startDictation();
-  }
-});
 
 setState('idle');

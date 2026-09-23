@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SmartVoice — AI Consultassistent",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Dicteer of neem consulten op en maak SOEP-notities voor Bricks Huisarts",
   "minimum_chrome_version": "116",
   "permissions": [
@@ -9,7 +9,8 @@
     "storage",
     "tabs",
     "offscreen",
-    "sidePanel"
+    "sidePanel",
+    "clipboardWrite"
   ],
   "host_permissions": [
     "https://*.bfrcloud.com/*",
@@ -63,20 +64,14 @@
     },
     {
       "matches": [
-        "https://*.bfrcloud.com/*",
-        "https://*.bfrnet.nl/*",
-        "https://*.bricks-huisarts.nl/*",
-        "https://*.bfrw.nl/*",
-        "https://*.bfrw.cloud/*",
-        "https://*.brickshuisarts.nl/*",
-        "https://*.bfrw-online.nl/*",
-        "http://localhost:8002/*"
+        "<all_urls>"
       ],
       "js": [
         "content/dictation-target.js"
       ],
       "all_frames": true,
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "match_about_blank": true
     }
   ],
   "options_ui": {

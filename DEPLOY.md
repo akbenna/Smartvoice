@@ -172,6 +172,11 @@ Kies bij Railway een EU-regio voor de service, zodat audio de EU niet verlaat en
 **Eerste gebruik:** bij de eerste start opent een tabblad dat eenmalig om microfoontoestemming vraagt
 (Chrome kan dat niet vanuit het zijpaneel zelf). Na een update van de extensie: ververs het Bricks-tabblad.
 
+**Dicteren zonder zijpaneel:** klik in het Bricks-veld en druk **Alt+Shift+D** (of klik op het
+extensie-icoon en dan "Dicteer in veld"). Een label rechtsonder toont dat SmartVoice luistert; nogmaals
+Alt+Shift+D of "Stop" beëindigt het. Lukt invoegen niet, dan staat het dictaat op het klembord.
+Met het zijpaneel open bedient dezelfde sneltoets het paneel.
+
 **Snelteksten & correcties:** via de link onderaan het paneel. Een commando ("normaal longen") wordt
 vervangen door je standaardtekst; correcties verbeteren woorden die verkeerd verstaan worden en gaan als
 hint mee naar Deepgram. Opgeslagen per computer (Chrome, lokaal); overzetten via Exporteren/Importeren.
