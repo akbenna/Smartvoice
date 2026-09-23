@@ -41,6 +41,11 @@ class LLMConfig:
     mistral_model: str = "mistral-small-latest"
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-haiku-4-5-20251001"
+    # SOEP generation needs medical reasoning (diagnosis naming, ICPC); the
+    # light tasks (cleanup, nazorg) stay on the cheaper, faster model.
+    anthropic_soep_model: str = "claude-sonnet-5"
+    # Thinking depth on Sonnet 5+: low | medium | high (latency vs. reasoning).
+    anthropic_effort: str = "medium"
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.0-flash"
     temperature: float = 0.1
@@ -103,6 +108,8 @@ def get_config() -> AppConfig:
             mistral_model=os.getenv("MISTRAL_MODEL", "mistral-small-latest"),
             anthropic_api_key=os.getenv("ANTHROPIC_API_KEY", ""),
             anthropic_model=os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001"),
+            anthropic_soep_model=os.getenv("ANTHROPIC_SOEP_MODEL", "claude-sonnet-5"),
+            anthropic_effort=os.getenv("ANTHROPIC_EFFORT", "medium"),
             gemini_api_key=os.getenv("GEMINI_API_KEY", ""),
             gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
             temperature=float(os.getenv("LLM_TEMPERATURE", "0.1")),

@@ -57,19 +57,39 @@
     return text;
   }
 
+  // Same normalisation the phrase pattern tolerates: case, dots inside
+  // words, and any run of spaces/punctuation between words.
+  function normalizePhrase(phrase) {
+    return phrase.toLowerCase().replace(/\./g, '').split(/[\s,;:!?-]+/).filter(Boolean).join(' ');
+  }
+
   function applySnippets(text, snippets) {
-    // Longest triggers first, so "normaal LO buik" wins over "normaal LO".
-    var pairs = [];
+    // One pass over the text with all triggers at once, so the text a snippet
+    // inserts is never expanded again (a template containing "gb" stays as is).
+    var byKey = {};
+    var bodies = [];
     (snippets || []).forEach(function (s) {
       if (!s || !s.text) return;
-      splitTriggers(s.triggers).forEach(function (t) { pairs.push({ trigger: t, text: s.text }); });
+      splitTriggers(s.triggers).forEach(function (t) {
+        var key = normalizePhrase(t);
+        var body = phrasePattern(t);
+        if (!key || !body || byKey[key] !== undefined) return;
+        byKey[key] = s.text;
+        bodies.push({ body: body, len: t.length });
+      });
     });
-    pairs.sort(function (a, b) { return b.trigger.length - a.trigger.length; });
-    pairs.forEach(function (p) {
-      var re = buildRegex(p.trigger, true);
-      if (re) text = text.replace(re, function (_m, pre) { return pre + p.text; });
+    if (!bodies.length) return text;
+    // Longest triggers first, so "normaal LO buik" wins over "normaal LO".
+    bodies.sort(function (a, b) { return b.len - a.len; });
+    var re = new RegExp('(^|[^' + WORD_CHAR + '])(' + bodies.map(function (b) { return b.body; }).join('|') +
+      ')([.,;:]?)(?![' + WORD_CHAR + '])', 'gi');
+    return text.replace(re, function (match, pre, trigger, punct) {
+      var replacement = byKey[normalizePhrase(trigger)];
+      if (replacement === undefined) return match;
+      // Keep the dictated punctuation, except a period the snippet already ends with.
+      if (punct === '.' && /[.!?]\s*$/.test(replacement)) punct = '';
+      return pre + replacement + punct;
     });
-    return text;
   }
 
   function applyRules(text, rules) {
@@ -89,7 +109,11 @@
       out.push(term);
     }
     ((rules && rules.corrections) || []).forEach(function (c) { add(c.right); });
-    ((rules && rules.snippets) || []).forEach(function (s) { splitTriggers(s.triggers).forEach(add); });
+    // Short codes ("vg", "gb") would pull the recognizer towards letter
+    // combinations; only spoken phrases are useful hints.
+    ((rules && rules.snippets) || []).forEach(function (s) {
+      splitTriggers(s.triggers).forEach(function (t) { if (t.length >= 5) add(t); });
+    });
     return out.slice(0, MAX_KEYTERMS);
   }
 

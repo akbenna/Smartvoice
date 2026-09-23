@@ -6,6 +6,18 @@ Temperature should always be 0.1 for medical output.
 NEVER let the LLM fabricate: only report what is in the transcript.
 """
 
+# ── Shared: medical terminology ──
+# Speech recognition mangles medical words; the model may repair them from
+# context, but must never add content.
+
+MEDISCHE_TERMINOLOGIE = """MEDISCHE TERMINOLOGIE:
+- De tekst komt uit spraakherkenning en kan fout verstane medische woorden   bevatten. Herstel evidente herkenningsfouten in ziektenamen, anatomie,   onderzoeksbevindingen en medicatie op basis van de context   (bijv. "diabetis" -> "diabetes mellitus", "amoxy cilline" -> "amoxicilline",   "atrium fibrilatie" -> "atriumfibrilleren", "la seek" -> "Lasègue").
+- Twijfel je of iets een herkenningsfout is, laat het dan staan zoals gezegd.
+- Benoem diagnoses met de gangbare Nederlandse huisartsterm (NHG-standaard),   zonder de inhoud te veranderen.
+- ICPC-2: kies de meest specifieke passende code bij de werkdiagnose   (bijv. R74 acute infectie bovenste luchtwegen, K86 hypertensie zonder   orgaanschade, L03 lage rugpijn zonder uitstraling). Geen werkdiagnose:   gebruik de code van de klacht (symptoomcode), anders lege string.
+- Voeg NOOIT bevindingen, diagnoses, doseringen of beleid toe die niet   gezegd zijn."""
+
+
 # ── SOEP Extraction + Generation ──
 
 SOEP_SYSTEM_PROMPT = """\
@@ -22,6 +34,8 @@ REGELS:
 - P (Plan): medicatie, verwijzingen, aanvullend onderzoek, controleafspraak.
 - Voeg een ICPC-2 code toe (bijv. R74, K86.00) als de diagnose duidelijk is.
 - Gebruik standaard medische afkortingen: LO, VG, dd, 1dd, 2dd, mg, etc.
+
+""" + MEDISCHE_TERMINOLOGIE + """
 
 ANTWOORD in exact dit JSON-formaat:
 {
@@ -223,6 +237,8 @@ REGELS:
 - ICPC-2: vul alleen in als de werkdiagnose eenduidig is; anders lege string.
 - Een rubriek waarover niets gedicteerd is, blijft een lege string.
 
+""" + MEDISCHE_TERMINOLOGIE + """
+
 ANTWOORD in exact dit JSON-formaat:
 {
   "s": "...",
@@ -238,3 +254,20 @@ Zet het volgende dictaat om naar een SOEP-regel:
 
 DICTAAT:
 {dictaat}"""
+
+
+# ── JSON schema for SOEP output (structured outputs on Sonnet 5+) ──
+
+SOEP_JSON_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "s": {"type": "string"},
+        "o": {"type": "string"},
+        "e": {"type": "string"},
+        "p": {"type": "string"},
+        "icpc_code": {"type": "string"},
+        "icpc_titel": {"type": "string"},
+    },
+    "required": ["s", "o", "e", "p", "icpc_code", "icpc_titel"],
+    "additionalProperties": False,
+}

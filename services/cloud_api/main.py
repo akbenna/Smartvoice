@@ -48,6 +48,7 @@ from .prompts import (
     DICTAAT_OPSCHONEN_USER_TEMPLATE,
     DICTAAT_SOEP_SYSTEM_PROMPT,
     DICTAAT_SOEP_USER_TEMPLATE,
+    SOEP_JSON_SCHEMA,
 )
 
 logger = structlog.get_logger()
@@ -236,6 +237,8 @@ async def process_dictation(
                 provider=body.llm_provider,
                 json_mode=True,
                 max_tokens=DICTAAT_SOEP_MAX_TOKENS,
+                quality=True,
+                json_schema=SOEP_JSON_SCHEMA,
             )
             data = _parse_json_response(raw)
             result = {

@@ -425,24 +425,28 @@ async function insertSoepPerField() {
   var tabId = await currentTabId();
   var res = tabId === null ? null : await chrome.runtime.sendMessage({
     action: 'SV_FILL_SOEP_REQUEST', tabId: tabId, values: soepValues(),
+    icpc: lastSoep && lastSoep.icpc_code || '',
   }).catch(function () { return null; });
 
-  if (res && res.mapped && res.filled.length) {
-    var done = res.filled.map(function (k) { return FIELD_NAMES[k]; }).join(', ');
+  if (res && res.filled && res.filled.length) {
+    var where = (res.labels || res.filled.map(function (k) { return { key: k, label: '' }; }))
+      .map(function (f) {
+        var name = f.key === 'icpc' ? 'ICPC' : FIELD_NAMES[f.key];
+        return f.label ? name + ' \u2192 ' + f.label : name;
+      }).join(', ');
     if (res.missing.length) {
-      setStatus('Ingevuld: ' + done + '. Niet gevonden: ' +
-        res.missing.map(function (k) { return FIELD_NAMES[k]; }).join(', ') +
-        '. Is het consult open? Anders opnieuw koppelen.', true);
+      setStatus('Ingevuld: ' + where + '. Geen veld gevonden voor: ' +
+        res.missing.map(function (k) { return FIELD_NAMES[k]; }).join(', ') + '.', true);
     } else {
-      setStatus('SOEP per veld ingevuld (' + done + ').');
+      setStatus('SOEP ingevuld: ' + where + '.');
     }
     return;
   }
-  // No mapping (or fields not on this page): everything into the clicked field.
+  // Nothing clicked yet (or fields not found): everything into one field.
   await insertOrCopy(soepAsText());
   var hint = res && res.mapped
     ? 'De gekoppelde velden staan niet op deze pagina; alles is in het aangeklikte veld gezet.'
-    : 'Tip: klik op "Velden koppelen" om S, O, E en P voortaan elk in hun eigen veld te zetten.';
+    : 'Tip: klik eerst in de S-regel in Bricks; S, O, E en P worden dan elk in hun eigen regel gezet.';
   setStatus(els.status.textContent + '\n' + hint, els.status.classList.contains('error'));
 }
 

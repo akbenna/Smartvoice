@@ -160,6 +160,7 @@ De tekst verschijnt terwijl je spreekt en gaat naar het Bricks-veld waarin je he
 ```
 DEEPGRAM_API_KEY=<je Deepgram API key>      # ook gebruikt voor live dicteren
 LLM_PROVIDER=anthropic                      # voor "Opschonen" en "Maak SOEP"
+# SOEP op Claude Sonnet 5 (standaard), opschonen op Haiku; zie .env.example
 ANTHROPIC_API_KEY=<je Anthropic API key>
 # Optioneel (standaardwaarden):
 DICTATION_DEEPGRAM_URL=wss://api.eu.deepgram.com/v1/listen   # EU-verwerking
@@ -177,8 +178,9 @@ extensie-icoon en dan "Dicteer in veld"). Een label rechtsonder toont dat SmartV
 Alt+Shift+D of "Stop" beëindigt het. Lukt invoegen niet, dan staat het dictaat op het klembord.
 Met het zijpaneel open bedient dezelfde sneltoets het paneel.
 
-**S/O/E/P per veld:** klik eenmalig op "S/O/E/P-velden koppelen" (popup of zijpaneel) en klik in Bricks
-achter elkaar in het S-, O-, E- en P-veld. Daarna vult "Alles invoegen" (zijpaneel), "Push naar Bricks"
+**S/O/E/P per veld:** klik in Bricks in de S-regel en kies "Alles invoegen": S komt in die regel, O, E en P
+in de regels daarna (een ICPC-codeveld ertussen krijgt de code). Wijkt de opmaak af, gebruik dan eenmalig
+"S/O/E/P-velden koppelen" (popup of zijpaneel) en klik in Bricks achter elkaar in het S-, O-, E- en P-veld. Daarna vult "Alles invoegen" (zijpaneel), "Push naar Bricks"
 (popup) en de invoegknop in Bricks elke regel in het eigen veld. Bestaande tekst blijft staan. Opnieuw
 koppelen kan altijd, bijvoorbeeld als Bricks van opmaak verandert.
 

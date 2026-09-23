@@ -1,0 +1,133 @@
+{
+  "snippets": [
+    {
+      "triggers": "knieo, knie o, sneltekst knie",
+      "text": "Inspectie: normale stand, geen zwelling, geen roodheid Palpatie: niet warm, geen hydrops, gewrichtspleet niet pijnlijk, geen drukpijn op patella of tuberositas tibiae Flexie en extensie ongestoord Banden intact"
+    },
+    {
+      "triggers": "longo, long o, sneltekst longen",
+      "text": "Niet acuut zieke patient, geen dyspnoe, geen gebruik hulpademhalingsspieren Temp Ademfrequentie rustig, sat % Pulm: sonore percussie, VAG zonder bijgeluiden Cor: S1S2"
+    },
+    {
+      "triggers": "neuroo, neuro o, sneltekst neuro",
+      "text": "EMV maximaal Cognitie en spraak gb Hersenzenuwen geen bijzonderheden Sensibiliteit en motoriek globaal intact Romberg gb Barre gb Top neus gb, koorddansgang gb Reflexen symmetrisch opwekbaar VZR bdz plantair"
+    },
+    {
+      "triggers": "neuroou, neuro uitgebreid, sneltekst neuro uitgebreid",
+      "text": "Uitgebried: Helder en adequaat. Georienteerd in trias. Geen dysartrie. Geen afasie. Geen meningeale prikkeling. HZ: Pupillen isocoor en lichtreactief bdz. Gezichtsvelden volgens Donders intact. Diplopie-, nystagmus-. Vloeiende oculomotoriek bdz. Gelaat sensomotoor intact. Symmetrisch geheven pharynxbogen. Tong in midline. Motoriek: Scoliose, waarbij evidente asymmetrie stand schouders, links hoger tov rechts. M. Deltoideus, M. Biceps 5/5, M. Triceps 5/5, m. Brachioradialis 5/5, Polsextensoren en -flexoren 5/5, Vingerextensoren 5/5, vingerflexoren diep 5/5, vingerflexoren oppervlakkig 5/5. M. Abductor pollicis 5/5, vingersspreiders 5/5. M. Iliopsoas, m. Quadriceps, Hamstrings 5/5, m. Gastrocnemius en tibialis anterior 5/5. Barre -/-, FART/FFRT symmetrisch intact. Tremor: minimale houdingstremor rechtszijdig. Geen rusttremor. Geen bradykinesie of rigiditeit. Sensibiliteit: Grove tast intact. Vibratiezin bdz afwezig Coordinatie: Rechtshandig. en KHP vloeiend beiderzijds. Reflexen: BPR 0/0. TPR 0/-1. KPR aanwezig bdz. APR afw bdz. VZR plantair bdz. Lopen: Normale gang en KDG. Hakken en tenen staan en lopen ongestoord."
+    },
+    {
+      "triggers": "pobo, po bo, sneltekst borst",
+      "text": "Geen vegetatieve verschijnselen.....RR, Pols, Sat.....Cor: S1S2.....Pulm: VAG zonder bijgeluiden.....Palpatie thorax: herkenbare drukpijn.....Palpatie abdomen gb, geen souffles, geen pulserende massa"
+    },
+    {
+      "triggers": "rugo, rug o, sneltekst rug",
+      "text": "Inspectie gb.....Ossale kloppijn en asdrukpijn afwezig.....Paravertebraal herkenbare drukpijn.....Flexie, retroflexie, lateroflexie.....Lasegue links, rechts.....Kracht en sensibiliteit van de benen symmetrisch intact.....KPR, APR normaal"
+    },
+    {
+      "triggers": "vertigoo, vertigo o, sneltekst vertigo",
+      "text": "RR Pols .....Neurologisch onderzoek:.....Hersenzenuwen geen bijzonderheden.....Sensibiliteit en motoriek globaal intact.....Romberg gb Barre gb.....Top neus gb, koorddansgang gb .....Reflexen symmetrisch opwekbaar.....Dix Hallpike gb, Head Impuls Test gb"
+    },
+    {
+      "triggers": "acuuto, acuut o, sneltekst abcde",
+      "text": "A: Vrij, CWK niet drukpijnlijk.....B: AF /min, symmetrische thoraxexcursies, Sat %, Pulmones: VAG, geen bijgeluiden. Geen thoracale drukpijn.....C: Refill <3sec, turgor goed, RR mmHg, P /min regulair en equaal, perifeer goed gecirculeerd, abdomen: NP, WT, soepele buik, niet drukpijnlijk. Lever en milt niet palpabel, geen slagpijn nierloge .....D: EMVmax, glucose .....E: Temp"
+    },
+    {
+      "triggers": "buiko, buik o, sneltekst buik",
+      "text": "Temp .....Abdomen: inspectie gb, niet-opgezette buik, normale peristaltiek zonder souffles, wisselende tympanie, soepele buik zonder defense, drukpijn, loslaatpijn, lever en milt niet palpabel, geen palpabele weerstanden, geen slagpijn nierloges, liezen gb."
+    },
+    {
+      "triggers": "hoofdpijno, hoofdpijn o, sneltekst hoofdpijn",
+      "text": "RR Geen nekstijfheid.....Geen drukpijn aa.temporales .....Neurologisch onderzoek screenend geen bijzonderheden.....Palpatie nekmusculatuur en occipitale aanhechtingen: pijnlijk en hypertoon"
+    },
+    {
+      "triggers": "kindo, kind o, sneltekst kind",
+      "text": "Alert en niet-ziek kind Ademfrequentie, temp, geen intrekkingen.....Turgor en refill gb, vochtige slijmvliezen Geen meningeale prikkeling ADS bdz luchthoudend middenoor en normaal TV Keel gb, klieren np Cor S1S2, pulmones VAG zonder bijgeluiden Abdomen soepel Huid gb, geen petechieen"
+    },
+    {
+      "triggers": "enkelo, enkel o, sneltekst enkel",
+      "text": "Zwelling lateraal/mediaal, geen hematoom.....Drukpijn laterale malleolus, geen drukpijn mediale malleolus, os naviculare of basis MT5.....Bewegingen antalgisch beperkt"
+    },
+    {
+      "triggers": "expe, sneltekst expectatief",
+      "text": "uitleg, geruststelling, expectatief beleid, instructies cf thuisarts.nl. patient akkoord"
+    },
+    {
+      "triggers": "vg",
+      "text": "voorgeschiedenis"
+    },
+    {
+      "triggers": "nvzb",
+      "text": "niet verschenen zonder bericht"
+    },
+    {
+      "triggers": "nv",
+      "text": "niet verschenen"
+    },
+    {
+      "triggers": "naz",
+      "text": "niet acuut ziek"
+    },
+    {
+      "triggers": "mz",
+      "text": "matig ziek"
+    },
+    {
+      "triggers": "crep min, crepitaties min",
+      "text": "geen crepitaties hoorbaar beiderzijds"
+    },
+    {
+      "triggers": "rh min, ronchi min",
+      "text": "Geen ronchi hoorbaar beiderzijds"
+    },
+    {
+      "triggers": "la min, klieren min",
+      "text": "Geen halsklieren palpabel"
+    },
+    {
+      "triggers": "vag",
+      "text": "vesiculair ademgeruis beiderzijds"
+    },
+    {
+      "triggers": "wt",
+      "text": "wisselend tympaan"
+    },
+    {
+      "triggers": "nl p",
+      "text": "normaal peristaltiek"
+    },
+    {
+      "triggers": "gb",
+      "text": "geen bijzonderheden"
+    },
+    {
+      "triggers": "pct",
+      "text": "paracetamol"
+    },
+    {
+      "triggers": "sphp",
+      "text": "spanningshoofdpijn"
+    },
+    {
+      "triggers": "verlexp",
+      "text": "verlengd expirium"
+    },
+    {
+      "triggers": "gst",
+      "text": "geruststelling"
+    },
+    {
+      "triggers": "zn",
+      "text": "zo nodig"
+    },
+    {
+      "triggers": "mndlks",
+      "text": "maandelijks"
+    },
+    {
+      "triggers": "herco",
+      "text": "hercontrole"
+    }
+  ],
+  "corrections": []
+}
