@@ -37,14 +37,7 @@ body {
   border-bottom: 1px solid var(--border);
 }
 .header-left { display: flex; align-items: center; gap: 8px; }
-.logo {
-  width: 28px; height: 28px;
-  background: var(--primary);
-  color: white;
-  border-radius: 6px;
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 700; font-size: 11px;
-}
+.logo { width: 28px; height: 28px; display: block; }
 .header h1 { font-size: 15px; font-weight: 600; }
 
 /* Buttons */
