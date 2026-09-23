@@ -140,8 +140,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           if (soep.icpc_code && values.e && values.e.indexOf(soep.icpc_code) === -1) {
             values.e += ' (' + soep.icpc_code + ')';
           }
-          const filledResult = await fillSoep(tabs[0].id, values);
-          if (filledResult.mapped && filledResult.filled.length) {
+          const filledResult = await fillSoep(tabs[0].id, values, soep.icpc_code || '');
+          if (filledResult.filled.length) {
             sendResponse({ success: true, filled: filledResult.filled, missing: filledResult.missing });
             return;
           }
@@ -419,11 +419,26 @@ async function startCalibration(tabId) {
 // find and reports back; results are collected for a short moment.
 const fillWaiters = new Map();
 
-async function fillSoep(tabId, values) {
+async function fillSoep(tabId, values, icpc) {
   const host = await hostOfTab(tabId);
   const mapping = await getFieldMap(host);
   const wanted = Object.keys(values).filter((k) => values[k]);
-  if (!mapping) return { mapped: false, filled: [], missing: wanted };
+  if (!mapping) {
+    // No mapped fields: S goes into the clicked field, O/E/P into the next ones.
+    const { svTarget } = await chrome.storage.session.get('svTarget');
+    if (!svTarget || svTarget.tabId !== tabId) return { mapped: false, filled: [], missing: wanted };
+    const res = await chrome.tabs.sendMessage(
+      tabId, { action: 'SV_FILL_SEQUENTIAL', values, icpc: icpc || '' }, { frameId: svTarget.frameId },
+    ).catch(() => null);
+    if (!res || !res.ok) return { mapped: false, filled: [], missing: wanted, error: res && res.error };
+    return {
+      mapped: false,
+      sequential: true,
+      filled: res.filled.map((f) => f.key),
+      labels: res.filled,
+      missing: res.missing,
+    };
+  }
   const requestId = Math.random().toString(36).slice(2);
   const filled = new Set();
   fillWaiters.set(requestId, filled);
@@ -454,7 +469,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
     case 'SV_FILL_SOEP_REQUEST': {
       const tabId = msg.tabId !== undefined ? msg.tabId : sender.tab && sender.tab.id;
-      fillSoep(tabId, msg.values).then(sendResponse);
+      fillSoep(tabId, msg.values, msg.icpc).then(sendResponse);
       return true;
     }
     case 'SV_FIELD_MAP_STATUS':

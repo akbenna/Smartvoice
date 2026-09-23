@@ -365,6 +365,78 @@
     }
   }
 
+  // ── Sequential fill: S in the clicked field, O/E/P in the fields after it ──
+
+  function isVisible(el) {
+    if (!el.getClientRects().length) return false;
+    var cs = getComputedStyle(el);
+    return cs.visibility !== 'hidden' && cs.display !== 'none';
+  }
+
+  function collectEditables(root, out) {
+    var nodes = root.querySelectorAll('*');
+    for (var i = 0; i < nodes.length; i++) {
+      var el = nodes[i];
+      var isRichChild = el.parentElement && el.parentElement.isContentEditable;
+      if (!isRichChild && isEditable(el) && isVisible(el)) out.push(el);
+      if (el.shadowRoot) collectEditables(el.shadowRoot, out);
+    }
+    return out;
+  }
+
+  function fieldText(el) {
+    return [el.id, el.getAttribute('name'), el.getAttribute('placeholder'),
+      el.getAttribute('aria-label'), el.getAttribute('title'), describe(el)].join(' ');
+  }
+
+  function looksLikeCodeField(el) {
+    // ICPC/code inputs sit between the SOEP lines in some HIS layouts.
+    if (/icpc|code/i.test(fieldText(el))) return true;
+    return el.tagName === 'INPUT' && el.maxLength > 0 && el.maxLength <= 10;
+  }
+
+  function fillSequential(values, icpc) {
+    var start = target;
+    if (!start || !start.isConnected) return { ok: false, error: 'Klik eerst in de S-regel.' };
+    var list = collectEditables(document, []);
+    var i = list.indexOf(start);
+    if (i === -1) return { ok: false, error: 'Het aangeklikte veld is niet gevonden.' };
+
+    // Plan first: S in the clicked field, O/E/P in the following fields,
+    // skipping code fields (ICPC) which may sit between the lines.
+    var plan = { s: list[i] };
+    var codeField = null;
+    ['o', 'e', 'p'].forEach(function (key) {
+      i += 1;
+      while (i < list.length && looksLikeCodeField(list[i])) {
+        if (!codeField) codeField = list[i];
+        i += 1;
+      }
+      if (i < list.length) plan[key] = list[i];
+    });
+
+    // With a separate code field the code goes there instead of behind E.
+    var suffix = icpc ? ' (' + icpc + ')' : '';
+    if (codeField && suffix && values.e) values.e = values.e.replace(suffix, '');
+
+    var filled = [];
+    var missing = [];
+    ['s', 'o', 'e', 'p'].forEach(function (key) {
+      if (!values[key]) return;
+      if (!plan[key]) { missing.push(key); return; }
+      appendToField(plan[key], values[key]);
+      filled.push({ key: key, label: describe(plan[key]) });
+    });
+    if (codeField && icpc) {
+      appendToField(codeField, icpc);
+      filled.push({ key: 'icpc', label: describe(codeField) });
+    }
+    // Back to the S field, where the doctor started.
+    target = start;
+    return { ok: true, filled: filled, missing: missing };
+  }
+
+
   document.addEventListener('focusin', function (e) {
     if (!calibrating) return;
     var path = e.composedPath ? e.composedPath() : [];
@@ -379,6 +451,10 @@
   chrome.runtime.onMessage.addListener(function (msg, _sender, sendResponse) {
     if (msg.action === 'SV_CALIBRATE') {
       calibrating = !!msg.active;
+      return false;
+    }
+    if (msg.action === 'SV_FILL_SEQUENTIAL') {
+      sendResponse(fillSequential(msg.values || {}, msg.icpc || ''));
       return false;
     }
     if (msg.action !== 'SV_FILL_SOEP') return false;

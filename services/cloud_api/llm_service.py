@@ -11,6 +11,9 @@ Compatible with Python 3.9+.
 
 from __future__ import annotations
 
+import re
+from typing import Optional
+
 import httpx
 import structlog
 
@@ -26,8 +29,15 @@ async def complete(
     json_mode: bool = False,
     max_tokens: int = None,
     cache_system: bool = False,
+    quality: bool = False,
+    json_schema: Optional[dict] = None,
 ) -> str:
     """Send a prompt to the LLM and return the response text.
+
+    quality: use the stronger model for tasks that need medical reasoning
+        (SOEP generation). Only affects Anthropic; other providers have one model.
+    json_schema: JSON schema for structured output on models without prefill
+        support (Claude Sonnet 5 and newer). Ignored by other providers.
 
     Args:
         max_tokens: Override the configured output budget for this single call.
@@ -54,7 +64,8 @@ async def complete(
         )
     elif provider == "anthropic":
         return await _complete_anthropic(
-            system_prompt, user_prompt, json_mode, max_tokens, cache_system
+            system_prompt, user_prompt, json_mode, max_tokens, cache_system, quality,
+            json_schema,
         )
     elif provider == "gemini":
         return await _complete_gemini(
@@ -100,26 +111,49 @@ async def _complete_mistral(
     return data["choices"][0]["message"]["content"]
 
 
+# Claude 4.6+ models (Sonnet 5, Opus, ...) reject assistant prefill and
+# sampling parameters with a 400; they take structured outputs instead.
+_MODERN_CLAUDE = re.compile(r"^claude-(sonnet-5|opus-5|opus-4-[6-9]|sonnet-4-[6-9]|fable|mythos)")
+
+# Thinking counts towards max_tokens on modern models; leave room for it.
+MODERN_MIN_MAX_TOKENS = 8000
+
+
+def _anthropic_text(data: dict) -> str:
+    """First text block; modern models may put thinking blocks before it."""
+    for block in data.get("content", []):
+        if block.get("type", "text") == "text":
+            return block.get("text", "")
+    return ""
+
+
 async def _complete_anthropic(
     system_prompt: str,
     user_prompt: str,
     json_mode: bool,
     max_tokens: int,
     cache_system: bool = False,
+    quality: bool = False,
+    json_schema: Optional[dict] = None,
 ) -> str:
     """Complete using Anthropic Claude API.
 
-    Kostenoptimalisaties:
+    Haiku 4.5 (default model):
       - JSON-prefill: bij json_mode starten we de assistant-beurt met "{" zodat
-        Claude direct geldige JSON produceert (geen markdown-fences, geen
-        inleidende zin). Bespaart output-tokens en elimineert parse-fouten.
-      - Per-call max_tokens (zie complete()).
-      - Optionele prompt-cache markering op de system-prompt.
+        Claude direct geldige JSON produceert. Bespaart output-tokens.
+      - Lage temperatuur voor medische output.
+    Sonnet 5 en nieuwer (SOEP-model):
+      - Geen prefill/temperatuur (400); JSON via structured outputs
+        (output_config.format met json_schema) wanneer een schema is gegeven.
+      - Adaptief nadenken met instelbare effort; max_tokens ruimer.
     """
     config = get_config()
     api_key = config.llm.anthropic_api_key
     if not api_key:
         raise ValueError("ANTHROPIC_API_KEY niet geconfigureerd.")
+
+    model = config.llm.anthropic_soep_model if quality else config.llm.anthropic_model
+    modern = bool(_MODERN_CLAUDE.match(model))
 
     # System-prompt als content-block, eventueel met cache_control. Onder de
     # modeldrempel negeert Anthropic de cache; boven de drempel ~90% korting.
@@ -128,11 +162,27 @@ async def _complete_anthropic(
         system_block["cache_control"] = {"type": "ephemeral"}
 
     messages = [{"role": "user", "content": user_prompt}]
-    if json_mode:
-        # Prefill dwingt geldige JSON af; we plakken de "{" later terug.
-        messages.append({"role": "assistant", "content": "{"})
+    body = {
+        "model": model,
+        "max_tokens": max_tokens,
+        "system": [system_block],
+        "messages": messages,
+    }
+    prefilled = False
+    if modern:
+        body["max_tokens"] = max(max_tokens, MODERN_MIN_MAX_TOKENS)
+        output_config = {"effort": config.llm.anthropic_effort}
+        if json_mode and json_schema:
+            output_config["format"] = {"type": "json_schema", "schema": json_schema}
+        body["output_config"] = output_config
+    else:
+        body["temperature"] = config.llm.temperature
+        if json_mode:
+            # Prefill dwingt geldige JSON af; we plakken de "{" later terug.
+            messages.append({"role": "assistant", "content": "{"})
+            prefilled = True
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=90.0) as client:
         response = await client.post(
             "https://api.anthropic.com/v1/messages",
             headers={
@@ -140,28 +190,28 @@ async def _complete_anthropic(
                 "anthropic-version": "2023-06-01",
                 "Content-Type": "application/json",
             },
-            json={
-                "model": config.llm.anthropic_model,
-                "max_tokens": max_tokens,
-                "temperature": config.llm.temperature,
-                "system": [system_block],
-                "messages": messages,
-            },
+            json=body,
         )
+        if response.status_code >= 400:
+            logger.error("llm.anthropic.error", status=response.status_code, body=response.text[:500])
         response.raise_for_status()
         data = response.json()
 
     usage = data.get("usage", {})
     logger.info(
         "llm.anthropic.usage",
+        model=model,
         input_tokens=usage.get("input_tokens"),
         output_tokens=usage.get("output_tokens"),
         cache_read=usage.get("cache_read_input_tokens"),
         cache_write=usage.get("cache_creation_input_tokens"),
     )
 
-    text = data["content"][0]["text"]
-    if json_mode:
+    if data.get("stop_reason") == "refusal":
+        raise ValueError("Het taalmodel weigerde dit verzoek.")
+
+    text = _anthropic_text(data)
+    if prefilled:
         # De prefill "{" zit niet in de response; voeg terug toe.
         text = "{" + text
     return text

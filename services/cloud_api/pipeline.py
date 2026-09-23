@@ -20,6 +20,7 @@ from .medical_vocabulary import correct_transcript_full, CorrectionStats
 from .prompts import (
     NAZORG_SYSTEM_PROMPT,
     NAZORG_USER_TEMPLATE,
+    SOEP_JSON_SCHEMA,
     SOEP_SYSTEM_PROMPT,
     SOEP_USER_TEMPLATE,
 )
@@ -152,6 +153,8 @@ async def process_consultation(
             provider=llm_provider,
             json_mode=True,
             max_tokens=SOEP_MAX_TOKENS,
+            quality=True,
+            json_schema=SOEP_JSON_SCHEMA,
         )
         soep_data = _parse_json_response(soep_response)
         result.soep = SOEPResult(

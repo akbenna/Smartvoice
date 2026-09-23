@@ -65,6 +65,14 @@ def test_user_keyterms_come_first_and_are_capped():
     assert len(terms) == dictation.MAX_KEYTERMS
 
 
+def test_core_medical_terms_are_sent_before_other_drugs():
+    terms = dictation.build_keyterms()
+    assert terms[0] == "hypertensie"
+    assert "atriumfibrilleren" in terms and "amoxicilline" in terms
+    assert len(terms) == dictation.MAX_KEYTERMS
+    assert len({t.lower() for t in terms}) == len(terms)
+
+
 @pytest.mark.parametrize("raw, expected", [
     (None, []),
     ("normaal longen", []),
@@ -278,3 +286,68 @@ def test_process_rejects_unknown_mode(api):
         headers={"X-API-Key": "geheim"},
     )
     assert resp.status_code == 422
+
+
+# === Claude-modelroute: Haiku (prefill) vs Sonnet 5 (structured outputs) ===
+
+def _fake_anthropic(content, stop_reason="end_turn"):
+    from unittest.mock import MagicMock
+    resp = MagicMock()
+    resp.status_code = 200
+    resp.raise_for_status = MagicMock()
+    resp.json = MagicMock(return_value={"content": content, "stop_reason": stop_reason, "usage": {}})
+    client = AsyncMock()
+    client.post = AsyncMock(return_value=resp)
+    client.__aenter__ = AsyncMock(return_value=client)
+    client.__aexit__ = AsyncMock(return_value=False)
+    return client
+
+
+@pytest.mark.asyncio
+async def test_soep_on_sonnet5_uses_structured_output_without_prefill(monkeypatch):
+    from services.cloud_api import llm_service
+    from services.cloud_api.prompts import SOEP_JSON_SCHEMA
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
+    get_config.cache_clear()
+    client = _fake_anthropic([
+        {"type": "thinking", "thinking": ""},
+        {"type": "text", "text": '{"s": "keelpijn"}'},
+    ])
+    with patch.object(llm_service.httpx, "AsyncClient", return_value=client):
+        out = await llm_service.complete(
+            "sys", "usr", provider="anthropic", json_mode=True, max_tokens=900,
+            quality=True, json_schema=SOEP_JSON_SCHEMA,
+        )
+    body = client.post.call_args.kwargs["json"]
+    assert body["model"] == "claude-sonnet-5"
+    assert "temperature" not in body
+    assert body["messages"][-1]["role"] == "user"          # geen prefill
+    assert body["output_config"]["format"]["schema"] == SOEP_JSON_SCHEMA
+    assert body["max_tokens"] >= llm_service.MODERN_MIN_MAX_TOKENS
+    assert json.loads(out) == {"s": "keelpijn"}            # tekstblok na thinking
+
+
+@pytest.mark.asyncio
+async def test_light_tasks_stay_on_haiku_with_prefill(monkeypatch):
+    from services.cloud_api import llm_service
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
+    get_config.cache_clear()
+    client = _fake_anthropic([{"type": "text", "text": '"decisief": "x"}'}])
+    with patch.object(llm_service.httpx, "AsyncClient", return_value=client):
+        out = await llm_service.complete("sys", "usr", provider="anthropic", json_mode=True, max_tokens=300)
+    body = client.post.call_args.kwargs["json"]
+    assert body["model"].startswith("claude-haiku-4-5")
+    assert body["temperature"] == 0.1
+    assert body["messages"][-1] == {"role": "assistant", "content": "{"}
+    assert json.loads(out) == {"decisief": "x"}
+
+
+@pytest.mark.asyncio
+async def test_refusal_raises_clear_error(monkeypatch):
+    from services.cloud_api import llm_service
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
+    get_config.cache_clear()
+    client = _fake_anthropic([], stop_reason="refusal")
+    with patch.object(llm_service.httpx, "AsyncClient", return_value=client):
+        with pytest.raises(ValueError):
+            await llm_service.complete("sys", "usr", provider="anthropic", quality=True)

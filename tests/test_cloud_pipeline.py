@@ -24,6 +24,7 @@ from services.cloud_api import llm_service, pipeline
 async def test_anthropic_json_prefill_prepends_brace():
     """Bij json_mode stuurt de prefill een '{' mee en plakt die terug."""
     fake_response = MagicMock()
+    fake_response.status_code = 200
     fake_response.raise_for_status = MagicMock()
     fake_response.json = MagicMock(
         return_value={

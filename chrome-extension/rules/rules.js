@@ -100,20 +100,51 @@ document.getElementById('export').addEventListener('click', function () {
   URL.revokeObjectURL(a.href);
 });
 
+// Add snippets/corrections from another list; existing triggers win.
+function mergeRules(incoming) {
+  incoming = SVTextRules.normalize(incoming);
+  var known = {};
+  rules.snippets.forEach(function (s) {
+    SVTextRules.splitTriggers(s.triggers).forEach(function (t) { known[t.toLowerCase()] = true; });
+  });
+  var added = 0;
+  incoming.snippets.forEach(function (s) {
+    var triggers = SVTextRules.splitTriggers(s.triggers).filter(function (t) { return !known[t.toLowerCase()]; });
+    if (!triggers.length) return;
+    triggers.forEach(function (t) { known[t.toLowerCase()] = true; });
+    rules.snippets.push({ triggers: triggers.join(', '), text: s.text });
+    added += 1;
+  });
+  var knownWrong = {};
+  rules.corrections.forEach(function (c) { knownWrong[c.wrong.toLowerCase()] = true; });
+  var addedCorr = 0;
+  incoming.corrections.forEach(function (c) {
+    if (knownWrong[c.wrong.toLowerCase()]) return;
+    rules.corrections.push({ wrong: c.wrong, right: c.right });
+    addedCorr += 1;
+  });
+  return SVTextRules.save(rules).then(function () {
+    render();
+    toast(added + ' snelteksten en ' + addedCorr + ' correcties toegevoegd');
+  });
+}
+
 document.getElementById('import').addEventListener('change', function (e) {
   var file = e.target.files[0];
   if (!file) return;
   file.text().then(function (content) {
-    var parsed = JSON.parse(content);
-    rules = SVTextRules.normalize(parsed);
-    return SVTextRules.save(rules);
-  }).then(function () {
-    render();
-    toast('Geïmporteerd: ' + rules.snippets.length + ' snelteksten, ' + rules.corrections.length + ' correcties');
+    return mergeRules(JSON.parse(content));
   }).catch(function () {
     toast('Dit bestand kon niet worden gelezen.');
   });
   e.target.value = '';
+});
+
+document.getElementById('load-bricks').addEventListener('click', function () {
+  fetch(chrome.runtime.getURL('rules/bricks-afkortingen.json'))
+    .then(function (r) { return r.json(); })
+    .then(mergeRules)
+    .catch(function () { toast('Kon de afkortingenlijst niet laden.'); });
 });
 
 SVTextRules.load().then(function (r) { rules = r; render(); });

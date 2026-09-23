@@ -382,8 +382,8 @@ function createWidget() {
     var soep = lastResult.soep || {};
     var values = { s: soep.s, o: soep.o, e: soep.e, p: soep.p };
     if (soep.icpc_code && values.e && values.e.indexOf(soep.icpc_code) === -1) values.e += ' (' + soep.icpc_code + ')';
-    var res = await chrome.runtime.sendMessage({ action: 'SV_FILL_SOEP_REQUEST', values: values }).catch(function() { return null; });
-    if (res && res.mapped && res.filled.length) {
+    var res = await chrome.runtime.sendMessage({ action: 'SV_FILL_SOEP_REQUEST', values: values, icpc: soep.icpc_code || '' }).catch(function() { return null; });
+    if (res && res.filled && res.filled.length) {
       showNotification(res.missing.length
         ? 'Deels ingevuld; niet gevonden: ' + res.missing.join(', ').toUpperCase() + '. Is het consult open?'
         : 'SOEP per veld ingevuld in Bricks!');
@@ -394,7 +394,7 @@ function createWidget() {
       showNotification('SOEP ingevoegd in Bricks!');
     } else {
       navigator.clipboard.writeText(formatSOEPText(lastResult));
-      showNotification('Velden niet gevonden; tekst gekopieerd. Tip: SmartVoice-icoon \u2192 "S/O/E/P-velden koppelen".');
+      showNotification('Velden niet gevonden; tekst gekopieerd. Tip: klik eerst in de S-regel en probeer opnieuw.');
     }
   });
 

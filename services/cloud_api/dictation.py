@@ -69,14 +69,51 @@ def sanitize_user_keyterms(raw: Any) -> List[str]:
     return terms
 
 
+# Words that general-practice dictation needs and a general speech model often
+# mishears. Deepgram accepts at most 100 keyterms, so this list is curated:
+# frequent GP diagnoses and exam terms, then the most prescribed drugs.
+CORE_MEDICAL_TERMS: List[str] = [
+    # diagnoses / klachten
+    "hypertensie", "diabetes mellitus", "COPD", "astma", "atriumfibrilleren",
+    "hartfalen", "angina pectoris", "pneumonie", "bronchitis", "sinusitis",
+    "otitis media", "otitis externa", "tonsillitis", "faryngitis", "cystitis",
+    "pyelonefritis", "urineweginfectie", "gastro-enteritis", "refluxziekte",
+    "obstipatie", "prikkelbaredarmsyndroom", "lumbago", "lumbosacraal radiculair syndroom",
+    "artrose", "jicht", "epicondylitis", "fasciitis plantaris", "tendinopathie",
+    "migraine", "spanningshoofdpijn", "BPPV", "vertigo", "depressie",
+    "angststoornis", "eczeem", "psoriasis", "impetigo", "erysipelas",
+    "dermatomycose", "onychomycose", "urticaria", "conjunctivitis",
+    "hypothyreoïdie", "anemie", "TIA", "CVA", "trombose", "longembolie",
+    # onderzoek
+    "auscultatie", "vesiculair ademgeruis", "crepitaties", "rhonchi", "souffle",
+    "trommelvlies", "saturatie", "Lasègue", "Romberg", "Dix-Hallpike",
+    "Barré", "McMurray", "Lachman", "hydrops", "defense", "peristaltiek",
+]
+
+CORE_MEDICATIONS: List[str] = [
+    "paracetamol", "ibuprofen", "naproxen", "diclofenac", "amoxicilline",
+    "amoxicilline-clavulaanzuur", "doxycycline", "nitrofurantoïne", "fosfomycine",
+    "azitromycine", "claritromycine", "feneticilline", "flucloxacilline",
+    "omeprazol", "pantoprazol", "metformine", "gliclazide", "atorvastatine",
+    "simvastatine", "rosuvastatine", "amlodipine", "lisinopril", "enalapril",
+    "losartan", "hydrochloorthiazide", "chloortalidon", "metoprolol",
+    "bisoprolol", "furosemide", "apixaban", "rivaroxaban", "clopidogrel",
+    "acetylsalicylzuur", "salbutamol", "fluticason", "budesonide", "tiotropium",
+    "prednisolon", "sertraline", "citalopram", "oxazepam", "levothyroxine",
+    "tramadol", "colecalciferol", "macrogol", "cetirizine",
+]
+
+
 def build_keyterms(user_terms: Optional[List[str]] = None) -> List[str]:
-    """The doctor's own words first, then medication names, capped at Deepgram's limit."""
-    terms = list(user_terms or [])
-    seen = {t.lower() for t in terms}
-    for name in sorted({name for name in MEDICATION_CORRECTIONS.values() if name}):
-        if name.lower() not in seen:
-            terms.append(name)
-            seen.add(name.lower())
+    """The doctor's own words first, then the curated medical terms and drugs,
+    then the remaining vocabulary medication names; capped at Deepgram's limit."""
+    terms: List[str] = []
+    seen = set()
+    extra = sorted({name for name in MEDICATION_CORRECTIONS.values() if name})
+    for term in list(user_terms or []) + CORE_MEDICAL_TERMS + CORE_MEDICATIONS + extra:
+        if term.lower() not in seen:
+            terms.append(term)
+            seen.add(term.lower())
     return terms[:MAX_KEYTERMS]
 
 
