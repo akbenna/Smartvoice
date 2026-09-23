@@ -101,7 +101,9 @@ async function testConnection() {
 
     var auth = await fetch(base + '/api/v1/providers', { method: 'GET', headers: headers });
     if (auth.ok) {
-      showToast('Verbinding én API-sleutel OK!');
+      // Save right away: the extension uses the stored key, not this field.
+      await saveSettings();
+      showToast('Verbinding én API-sleutel OK — opgeslagen.');
     } else if (auth.status === 403) {
       showToast('Server OK, maar API-sleutel klopt niet (403). Vergelijk met API_KEYS op de server.');
     } else if (auth.status === 401) {

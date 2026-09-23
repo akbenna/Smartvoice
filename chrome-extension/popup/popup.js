@@ -351,6 +351,8 @@ document.getElementById('btn-new-consult').addEventListener('click', function() 
 });
 
 document.getElementById('btn-retry').addEventListener('click', function() {
+  // Clear the stored error too, or it reappears the next time the popup opens.
+  chrome.storage.local.remove(['sv_state', 'sv_error']);
   hideStatus();
   setState('idle');
 });
