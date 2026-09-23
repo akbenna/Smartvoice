@@ -11,8 +11,12 @@
  */
 
 (function () {
-  if (window.__svDictationTarget) return;
-  window.__svDictationTarget = true;
+  // After an extension update the old copy of this script stays in open pages
+  // but can no longer reach the extension. Only skip if a *live* copy exists.
+  if (window.__svDictationAlive && window.__svDictationAlive()) return;
+  window.__svDictationAlive = function () {
+    try { return !!(chrome.runtime && chrome.runtime.id); } catch (e) { return false; }
+  };
 
   var target = null;
   var savedRange = null;
@@ -471,6 +475,54 @@
       catch (err) { /* ignore */ }
     }
     sendResponse({ ok: true });
+    return false;
+  });
+
+  // ── Diagnostics: what does the doctor's clicked field look like? ──
+
+  function deepActiveElement() {
+    var el = document.activeElement;
+    var chain = [];
+    while (el) {
+      chain.push(el);
+      if (el.shadowRoot && el.shadowRoot.activeElement) el = el.shadowRoot.activeElement;
+      else break;
+    }
+    return chain;
+  }
+
+  function sketch(el) {
+    if (!el || !el.tagName) return String(el);
+    var attrs = ['id', 'name', 'type', 'role', 'contenteditable', 'aria-label', 'placeholder', 'class']
+      .map(function (a) {
+        var v = el.getAttribute(a);
+        return v ? a + '="' + String(v).slice(0, 40) + '"' : '';
+      }).filter(Boolean).join(' ');
+    return '<' + el.tagName.toLowerCase() + (attrs ? ' ' + attrs : '') + '>' +
+      (el.shadowRoot ? ' [shadow ' + el.shadowRoot.mode + ']' : '') +
+      (el.readOnly ? ' [readonly]' : '') + (el.disabled ? ' [disabled]' : '');
+  }
+
+  function diagnose() {
+    var chain = deepActiveElement();
+    var last = chain[chain.length - 1];
+    var editables = collectEditables(document, []);
+    return {
+      frame: location.origin + location.pathname,
+      top: window.top === window,
+      hasFocus: document.hasFocus(),
+      active: chain.map(sketch),
+      activeIsEditable: last ? isEditable(last) : false,
+      target: target ? sketch(target) : null,
+      editableCount: editables.length,
+      firstEditables: editables.slice(0, 6).map(sketch),
+    };
+  }
+
+  chrome.runtime.onMessage.addListener(function (msg) {
+    if (msg.action !== 'SV_DIAG') return false;
+    try { chrome.runtime.sendMessage({ action: 'SV_DIAG_REPORT', requestId: msg.requestId, report: diagnose() }); }
+    catch (err) { /* ignore */ }
     return false;
   });
 

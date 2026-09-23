@@ -125,7 +125,8 @@ chrome.storage.onChanged.addListener(function (changes, area) {
 async function sendToTarget(text) {
   var r = await chrome.storage.session.get('svTarget');
   var target = r.svTarget;
-  if (!target) throw new Error('Nog geen doelveld: klik eerst in Bricks in het veld waar de tekst moet komen.');
+  if (!target) throw new Error('SmartVoice heeft geen klik in een tekstveld gezien. Klik in Bricks in het veld ' +
+    '(bijv. de S-regel) en probeer opnieuw. Lukt dat niet: klik onderaan op "Diagnose".');
   var res;
   try {
     res = await chrome.tabs.sendMessage(target.tabId, { action: 'SV_INSERT_TEXT', text: text }, { frameId: target.frameId });
@@ -530,6 +531,50 @@ chrome.storage.onChanged.addListener(function (changes, area) {
   }
 });
 
+// ── Diagnose: report what the clicked field in the page looks like ──
+
+async function runDiagnose() {
+  var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+  var tab = tabs[0];
+  if (!tab) return;
+  var requestId = Math.random().toString(36).slice(2);
+  var reports = [];
+  function onReport(msg) {
+    if (msg.action === 'SV_DIAG_REPORT' && msg.requestId === requestId) reports.push(msg.report);
+  }
+  chrome.runtime.onMessage.addListener(onReport);
+  await chrome.tabs.sendMessage(tab.id, { action: 'SV_DIAG', requestId: requestId }).catch(function () {});
+  await new Promise(function (r) { setTimeout(r, 700); });
+  chrome.runtime.onMessage.removeListener(onReport);
+
+  var stored = await chrome.storage.session.get('svTarget');
+  var lines = [
+    'SmartVoice ' + chrome.runtime.getManifest().version + ' — diagnose',
+    'Tabblad: ' + (tab.url || '').split('?')[0],
+    'Doelveld bekend: ' + (stored.svTarget ? stored.svTarget.label + ' (tab ' + (stored.svTarget.tabId === tab.id ? 'dit' : 'ander') + ')' : 'nee'),
+    'Frames met SmartVoice-script: ' + reports.length,
+  ];
+  reports.forEach(function (r, i) {
+    lines.push('');
+    lines.push('Frame ' + (i + 1) + (r.top ? ' (hoofdpagina)' : '') + ': ' + r.frame + (r.hasFocus ? ' [focus]' : ''));
+    lines.push('  Actief element: ' + (r.active.join(' > ') || '-'));
+    lines.push('  Actief is tekstveld: ' + (r.activeIsEditable ? 'ja' : 'nee'));
+    lines.push('  Onthouden veld: ' + (r.target || '-'));
+    lines.push('  Tekstvelden gevonden: ' + r.editableCount + (r.firstEditables.length ? ' — ' + r.firstEditables.join(' | ') : ''));
+  });
+  if (!reports.length) {
+    lines.push('Geen enkel frame antwoordde: het script draait niet op deze pagina. Ververs de pagina (F5).');
+  }
+  var report = lines.join('\n');
+  // Shown below the text box; the dictated text itself is left alone.
+  setStatus(report + '\n', false, {
+    label: 'Kopieer verslag',
+    onClick: function () {
+      navigator.clipboard.writeText(report).then(function () { setStatus('Verslag gekopieerd. Plak het in de chat met Claude.'); });
+    },
+  });
+}
+
 // ── Wiring ──
 
 els.mic.addEventListener('click', toggleDictation);
@@ -570,6 +615,10 @@ document.getElementById('learn-input').addEventListener('keydown', function (e) 
 document.getElementById('open-rules').addEventListener('click', function (e) {
   e.preventDefault();
   chrome.tabs.create({ url: chrome.runtime.getURL('rules/rules.html') });
+});
+document.getElementById('run-diag').addEventListener('click', function (e) {
+  e.preventDefault();
+  runDiagnose();
 });
 document.getElementById('open-settings').addEventListener('click', function (e) {
   e.preventDefault();
