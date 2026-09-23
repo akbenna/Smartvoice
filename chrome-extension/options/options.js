@@ -103,7 +103,16 @@ async function testConnection() {
     if (auth.ok) {
       // Save right away: the extension uses the stored key, not this field.
       await saveSettings();
-      showToast('Verbinding én API-sleutel OK — opgeslagen.');
+      // Check that the server actually has a key for the chosen language model.
+      var providers = await auth.json().catch(function () { return null; });
+      var llm = document.getElementById('llmProvider').value;
+      var names = { mistral: 'MISTRAL_API_KEY', anthropic: 'ANTHROPIC_API_KEY', gemini: 'GEMINI_API_KEY' };
+      if (providers && providers.llm && providers.llm.available && providers.llm.available[llm] === false) {
+        showToast('Verbinding OK, maar de server heeft geen ' + names[llm] + '. Voeg die toe in Railway ' +
+          '(en klik daar op Deploy), of kies een ander taalmodel.', 9000);
+      } else {
+        showToast('Verbinding, API-sleutel en taalmodel OK — opgeslagen.');
+      }
     } else if (auth.status === 403) {
       showToast('Server OK, maar API-sleutel klopt niet (403). Vergelijk met API_KEYS op de server.');
     } else if (auth.status === 401) {
