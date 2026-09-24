@@ -556,17 +556,22 @@
       '.p.cal .t,.p.ok .t{font-style:normal;color:#fff}.p.cal button{background:#475569}.p.ok button{display:none}' +
       '.p.ok{border-radius:12px;align-items:flex-start}.p.ok .d{margin-top:4px}.p.ok .t{white-space:normal}' +
       'button{margin-left:4px;border:0;border-radius:999px;padding:4px 10px;background:#dc2626;color:#fff;' +
-      'font:inherit;font-weight:600;cursor:pointer}.p.err button,.p.busy button{display:none}' +
+      'font:inherit;font-weight:600;cursor:pointer}.p.err .a,.p.busy .a{display:none}' +
+      '.x{background:transparent;color:#94a3b8;padding:2px 6px;margin-left:0;font-size:16px;line-height:1}' +
+      '.x:hover{color:#fff}.p button.x{background:transparent;display:inline}' +
       '</style>' +
       '<div class="p"><span class="d"></span><span class="l"></span><span class="t"></span>' +
-      '<button type="button" title="Stoppen (Alt+Shift+D)">Stop</button></div>';
+      '<button type="button" class="a" title="Stoppen (Alt+Shift+D)">Stop</button>' +
+      '<button type="button" class="x" title="Sluiten (Esc)" aria-label="Sluiten">×</button></div>';
     pill = shadow.querySelector('.p');
     pillLabel = shadow.querySelector('.l');
     pillText = shadow.querySelector('.t');
-    pillButton = shadow.querySelector('button');
+    pillButton = shadow.querySelector('.a');
     pillButton.addEventListener('click', function () {
-      chrome.runtime.sendMessage({ action: pillButton.dataset.action || 'SV_QUICK_TOGGLE' });
+      try { chrome.runtime.sendMessage({ action: pillButton.dataset.action || 'SV_QUICK_TOGGLE' }); }
+      catch (e) { hidePill(); }   // extension reloaded: nothing left to talk to
     });
+    shadow.querySelector('.x').addEventListener('click', closePill);
     document.documentElement.appendChild(host);
     pill.__host = host;
   }
@@ -591,6 +596,20 @@
   function hidePill() {
     if (pill) pill.__host.style.display = 'none';
   }
+
+  // × or Esc: always possible. While pointing at fields it stops that too;
+  // while dictating it stops the dictation.
+  function closePill() {
+    var mode = pill && pill.className;
+    hidePill();
+    try {
+      if (/\bcal\b/.test(mode)) chrome.runtime.sendMessage({ action: 'SV_CALIBRATE_CANCEL' });
+      else if (mode === 'p') chrome.runtime.sendMessage({ action: 'SV_QUICK_TOGGLE' });
+    } catch (e) { /* extension reloaded */ }
+  }
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && pill && pill.__host.style.display !== 'none' && /\bcal\b/.test(pill.className)) closePill();
+  }, true);
 
   chrome.runtime.onMessage.addListener(function (msg) {
     if (msg.action !== 'SV_PILL') return false;
