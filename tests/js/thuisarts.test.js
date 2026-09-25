@@ -66,6 +66,16 @@ test('een ontbrekende of rare tabel geeft niets terug', () => {
   assert.deepEqual(T.pagesForIcpc('R78', { paginas: [null, {}] }), []);
 });
 
+/* Corrigeert de arts de code, dan hoort de titel van de oude code niet te
+   blijven staan. De titel mag uit een ongecontroleerde regel komen: het is het
+   label van de code, geen link. */
+test('de titel bij een code komt uit de tabel, ook zonder adres', () => {
+  assert.equal(T.titelVoor('N95', TABEL), 'Spanningshoofdpijn');
+  assert.equal(T.titelVoor('R78.01', TABEL), 'Acute bronchitis');
+  assert.equal(T.titelVoor('Z99', TABEL), '');
+  assert.equal(T.titelVoor('', TABEL), '');
+});
+
 test('de zoekterm wordt veilig in het zoekadres gezet', () => {
   assert.equal(T.zoekUrl('acute bronchitis'), 'https://www.thuisarts.nl/zoeken?query=acute%20bronchitis');
   assert.ok(T.zoekUrl('<script>').indexOf('<') === -1);

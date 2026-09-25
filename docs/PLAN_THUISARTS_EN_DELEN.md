@@ -123,9 +123,20 @@ node --test tests/js/thuisarts.test.js
 
 ### In het zijpaneel
 
-Onder de SOEP-regels staat een chip `Thuisarts: Acute bronchitis ↗`; klikken
-opent de pagina, zodat de arts leest wat de patiënt gaat lezen. "Voeg toe aan
-uitleg" zet onder de B1-tekst de regel `Meer lezen: <url>`.
+Onder de SOEP-regels staat per pagina een chip `Thuisarts: Acute bronchitis ↗`;
+klikken opent de pagina, zodat de arts leest wat de patiënt gaat lezen. Naast
+elke chip staat een eigen knop "Voeg toe aan uitleg", die onder de B1-tekst de
+regel `Meer lezen: <url>` zet. Heeft een code twee pagina's, dan kiest de arts
+welke.
+
+Tonen is niet kiezen. Pas die klik maakt een pagina "gekozen", en ze blijft dat
+zolang de link in de tekst staat. Maakt de arts de uitleg opnieuw, of haalt hij
+de regel weg, dan verdwijnt ook de QR van de afdruk. Er gaat dus nooit een link
+naar de patiënt die de arts niet zelf heeft toegevoegd.
+
+Corrigeert de arts de ICPC-code, dan wisselt de titel ernaast mee naar die van
+de nieuwe code (uit de tabel), of blijft leeg. De titel van de oude code laten
+staan zou "R78 · Spanningshoofdpijn" opleveren.
 
 Twee randgevallen staan in de tekst op het scherm:
 
@@ -139,7 +150,8 @@ Twee randgevallen staan in de tekst op het scherm:
 
 ### Afdrukken met QR-code
 
-De afdruk krijgt de link als tekst én als QR-code. De code wordt in de browser
+Heeft de arts een pagina toegevoegd, dan krijgt de afdruk de link als tekst én
+als QR-code. De code wordt in de browser
 gemaakt, met `chrome-extension/lib/qrcode/` (qrcode-generator 2.0.4, MIT,
 meegeleverd zoals pdf.js). Geen externe dienst: een QR-dienst op internet ziet
 anders welke aandoening er op papier gaat.
@@ -151,6 +163,11 @@ doorverwijzingen; hij volgt een doorverwijzing niet, want of de nieuwe pagina
 nog over dezelfde aandoening gaat is geen machineoordeel. Draait wekelijks via
 `deploy/cron/smartvoice-thuisarts.cron`, vanaf de server en niet vanuit de
 browser van de arts.
+
+Het script schrijft niets in de tabel. `gecontroleerd_op` betekent "met het oog
+gezien door `door`", en een 200 van de server is dat niet: een pagina kan
+bereikbaar blijven terwijl de inhoud verschuift. Een machine die die datum
+ververst, laat een verouderde regel eruitzien als een verse controle.
 
 ### Gebruikslog
 

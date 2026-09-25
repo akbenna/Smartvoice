@@ -56,12 +56,21 @@
     return window.SVThuisartsUI ? window.SVThuisartsUI.huidigePagina() : null;
   }
 
-  /* The explanation as it leaves: with the link added when there is one. */
+  /* The explanation as it leaves. The link is in it only if the doctor added
+     it; nothing is appended here on the doctor's behalf. */
   function berichtTekst() {
-    var t = fullText();
-    var p = pagina();
-    if (p && t.indexOf(p.url) === -1) t += '\n\n' + SVThuisarts.verwijzing(p.url, 'nl');
-    return t;
+    return fullText();
+  }
+
+  /* Open the practice's own mail client. An anchor click hands mailto: to the
+     protocol handler without opening an empty tab from the side panel. */
+  function openMail(href) {
+    var a = document.createElement('a');
+    a.href = href;
+    a.rel = 'noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   }
   $('pi-copy').addEventListener('click', async function () {
     await navigator.clipboard.writeText(fullText());
@@ -147,12 +156,12 @@
       // Mail clients silently truncate longer bodies. Better on the clipboard
       // and pasted in sight than half an explanation sent.
       await navigator.clipboard.writeText(tekst);
-      window.open('mailto:?subject=' + encodeURIComponent(onderwerp), '_blank');
+      openMail('mailto:?subject=' + encodeURIComponent(onderwerp));
       setStatus('De uitleg is te lang om vooraf in te vullen en staat op het klembord. Plak hem in de mail ' +
         'en vul zelf het adres in, via de beveiligde mail van de praktijk.');
       return;
     }
-    window.open('mailto:?subject=' + encodeURIComponent(onderwerp) + '&body=' + encodeURIComponent(tekst), '_blank');
+    openMail('mailto:?subject=' + encodeURIComponent(onderwerp) + '&body=' + encodeURIComponent(tekst));
     setStatus('Mail geopend zonder ontvanger. Vul het adres zelf in, via de beveiligde mail van de praktijk.');
   });
 

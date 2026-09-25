@@ -84,6 +84,20 @@ var SVThuisarts = (function () {
     es: 'Más información (este sitio web está en neerlandés): '
   };
 
+  /**
+   * The ICPC title for a code, from any row of the table, or ''. This is the
+   * label of the code, not a link, so an unchecked row may supply it. Used when
+   * the doctor corrects the code: the title of the old code must not linger.
+   */
+  function titelVoor(code, tabel) {
+    var hoofd = normaliseer(code);
+    var rijen = (tabel && tabel.paginas) || [];
+    for (var i = 0; i < rijen.length; i++) {
+      if (rijen[i] && normaliseer(rijen[i].icpc) === hoofd && rijen[i].titel) return rijen[i].titel;
+    }
+    return '';
+  }
+
   function verwijzing(url, taal) {
     var aanhef = NEDERLANDS[taal || 'nl'] || NEDERLANDS.nl;
     return aanhef + url;
@@ -92,6 +106,7 @@ var SVThuisarts = (function () {
   return {
     normaliseer: normaliseer,
     pagesForIcpc: pagesForIcpc,
+    titelVoor: titelVoor,
     zoekUrl: zoekUrl,
     verwijzing: verwijzing,
     TALEN: NEDERLANDS

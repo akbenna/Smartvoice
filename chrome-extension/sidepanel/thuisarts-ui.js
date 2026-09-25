@@ -19,7 +19,7 @@ window.SVThuisartsUI = (function () {
 
   var $ = function (id) { return document.getElementById(id); };
   var tabel = null;
-  var gekozen = null;   // de pagina die in de uitleg gaat
+  var gekozen = null;   // the page the doctor added to the explanation
 
   // The table is a file inside the extension; nothing goes over the network.
   var geladen = fetch(chrome.runtime.getURL('lib/thuisarts-icpc.json'))
@@ -69,7 +69,8 @@ window.SVThuisartsUI = (function () {
     geladen.then(function () {
       var code = huidigeCode();
       vak.textContent = '';
-      gekozen = null;
+      // Showing a page is not choosing it. `gekozen` is only set by an explicit
+      // click below, so nothing reaches the patient that the doctor did not pick.
 
       var paginas = SVThuisarts.pagesForIcpc(code, tabel);
       if (!paginas.length) {
@@ -78,20 +79,22 @@ window.SVThuisartsUI = (function () {
         return;
       }
 
-      // The doctor reads what the patient will read: the link simply opens.
+      // One chip per page, each with its own add button: when a code has two
+      // pages (R78: the condition and "hoesten"), the doctor picks which.
       paginas.forEach(function (pagina) {
-        vak.appendChild(nieuwLink(pagina.url, 'Thuisarts: ' + pagina.titel + ' ↗',
+        var groep = document.createElement('span');
+        groep.className = 'ta-pagina';
+        // The doctor reads what the patient will read: the link simply opens.
+        groep.appendChild(nieuwLink(pagina.url, 'Thuisarts: ' + pagina.titel + ' ↗',
           'Gecontroleerd op ' + pagina.gecontroleerd_op));
+        var knop = document.createElement('button');
+        knop.className = 'btn small ta-voeg-toe';
+        knop.textContent = 'Voeg toe aan uitleg';
+        knop.title = 'Zet een regel met ' + pagina.titel + ' onder de uitleg voor de patiënt';
+        knop.addEventListener('click', function () { voegToe(pagina); });
+        groep.appendChild(knop);
+        vak.appendChild(groep);
       });
-
-      var knop = document.createElement('button');
-      knop.className = 'btn small ta-voeg-toe';
-      knop.textContent = paginas.length > 1 ? 'Voeg eerste toe aan uitleg' : 'Voeg toe aan uitleg';
-      knop.title = 'Zet een regel met deze link onder de uitleg voor de patiënt';
-      knop.addEventListener('click', function () { voegToe(paginas[0]); });
-      vak.appendChild(knop);
-
-      gekozen = paginas[0];
       vak.classList.remove('hidden');
     });
   }
@@ -143,7 +146,18 @@ window.SVThuisartsUI = (function () {
   var codeEl = $('icpc-code');
   if (codeEl) {
     codeEl.addEventListener('input', function () {
-      if (typeof lastSoep !== 'undefined' && lastSoep) lastSoep.icpc_code = huidigeCode();
+      var code = huidigeCode();
+      // The title shown next to the code belonged to the old code. Replace it
+      // with the table's title for the new one, or leave it empty: "R78 ·
+      // Spanningshoofdpijn" is worse than no title at all.
+      geladen.then(function () {
+        var titel = SVThuisarts.titelVoor(code, tabel);
+        $('icpc-titel').textContent = titel ? ' \u00b7 ' + titel : '';
+        if (typeof lastSoep !== 'undefined' && lastSoep) {
+          lastSoep.icpc_code = code;
+          lastSoep.icpc_titel = titel;
+        }
+      });
       toon();
     });
     // One line, no formatting: enter and pasted markup do not belong here.
@@ -155,5 +169,16 @@ window.SVThuisartsUI = (function () {
     });
   }
 
-  return { toon: toon, huidigePagina: function () { return gekozen; } };
+  /**
+   * The page the doctor added, for as long as its link is still in the text.
+   * Regenerating the explanation or deleting the "Meer lezen" line removes the
+   * link; then the QR on the printout should disappear with it, not linger.
+   */
+  function huidigePagina() {
+    var nl = $('pi-nl');
+    if (!gekozen || !nl || nl.value.indexOf(gekozen.url) === -1) return null;
+    return gekozen;
+  }
+
+  return { toon: toon, huidigePagina: huidigePagina };
 })();

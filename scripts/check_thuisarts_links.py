@@ -6,8 +6,7 @@ Links verlopen. Een pagina wordt hernoemd, samengevoegd of weggehaald, en dan
 wijst de extensie de patiënt stilletjes naar een 404 of, erger, naar een pagina
 over iets anders. Dit script loopt de tabel na en meldt wat er niet klopt.
 
-  python3 scripts/check_thuisarts_links.py              alleen melden
-  python3 scripts/check_thuisarts_links.py --bijwerken  controledatum verversen
+  python3 scripts/check_thuisarts_links.py
 
 Draait wekelijks vanaf de server (zie deploy/cron/smartvoice-thuisarts.cron) en
 niet vanuit de browser van de arts: dan zou elk spreekuur de hele tabel
@@ -17,8 +16,11 @@ opvraagt.
 Wat het WEL kan: zien of een adres nog bestaat en of het doorverwijst.
 Wat het NIET kan: zien of de pagina nog over de juiste aandoening gaat. Een
 doorverwijzing wordt daarom gemeld en niet gevolgd-en-goedgekeurd; dat oordeel
-blijft bij een mens. Om dezelfde reden zet `--bijwerken` alleen de datum bij
-regels die ongewijzigd goed zijn, en raakt het een verdachte regel niet aan.
+blijft bij een mens. Om dezelfde reden schrijft dit script niets in de tabel.
+`gecontroleerd_op` betekent "met het oog gezien door `door`", en een 200 van
+de server is dat niet: een pagina kan bereikbaar blijven terwijl de inhoud
+naar een andere aandoening is verschoven. Een machine die die datum ververst,
+laat een verouderde regel eruitzien als een verse controle.
 
 Afsluitcode 0 als alles goed is, 1 als er iets te bekijken valt. Zo ziet cron
 het verschil.
@@ -27,7 +29,6 @@ het verschil.
 from __future__ import annotations
 
 import argparse
-import datetime as dt
 import json
 import sys
 import urllib.error
@@ -68,9 +69,7 @@ def controleer(url: str) -> tuple[str, str]:
 
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--bijwerken", action="store_true",
-                   help="zet de controledatum van vandaag bij regels die goed zijn")
-    args = p.parse_args()
+    p.parse_args()
 
     tabel = json.loads(TABEL.read_text(encoding="utf-8"))
     rijen = [r for r in tabel["paginas"] if r.get("url")]
@@ -81,19 +80,13 @@ def main() -> int:
         print("Zie scripts/thuisarts_tabel.py; zolang de tabel leeg is toont de extensie geen link.")
         return 1
 
-    vandaag = dt.date.today().isoformat()
     gemeld = 0
     for rij in rijen:
         oordeel, toelichting = controleer(rij["url"])
         if oordeel == "goed":
-            if args.bijwerken:
-                rij["gecontroleerd_op"] = vandaag
             continue
         gemeld += 1
         print(f"{rij['icpc']:<4} {oordeel:<12} {rij['url']}  ({toelichting})")
-
-    if args.bijwerken:
-        TABEL.write_text(json.dumps(tabel, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
     print(f"\n{len(rijen)} links gecontroleerd, {gemeld} met een opmerking"
           + (f", {zonder} regels nog zonder URL" if zonder else "") + ".")
