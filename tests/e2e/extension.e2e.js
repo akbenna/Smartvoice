@@ -87,6 +87,20 @@ function check(name, cond, extra) {
   check('SOEP getoond', (await panel.$$eval('.soep-text', (e) => e.map((x) => x.textContent))).includes('Pneumonie'));
   const kaart = await panel.textContent('#soep-check');
   check('kaart heet "Onvolledig in de verslaglegging"', kaart.includes('Onvolledig in de verslaglegging') && kaart.includes('Duur'), kaart);
+  // Thuisarts: the shipped table has no URLs yet, so no link may appear. The
+  // title lookup after correcting the code can only come from the real table,
+  // loaded via chrome.runtime.getURL inside the extension.
+  check('geen Thuisarts-link zonder gecontroleerde regel',
+    (await panel.textContent('#ta')).includes('Geen Thuisarts-pagina') && (await panel.$$('.ta-chip')).length === 0);
+  await panel.click('#icpc-code');
+  await panel.keyboard.press('Control+A');
+  await panel.keyboard.type('R78');
+  await sleep(300);
+  check('gecorrigeerde ICPC-code krijgt de titel uit de tabel',
+    (await panel.textContent('#icpc-titel')).includes('Acute bronchitis'), await panel.textContent('#icpc-titel'));
+  await panel.keyboard.press('Control+A');
+  await panel.keyboard.type('R81');
+  await sleep(200);
   await panel.click('#btn-patient');
   await panel.selectOption('#pi-taal', 'ar');
   await panel.click('#pi-go');
@@ -94,6 +108,7 @@ function check(name, cond, extra) {
   const piReq = sent.find((s) => s.url.endsWith('/patient-instructions'));
   check('patiëntinstructie vraagt E+P en taal', piReq && piReq.body.p.includes('Amoxicilline') && piReq.body.taal === 'ar', piReq && piReq.body);
   check('B1 en vertaling getoond', (await panel.inputValue('#pi-nl')).includes('Uw medicijn') && (await panel.isVisible('#pi-tr')));
+  check('mailknop verborgen zolang de praktijk hem niet aanzet', await panel.isHidden('#pi-mail'));
 
   console.log('Brieven');
   await panel.click('.view-tab[data-view="letters"]');
