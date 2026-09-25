@@ -42,14 +42,21 @@ Laat het oude domein staan tot stap 4 klaar is.
 
 ## 4. Railway (API)
 
-Zet `CORS_ALLOWED_ORIGINS` op beide adressen, zoals in `.env.production`:
+De service die de extensie bedient draait `services.cloud_api`
+(`Dockerfile.railway`). Die laat elke herkomst toe, omdat de extensie vanaf
+`chrome-extension://` aanroept, en leest `CORS_ALLOWED_ORIGINS` niet. Voor die
+service hoeft er aan CORS dus niets te veranderen.
+
+`CORS_ALLOWED_ORIGINS` geldt alleen voor `services/api`, de backend van de
+review-app op Vercel. Draait die ergens, zet daar dan beide adressen:
 
 ```
 CORS_ALLOWED_ORIGINS=https://vitascribe.vercel.app,https://smartvoice-nine.vercel.app
 ```
 
-De service mag een nieuwe naam krijgen. **Het adres van de API liever niet
-veranderen**, of alleen door een nieuw adres náást het oude te zetten. Dat
+De service en het project mogen een nieuwe naam krijgen. **Het adres van de API
+blijft `smartvoice-production.up.railway.app`**, ook al staat de oude naam erin. Wil je ooit een ander adres,
+zet het dan náást het oude. Dat
 adres staat op twee plekken die niet in deze repo zitten: in de instellingen van
 de extensie op elke werkplek (`apiUrl`), en in de beleidswaarde
 `ExtensionInstallForcelist` (`<id>;<adres>/extension/update.xml`). Wie het adres
@@ -91,7 +98,8 @@ Pas als geen werkplek, beleid of omgeving de oude naam nog gebruikt:
   `services/cloud_api/main.py`, met de bijbehorende proef;
 - de terugval op `SMARTVOICE_ROOT` in `scripts/run_learning_jobs.sh`.
 
-`git grep -i smartvoice` laat dan alleen dit document nog zien.
+`git grep -i smartvoice` laat dan alleen dit document nog zien, en het API-adres
+`smartvoice-production.up.railway.app`, dat met opzet blijft.
 
 ## Wat bewust niet hernoemd is
 
