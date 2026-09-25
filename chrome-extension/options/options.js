@@ -3,7 +3,9 @@
  * Manages extension settings stored in chrome.storage.sync.
  */
 
-var FIELDS = ['apiUrl', 'apiKey', 'sttProvider', 'llmProvider', 'micDevice'];
+// delenPerMail is off by default: mailing is a decision of the practice, not
+// a default of the software.
+var FIELDS = ['apiUrl', 'apiKey', 'sttProvider', 'llmProvider', 'micDevice', 'delenPerMail'];
 
 var SELECTOR_FIELDS = {
   selJournaal: 'journaal',

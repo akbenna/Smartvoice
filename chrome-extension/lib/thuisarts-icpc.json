@@ -1,0 +1,310 @@
+{
+  "toelichting": "Koppeling van ICPC-code naar een pagina op Thuisarts.nl. De arts legt de code vast; deze tabel zoekt daar de pagina bij. Er komt geen taalmodel aan te pas, want een pagina kiezen op grond van het dictaat is een diagnose stellen, en dat sluit data_policy uit. Een regel telt pas mee als 'url' en 'gecontroleerd_op' allebei gevuld zijn: een ongecontroleerde link is in dit vak gevaarlijker dan geen link.",
+  "invullen": "Zoek de pagina op thuisarts.nl, plak het adres in 'url', zet je initialen in 'door' en de dag van controle in 'gecontroleerd_op' (JJJJ-MM-DD). Een code mag naar meer dan een pagina wijzen; dan kiest de arts. Zie scripts/thuisarts_tabel.py en scripts/check_thuisarts_links.py.",
+  "bron": "Nog na te vragen bij het NHG: bestaat er een officiele koppeling ICPC naar Thuisarts, en onder welke licentie. Het NHG beheert Thuisarts.nl en publiceert de ICPC-tabellen voor het HIS, waaronder tabel 65 met patientvriendelijke titels. Bestaat die koppeling, gebruik haar dan en vervang deze tabel; bestaat ze niet, dan blijft dit handwerk.",
+  "versie": "2026-09-25",
+  "paginas": [
+    {
+      "icpc": "A04",
+      "titel": "Moeheid/zwakte",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "D12",
+      "titel": "Obstipatie",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "D73",
+      "titel": "Gastro-enteritis vermoedelijk infectieus",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "D87",
+      "titel": "Maagfunctiestoornis",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "F70",
+      "titel": "Conjunctivitis infectieus",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "H70",
+      "titel": "Otitis externa",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "H71",
+      "titel": "Acute otitis media/myringitis",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "H81",
+      "titel": "Overmatig cerumen",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "K74",
+      "titel": "Ischemische hartziekte met angina",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "K77",
+      "titel": "Decompensatio cordis/hartfalen",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "K78",
+      "titel": "Boezemfibrilleren/-fladderen",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "K86",
+      "titel": "Hypertensie zonder orgaanbeschadiging",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "L03",
+      "titel": "Lage-rugklachten zonder uitstraling",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "L77",
+      "titel": "Verstuiking/distorsie enkel",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "L86",
+      "titel": "Rugsyndroom met uitstraling",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "L90",
+      "titel": "Artrose knie",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "L92",
+      "titel": "Schoudersyndroom",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "N17",
+      "titel": "Vertigo/duizeligheid",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "N89",
+      "titel": "Migraine",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "N95",
+      "titel": "Spanningshoofdpijn",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "P06",
+      "titel": "Slapeloosheid",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "P15",
+      "titel": "Chronisch alcoholmisbruik",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "P17",
+      "titel": "Tabaksmisbruik",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "P74",
+      "titel": "Angststoornis",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "P76",
+      "titel": "Depressie",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "P78",
+      "titel": "Neurasthenie/surmenage",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "R74",
+      "titel": "Acute infectie bovenste luchtwegen",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "R76",
+      "titel": "Acute tonsillitis",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "R78",
+      "titel": "Acute bronchitis/bronchiolitis",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "R81",
+      "titel": "Pneumonie",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "R95",
+      "titel": "COPD",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "R96",
+      "titel": "Astma",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "R97",
+      "titel": "Allergische rhinitis",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "S74",
+      "titel": "Dermatomycose",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "S84",
+      "titel": "Impetigo",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "S87",
+      "titel": "Constitutioneel eczeem",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "S88",
+      "titel": "Contacteczeem/andere dermatitis",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "T82",
+      "titel": "Adipositas",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "T86",
+      "titel": "Verworven hypothyroïdie",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "T90",
+      "titel": "Diabetes mellitus type 2",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "T93",
+      "titel": "Vetstofwisselingsstoornis",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "U71",
+      "titel": "Cystitis/urineweginfectie",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "icpc": "X72",
+      "titel": "Candidiasis genitalis vrouw",
+      "url": null,
+      "gecontroleerd_op": null,
+      "door": null
+    }
+  ],
+  "uitzonderingen": []
+}
