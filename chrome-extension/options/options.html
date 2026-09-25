@@ -103,25 +103,17 @@
   </div>
 
   <div class="card">
-    <h2>AI Providers</h2>
-    <div class="field">
-      <label for="sttProvider">Spraak-naar-tekst (STT)</label>
-      <select id="sttProvider">
-        <option value="deepgram">Deepgram Nova-2 (beste Nederlands)</option>
-        <option value="groq">Groq Whisper (gratis tier, snel)</option>
-        <option value="openai">OpenAI Whisper</option>
-      </select>
-      <p class="hint">Deepgram is het nauwkeurigst voor Nederlands, Groq is gratis</p>
-    </div>
-    <div class="field">
-      <label for="llmProvider">Taalmodel (LLM)</label>
-      <select id="llmProvider">
-        <option value="mistral">Mistral Small (EU-gevestigd, goedkoop)</option>
-        <option value="anthropic">Claude Haiku (beste kwaliteit)</option>
-        <option value="gemini">Gemini Flash 2.0 (goedkoopst)</option>
-      </select>
-      <p class="hint">Mistral is EU-gevestigd (beste AVG). Claude Haiku levert de beste medische kwaliteit.</p>
-    </div>
+    <h2>Waar gaan de gegevens heen</h2>
+    <p class="hint" id="policy-info">Dit bepaalt de server, niet de extensie (AVG-afspraak van de praktijk). Klik op "Test verbinding" om de actuele instelling te zien.</p>
+    <ul class="hint" style="margin:6px 0 0 16px;padding:0">
+      <li>Spraak: Deepgram, EU-eindpunt, zonder opslag of training</li>
+      <li>Dictaat, SOEP, consultverslag, schermafdrukken, patiëntinstructie: Mistral (EU)</li>
+      <li>Brieven, na verwijdering van naam, BSN, adres en datums: Claude</li>
+    </ul>
+    <!-- Kept for compatibility; the server ignores these for patient data. -->
+    <select id="sttProvider" hidden><option value="deepgram">Deepgram</option></select>
+    <select id="llmProvider" hidden><option value="mistral">Mistral</option></select>
+  </div>
   </div>
 
   <div class="card">

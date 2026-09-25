@@ -55,6 +55,13 @@ async function checkMicPermission() {
 }
 
 async function startRecording() {
+  // KNMG (2026): consultopname alleen met toestemming van de patiënt.
+  var consent = document.getElementById('consent-recording');
+  if (consent && !consent.checked) {
+    showStatus('Vink eerst aan dat de patiënt toestemming geeft voor de opname.', true);
+    consent.focus();
+    return;
+  }
   // Check of microfoontoestemming al is verleend.
   // In een popup context kan de toestemmingsdialoog de popup sluiten,
   // waardoor "Permission dismissed" optreedt. Stuur de gebruiker naar
@@ -194,6 +201,7 @@ async function sendAudioToAPI(blob, mimeType) {
     var formData = new FormData();
     var ext = mimeType.includes('webm') ? 'webm' : 'wav';
     formData.append('audio', blob, 'consult.' + ext);
+    formData.append('consent', 'true');
     if (config.sttProvider) formData.append('stt_provider', config.sttProvider);
     if (config.llmProvider) formData.append('llm_provider', config.llmProvider);
 

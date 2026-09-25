@@ -1,0 +1,33 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r tests/requirements-cloud.txt
+      - name: Cloud API (dicteren, SOEP, brieven, AVG-beleid)
+        run: >
+          pytest -q tests/test_cloud_dictation.py tests/test_cloud_pipeline.py
+          tests/test_cloud_letters.py tests/test_cloud_policy.py tests/test_vocabulary.py
+
+  extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Syntaxcontrole
+        run: for f in chrome-extension/*/*.js; do node --check "$f"; done
+      - run: npm install --no-save playwright@1.56 && npx playwright install --with-deps chromium
+      - name: End-to-end in Chromium (nagebootst Bricks, gesimuleerde server)
+        run: node tests/e2e/extension.e2e.js

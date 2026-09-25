@@ -60,7 +60,7 @@ async def complete(
 
     if provider == "mistral":
         return await _complete_mistral(
-            system_prompt, user_prompt, json_mode, max_tokens
+            system_prompt, user_prompt, json_mode, max_tokens, quality
         )
     elif provider == "anthropic":
         return await _complete_anthropic(
@@ -76,16 +76,18 @@ async def complete(
 
 
 async def _complete_mistral(
-    system_prompt: str, user_prompt: str, json_mode: bool, max_tokens: int,
+    system_prompt: str, user_prompt, json_mode: bool, max_tokens: int,
+    quality: bool = False,
 ) -> str:
-    """Complete using Mistral API (EU-based)."""
+    """Complete using Mistral API (EU-based). user_prompt may be a list of
+    content parts (text and image_url) for the multimodal model."""
     config = get_config()
     api_key = config.llm.mistral_api_key
     if not api_key:
         raise ValueError("MISTRAL_API_KEY niet geconfigureerd.")
 
     body = {
-        "model": config.llm.mistral_model,
+        "model": config.llm.mistral_quality_model if quality else config.llm.mistral_model,
         "temperature": config.llm.temperature,
         "max_tokens": max_tokens,
         "messages": [
@@ -105,6 +107,10 @@ async def _complete_mistral(
             },
             json=body,
         )
+        if response.status_code >= 400:
+            logger.error("llm.mistral.error", status=response.status_code, body=response.text[:300])
+            if response.status_code == 429:
+                raise ValueError("Mistral: limiet bereikt (429). Controleer het abonnement.")
         response.raise_for_status()
         data = response.json()
 
@@ -322,3 +328,67 @@ async def stream_anthropic(
                         raise ValueError("Het taalmodel weigerde dit verzoek.")
                 elif event.get("type") == "error":
                     raise ValueError(event.get("error", {}).get("message", "Onbekende fout"))
+
+
+async def stream_mistral(system_prompt: str, user_content, max_tokens: int, quality: bool = False):
+    """Stream Mistral's answer as text deltas (EU-hosted)."""
+    config = get_config()
+    api_key = config.llm.mistral_api_key
+    if not api_key:
+        raise ValueError("MISTRAL_API_KEY niet geconfigureerd.")
+    body = {
+        "model": config.llm.mistral_quality_model if quality else config.llm.mistral_model,
+        "temperature": config.llm.temperature,
+        "max_tokens": max_tokens,
+        "stream": True,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content},
+        ],
+    }
+    logger.info("llm.mistral.stream", model=body["model"])
+    import json as _json
+    async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=15.0)) as client:
+        async with client.stream(
+            "POST", "https://api.mistral.ai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json=body,
+        ) as response:
+            if response.status_code >= 400:
+                detail = (await response.aread()).decode("utf-8", "replace")[:300]
+                logger.error("llm.mistral.error", status=response.status_code, body=detail)
+                raise ValueError(f"Taalmodel gaf fout {response.status_code}.")
+            async for line in response.aiter_lines():
+                if not line.startswith("data: "):
+                    continue
+                payload = line[6:].strip()
+                if payload == "[DONE]":
+                    break
+                try:
+                    event = _json.loads(payload)
+                except ValueError:
+                    continue
+                for choice in event.get("choices", []):
+                    piece = (choice.get("delta") or {}).get("content")
+                    if isinstance(piece, str) and piece:
+                        yield piece
+
+
+def image_part(provider: str, media_type: str, data_b64: str) -> dict:
+    """An image content part in the format of the given provider."""
+    if provider == "mistral":
+        return {"type": "image_url", "image_url": f"data:{media_type};base64,{data_b64}"}
+    return {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": data_b64}}
+
+
+def text_part(provider: str, text: str) -> dict:
+    return {"type": "text", "text": text}
+
+
+def stream_llm(provider: str, system_prompt: str, user_content, max_tokens: int, quality: bool = False):
+    """Stream from the chosen provider (mistral | anthropic)."""
+    if provider == "mistral":
+        return stream_mistral(system_prompt, user_content, max_tokens=max_tokens, quality=quality)
+    if provider == "anthropic":
+        return stream_anthropic(system_prompt, user_content, max_tokens=max_tokens, quality=quality)
+    raise ValueError(f"Onbekende LLM provider: {provider}")

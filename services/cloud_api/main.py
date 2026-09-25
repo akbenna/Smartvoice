@@ -28,6 +28,7 @@ from fastapi import (
     WebSocket,
 )
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, Response
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
@@ -35,7 +36,8 @@ from .auth import verify_api_key
 from .config import get_config
 from .dictation import relay_dictation
 from .letters import router as letters_router
-from . import llm_service
+from .patient_info import router as patient_router
+from . import audit, data_policy, llm_service
 from .medical_vocabulary import (
     add_custom_correction,
     correct_transcript_full,
@@ -109,7 +111,83 @@ async def health():
         "version": "1.0.0",
         "stt_provider": config.stt.default_provider,
         "llm_provider": config.llm.default_provider,
+        "data_policy": data_policy.summary(),
     }
+
+
+@app.get("/extension/update.xml")
+async def extension_update_manifest():
+    """Update manifest for Edge/Chrome ExtensionInstallForcelist (self-hosted).
+    Serves EXTENSION_DIST_DIR/update.xml written by scripts/pack_extension.sh."""
+    dist = os.getenv("EXTENSION_DIST_DIR", "")
+    path = os.path.join(dist, "update.xml") if dist else ""
+    if not path or not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail="Geen extensiepakket gepubliceerd.")
+    with open(path, encoding="utf-8") as f:
+        return Response(content=f.read(), media_type="application/xml")
+
+
+@app.get("/extension/smartvoice.crx")
+async def extension_package():
+    dist = os.getenv("EXTENSION_DIST_DIR", "")
+    path = os.path.join(dist, "smartvoice.crx") if dist else ""
+    if not path or not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail="Geen extensiepakket gepubliceerd.")
+    with open(path, "rb") as f:
+        return Response(content=f.read(), media_type="application/x-chrome-extension")
+
+
+@app.get("/health/deep")
+async def health_deep(token: str = ""):
+    """Checks the services dictation and letters depend on, without sending
+    any patient data or using model tokens: opens (and closes) a Deepgram EU
+    connection and lists the models of the language-model providers.
+    For an uptime monitor; set HEALTH_TOKEN and call /health/deep?token=..."""
+    expected = os.getenv("HEALTH_TOKEN", "")
+    if expected and token != expected:
+        raise HTTPException(status_code=403, detail="Ongeldig token.")
+    from .dictation import build_deepgram_url, _default_connect
+    cfg = get_config()
+    checks = {}
+
+    async def check_deepgram():
+        if not cfg.stt.deepgram_api_key:
+            return "geen sleutel"
+        ws = await _default_connect(build_deepgram_url(cfg), cfg.stt.deepgram_api_key)
+        try:
+            await ws.send('{"type": "CloseStream"}')
+        finally:
+            await ws.close()
+        return "ok"
+
+    async def check_http(url, headers):
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.get(url, headers=headers)
+        return "ok" if r.status_code == 200 else f"fout {r.status_code}"
+
+    async def run(name, coro):
+        try:
+            checks[name] = await coro
+        except Exception as exc:  # report, never raise
+            checks[name] = f"fout: {str(exc)[:80]}"
+
+    await run("deepgram_eu", check_deepgram())
+    if cfg.llm.mistral_api_key:
+        await run("mistral", check_http("https://api.mistral.ai/v1/models",
+                                        {"Authorization": f"Bearer {cfg.llm.mistral_api_key}"}))
+    else:
+        checks["mistral"] = "geen sleutel"
+    if cfg.llm.anthropic_api_key:
+        await run("anthropic", check_http("https://api.anthropic.com/v1/models",
+                                          {"x-api-key": cfg.llm.anthropic_api_key,
+                                           "anthropic-version": "2023-06-01"}))
+    else:
+        checks["anthropic"] = "geen sleutel"
+
+    needed = ["deepgram_eu", data_policy.phi_llm_provider(), data_policy.letters_llm_provider()]
+    ok = all(checks.get(n) == "ok" for n in needed)
+    return JSONResponse(status_code=200 if ok else 503,
+                        content={"status": "ok" if ok else "storing", "checks": checks})
 
 
 # ── Main processing endpoint ──
@@ -119,10 +197,19 @@ async def process_consult(
     audio: UploadFile = File(..., description="Audio bestand (webm, mp3, wav, m4a)"),
     stt_provider: str = Form(default=None, description="STT provider override"),
     llm_provider: str = Form(default=None, description="LLM provider override"),
-    _api_key: str = Depends(verify_api_key),
+    consent: bool = Form(default=False, description="Patiënt gaf toestemming voor opname"),
+    user: str = Depends(verify_api_key),
 ):
     """Process a consultation audio recording through the full pipeline."""
     start_time = time.time()
+    # KNMG (2026): recording a consultation requires the patient's consent.
+    if os.getenv("REQUIRE_RECORDING_CONSENT", "true").lower() == "true" and not consent:
+        audit.log_event(user, "consult.refused", status="geen_toestemming")
+        raise HTTPException(
+            status_code=400,
+            detail="Toestemming van de patiënt voor de opname is niet bevestigd. Werk de extensie bij.",
+        )
+    audit.log_event(user, "consult.process", consent=True)
 
     # Validate file size
     max_size = config.max_audio_size_mb * 1024 * 1024
@@ -201,6 +288,7 @@ DICTAAT_MAX_CHARS = 20000
 
 
 app.include_router(letters_router)
+app.include_router(patient_router)
 
 
 @app.websocket("/api/v1/dictation/stream")
@@ -218,12 +306,14 @@ class DictationProcessRequest(BaseModel):
 @app.post("/api/v1/dictation/process")
 async def process_dictation(
     body: DictationProcessRequest,
-    _api_key: str = Depends(verify_api_key),
+    user: str = Depends(verify_api_key),
 ):
     """Dictaat licht opschonen (clean) of omzetten naar een SOEP-regel (soep)."""
     text = body.text.strip()
     if not text:
         raise HTTPException(status_code=400, detail="Leeg dictaat.")
+    audit.log_event(user, "dictation.process", mode=body.mode, chars=len(text),
+                    provider=data_policy.phi_llm_provider())
 
     start_time = time.time()
     try:
@@ -231,7 +321,7 @@ async def process_dictation(
             cleaned = await llm_service.complete(
                 system_prompt=DICTAAT_OPSCHONEN_SYSTEM_PROMPT,
                 user_prompt=DICTAAT_OPSCHONEN_USER_TEMPLATE.format(dictaat=text),
-                provider=body.llm_provider,
+                provider=data_policy.phi_llm_provider(body.llm_provider),
                 max_tokens=DICTAAT_OPSCHONEN_MAX_TOKENS,
             )
             result = {"mode": "clean", "text": cleaned.strip()}
@@ -239,7 +329,7 @@ async def process_dictation(
             raw = await llm_service.complete(
                 system_prompt=DICTAAT_SOEP_SYSTEM_PROMPT,
                 user_prompt=DICTAAT_SOEP_USER_TEMPLATE.format(dictaat=text),
-                provider=body.llm_provider,
+                provider=data_policy.phi_llm_provider(body.llm_provider),
                 json_mode=True,
                 max_tokens=DICTAAT_SOEP_MAX_TOKENS,
                 quality=True,

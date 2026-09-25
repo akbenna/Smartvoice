@@ -31,7 +31,8 @@ from urllib.parse import urlencode
 import structlog
 from fastapi import WebSocket, WebSocketDisconnect
 
-from .auth import is_valid_api_key
+from . import audit
+from .auth import is_valid_api_key, user_for_key
 from .config import AppConfig, get_config
 from .medical_vocabulary import MEDICATION_CORRECTIONS, correct_transcript_full
 
@@ -52,6 +53,14 @@ UPSTREAM_CLOSE_TIMEOUT_SECS = 5.0
 _SPOKEN_COMMANDS = [
     (re.compile(r"[\s,.]*\bnieuwe alinea\b[\s,.]*", re.IGNORECASE), "\n\n"),
     (re.compile(r"[\s,.]*\bnieuwe regel\b[\s,.]*", re.IGNORECASE), "\n"),
+    # Spoken punctuation. "38 komma 5" is a number, not a comma.
+    (re.compile(r"(\d)\s+komma\s+(\d)", re.IGNORECASE), r"\1,\2"),
+    (re.compile(r"[\s,.]*\bdubbele punt\b[\s,.]*", re.IGNORECASE), ": "),
+    (re.compile(r"[\s,.]*\bpuntkomma\b[\s,.]*", re.IGNORECASE), "; "),
+    (re.compile(r"[\s,.]*\bvraagteken\b[\s,.]*", re.IGNORECASE), "? "),
+    (re.compile(r"[\s,.]*\bkomma\b[\s,.]*", re.IGNORECASE), ", "),
+    # "punt" only as the last word of a segment ("McBurney punt" stays).
+    (re.compile(r"[\s,]*\bpunt\b[\s.]*$", re.IGNORECASE), ". "),
 ]
 
 
@@ -147,6 +156,8 @@ def build_deepgram_url(cfg: AppConfig, user_terms: Optional[List[str]] = None,
         ("smart_format", "true"),
         ("interim_results", "true"),
         ("endpointing", str(cfg.dictation.endpointing_ms)),
+        # AVG: audio is not kept or used for training (Model Improvement Program off).
+        ("mip_opt_out", "true"),
     ]
     # Keyterm prompting is a Nova-3 feature and billed as an add-on.
     if (token_budget > 0 and cfg.dictation.keyterms_enabled
@@ -159,7 +170,9 @@ def apply_spoken_commands(text: str) -> str:
     """Turn spoken layout commands ("nieuwe regel") into line breaks."""
     for pattern, replacement in _SPOKEN_COMMANDS:
         text = pattern.sub(replacement, text)
-    return text
+    text = re.sub(r"[ \t]+([,.;:?])", r"\1", text)      # no space before punctuation
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    return text.rstrip(" ") if not text.endswith("\n") else text
 
 
 def parse_deepgram_message(raw: str) -> Optional[Dict[str, Any]]:
@@ -266,6 +279,7 @@ async def relay_dictation(
         return
 
     logger.info("dictation.start", model=cfg.dictation.deepgram_model)
+    audit.log_event(user_for_key(str(auth.get("api_key") or "")) or "onbekend", "dictation.stream")
     await _send_json(ws, {"type": "ready"})
 
     async def client_to_upstream() -> None:

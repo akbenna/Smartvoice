@@ -27,6 +27,8 @@ async function callCloudAPI(base64Audio, mimeType) {
   const ext = mimeType.includes('webm') ? 'webm' : 'wav';
   const formData = new FormData();
   formData.append('audio', blob, 'consult.' + ext);
+  // Recording only starts after the consent box is ticked (popup / widget).
+  formData.append('consent', 'true');
   if (config.sttProvider) formData.append('stt_provider', config.sttProvider);
   if (config.llmProvider) formData.append('llm_provider', config.llmProvider);
 
@@ -374,6 +376,16 @@ const SOEP_STEPS = [
 ];
 let calib = null;   // { tabId, host, step, result }
 
+// The service worker is stopped after ~30 s idle; keep the calibration in
+// session storage so "Overslaan" and field clicks still work afterwards.
+async function loadCalib() {
+  if (!calib) calib = (await chrome.storage.session.get('svCalib')).svCalib || null;
+  return calib;
+}
+function saveCalib() {
+  return calib ? chrome.storage.session.set({ svCalib: calib }) : chrome.storage.session.remove('svCalib');
+}
+
 async function hostOfTab(tabId) {
   try { return new URL((await chrome.tabs.get(tabId)).url).host; } catch (e) { return null; }
 }
@@ -389,14 +401,33 @@ function broadcastCalibrate(tabId, active) {
 
 function calibPrompt() {
   const step = SOEP_STEPS[calib.step];
-  pill(calib.tabId, 'calibrate', step.label, { label: 'Overslaan', action: 'SV_CALIBRATE_SKIP' });
+  pill(calib.tabId, 'calibrate', step.label, { label: 'Overslaan', action: 'SV_CALIBRATE_SKIP', close: true });
+}
+
+// Stop pointing at fields; fields picked so far are kept.
+async function calibCancel(tabId) {
+  await loadCalib();
+  const target = calib ? calib.tabId : tabId;
+  if (calib && Object.keys(calib.result).length) {
+    const { svSoepFields } = await chrome.storage.local.get('svSoepFields');
+    const all = svSoepFields || {};
+    all[calib.host] = Object.assign({}, all[calib.host] || {}, calib.result);
+    await chrome.storage.local.set({ svSoepFields: all });
+  }
+  calib = null;
+  await saveCalib();
+  if (target !== undefined && target !== null) {
+    broadcastCalibrate(target, false);
+    pill(target, 'idle');
+  }
 }
 
 async function calibAdvance() {
   calib.step += 1;
-  if (calib.step < SOEP_STEPS.length) { calibPrompt(); return; }
+  if (calib.step < SOEP_STEPS.length) { await saveCalib(); calibPrompt(); return; }
   const { tabId, host, result } = calib;
   calib = null;
+  await saveCalib();
   broadcastCalibrate(tabId, false);
   const { svSoepFields } = await chrome.storage.local.get('svSoepFields');
   const all = svSoepFields || {};
@@ -410,6 +441,7 @@ async function startCalibration(tabId) {
   const host = await hostOfTab(tabId);
   if (!host) return { ok: false, error: 'Open eerst Bricks in dit tabblad.' };
   calib = { tabId, host, step: 0, result: {} };
+  await saveCalib();
   broadcastCalibrate(tabId, true);
   calibPrompt();
   return { ok: true };
@@ -454,13 +486,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       startCalibration(msg.tabId).then(sendResponse);
       return true;
     case 'SV_CALIBRATE_PICK':
-      if (calib && sender.tab && sender.tab.id === calib.tabId) {
-        calib.result[SOEP_STEPS[calib.step].key] = msg.desc;
-        calibAdvance();
-      }
+      loadCalib().then((c) => {
+        if (c && sender.tab && sender.tab.id === c.tabId) {
+          c.result[SOEP_STEPS[c.step].key] = msg.desc;
+          calibAdvance();
+        }
+      });
       return false;
     case 'SV_CALIBRATE_SKIP':
-      if (calib) calibAdvance();
+      loadCalib().then((c) => {
+        if (c) calibAdvance();
+        else calibCancel(sender.tab && sender.tab.id);   // stale pill: clear it
+      });
+      return false;
+    case 'SV_CALIBRATE_CANCEL':
+      calibCancel(sender.tab && sender.tab.id);
       return false;
     case 'SV_FILL_REPORT': {
       const set = fillWaiters.get(msg.requestId);

@@ -15,7 +15,7 @@ from typing import Dict, List, Optional
 
 import structlog
 
-from . import llm_service, stt_service
+from . import data_policy, llm_service, stt_service
 from .medical_vocabulary import correct_transcript_full, CorrectionStats
 from .prompts import (
     NAZORG_SYSTEM_PROMPT,
@@ -102,6 +102,9 @@ async def process_consultation(
     4. Detect red flags (LLM)
     """
     result = PipelineResult()
+    # AVG: the browser cannot pick a non-EU service for patient data.
+    stt_provider = data_policy.stt_provider(stt_provider)
+    llm_provider = data_policy.phi_llm_provider(llm_provider)
 
     # ── Step 1: Transcription ──
     logger.info("pipeline.step", step="transcription")
@@ -191,7 +194,9 @@ async def process_consultation(
         nazorg_data = _parse_json_response(nazorg_response)
         result.decisief = str(nazorg_data.get("decisief", "")).strip().strip('"').strip("'")
         result.detection = DetectionResult(
-            rode_vlaggen=nazorg_data.get("rode_vlaggen", []),
+            # MDR: no clinical alarm signals unless explicitly enabled.
+            rode_vlaggen=(nazorg_data.get("rode_vlaggen", [])
+                          if data_policy.clinical_decision_support() else []),
             ontbrekende_info=nazorg_data.get("ontbrekende_info", []),
         )
     except Exception as e:

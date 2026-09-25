@@ -145,6 +145,12 @@ async function startRecording() {
     showNotification(STALE_PAGE_MESSAGE);
     return;
   }
+  // KNMG (2026): consultopname alleen met toestemming van de patiënt.
+  var consentBox = document.getElementById('sv-consent');
+  if (consentBox && !consentBox.checked) {
+    showNotification('Vink eerst aan dat de patiënt toestemming geeft voor de opname.');
+    return;
+  }
 
   // Pre-check microfoontoestemming
   try {
@@ -224,6 +230,7 @@ async function sendAudioToAPI(blob, mimeType) {
     var formData = new FormData();
     var ext = mimeType.includes('webm') ? 'webm' : 'wav';
     formData.append('audio', blob, 'consult.' + ext);
+    formData.append('consent', 'true');
     if (config.sttProvider) formData.append('stt_provider', config.sttProvider);
     if (config.llmProvider) formData.append('llm_provider', config.llmProvider);
 
@@ -297,6 +304,7 @@ function createWidget() {
       // State: Idle
       '<div class="sv-body" id="sv-state-idle">' +
         '<p class="sv-hint">Klik om het consult op te nemen</p>' +
+        '<label class="sv-consent"><input type="checkbox" id="sv-consent"> Patiënt geeft toestemming voor opname en AI-verslag</label>' +
         '<button id="sv-btn-record" class="sv-btn sv-btn-record">' +
           '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>' +
           ' Start opname' +

@@ -1,11 +1,21 @@
 """
 SmartVoice Cloud API - Authentication
 
-Simple API key authentication via X-API-Key header.
-Dev mode: no keys configured = allow all requests.
+API key authentication via the X-API-Key header.
+
+Keys:
+  API_USERS  "naam:sleutel,naam2:sleutel2"  one key per user (preferred);
+             the name appears in the usage log, so access can be traced and
+             one workplace can be switched off without touching the others.
+  API_KEYS   "sleutel1,sleutel2"            legacy shared keys (user "gedeeld").
+Dev mode: no keys configured at all = allow all requests (user "dev").
 """
 
 from __future__ import annotations
+
+import hmac
+import os
+from typing import Dict, Optional
 
 from fastapi import HTTPException, Security
 from fastapi.security import APIKeyHeader
@@ -15,27 +25,42 @@ from .config import get_config
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
+def _key_table() -> Dict[str, str]:
+    """key -> user name."""
+    table: Dict[str, str] = {}
+    for entry in (os.getenv("API_USERS") or "").split(","):
+        if ":" in entry:
+            name, key = entry.split(":", 1)
+            if name.strip() and key.strip():
+                table[key.strip()] = name.strip()
+    for key in get_config().api_keys.split(","):
+        if key.strip():
+            table.setdefault(key.strip(), "gedeeld")
+    return table
+
+
+def user_for_key(api_key: str) -> Optional[str]:
+    """User name for a key, "dev" in dev mode, None when the key is invalid."""
+    table = _key_table()
+    if not table:
+        return "dev"
+    for key, name in table.items():
+        if api_key and hmac.compare_digest(key, api_key):
+            return name
+    return None
+
+
 def is_valid_api_key(api_key: str) -> bool:
-    """Check a key against API_KEYS. No keys configured = dev mode (allow all)."""
-    valid_keys = {k.strip() for k in get_config().api_keys.split(",") if k.strip()}
-    return not valid_keys or api_key in valid_keys
+    return user_for_key(api_key) is not None
 
 
-async def verify_api_key(
-    api_key: str = Security(api_key_header),
-) -> str:
-    """Validate API key. No keys configured = dev mode (allow all)."""
-    config = get_config()
-    valid_keys = {k.strip() for k in config.api_keys.split(",") if k.strip()}
-
-    # Dev mode: no keys configured, allow everything
-    if not valid_keys:
-        return "dev-mode"
-
+async def verify_api_key(api_key: str = Security(api_key_header)) -> str:
+    """Validate the key and return the user name (for the usage log)."""
+    if not _key_table():
+        return "dev"
     if not api_key:
         raise HTTPException(status_code=401, detail="API sleutel ontbreekt.")
-
-    if api_key not in valid_keys:
+    user = user_for_key(api_key)
+    if user is None:
         raise HTTPException(status_code=403, detail="Ongeldige API sleutel.")
-
-    return api_key
+    return user
