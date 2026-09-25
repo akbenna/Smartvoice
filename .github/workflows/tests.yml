@@ -19,6 +19,7 @@ jobs:
           pytest -q tests/test_cloud_dictation.py tests/test_cloud_pipeline.py
           tests/test_cloud_letters.py tests/test_cloud_policy.py tests/test_vocabulary.py
           tests/test_cloud_thuisarts.py tests/test_cloud_extension_download.py
+          tests/test_pack_extension.py
 
   extension:
     runs-on: ubuntu-latest
