@@ -52,7 +52,16 @@ function check(name, cond, extra) {
     if (url.endsWith('/patient-instructions')) return r.fulfill({ contentType: 'application/json', body: JSON.stringify({ nl: 'Uw medicijn\nAmoxicilline 500 mg, 3 keer per dag.', vertaling: 'دواؤك', taal: 'Arabisch' }) });
     return r.fulfill({ status: 404, body: '' });
   });
-  const sw = ctx.serviceWorkers()[0] || await ctx.waitForEvent('serviceworker');
+  // The worker can be reported before its extension bindings are installed. On
+  // a slow runner chrome.storage is then still undefined and the first call
+  // throws, although nothing is wrong with the extension. Wait for the bindings
+  // instead of racing them.
+  const isExt = (w) => w.url().startsWith('chrome-extension://');
+  const sw = ctx.serviceWorkers().find(isExt) || await ctx.waitForEvent('serviceworker', isExt);
+  for (let i = 0; i < 100; i++) {
+    if (await sw.evaluate(() => !!(self.chrome && chrome.storage && chrome.storage.sync))) break;
+    await sleep(100);
+  }
   const id = new URL(sw.url()).host;
   await sw.evaluate(() => chrome.storage.sync.set({ apiUrl: 'http://localhost:8002', apiKey: 'test' }));
   const page = await ctx.newPage();
