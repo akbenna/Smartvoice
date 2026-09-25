@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-SmartVoice - Zelflerende vocabulaire-job (Fase 2, niveau 1)
+VitaScribe - Zelflerende vocabulaire-job (Fase 2, niveau 1)
 ==========================================================
 
 Draait de zelflerende lus: leert (fout -> goed)-correcties uit artsfeedback,
@@ -48,7 +48,7 @@ async def _run(cfg: LearnerConfig) -> int:
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description="SmartVoice zelflerende vocabulaire-job")
+    ap = argparse.ArgumentParser(description="VitaScribe zelflerende vocabulaire-job")
     ap.add_argument("--min-confirmations", type=int, default=None,
                     help="Aantal onafhankelijke bevestigingen voor activatie")
     ap.add_argument("--min-dominance", type=float, default=None,

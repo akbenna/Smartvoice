@@ -1,8 +1,8 @@
-# SmartVoice — Go-Live Deployment Guide
+# VitaScribe — Go-Live Deployment Guide
 
 ## Overzicht
 
-- **Frontend**: Vercel (`smartvoice-nine.vercel.app`) — al live
+- **Frontend**: Vercel (`vitascribe.vercel.app`; tot dat domein is toegevoegd draait hij op `smartvoice-nine.vercel.app`)
 - **Backend API**: Railway (CPU-only container)
 - **Database**: Railway PostgreSQL plugin
 - **Cache**: Railway Redis plugin (optioneel, graceful fallback)
@@ -14,7 +14,7 @@
 
 1. Ga naar [railway.app](https://railway.app) en log in met GitHub
 2. Klik **New Project** → **Deploy from GitHub repo**
-3. Selecteer je SmartVoice repository
+3. Selecteer je VitaScribe repository
 4. Railway detecteert automatisch `railway.toml` en `Dockerfile.railway`
 
 ## Stap 2 — Database & Redis Toevoegen
@@ -36,7 +36,9 @@ APP_ENV=production
 APP_SECRET_KEY=<genereer: openssl rand -hex 32>
 
 # CORS — je Vercel frontend URL
-CORS_ALLOWED_ORIGINS=https://smartvoice-nine.vercel.app
+# Tijdens de overstap staan beide erin: het nieuwe adres en het huidige live adres.
+# Het oude kan eruit zodra de frontend alleen nog op vitascribe.vercel.app draait.
+CORS_ALLOWED_ORIGINS=https://vitascribe.vercel.app,https://smartvoice-nine.vercel.app
 
 # Database — Railway vult DATABASE_URL automatisch in
 # Je hoeft POSTGRES_* niet handmatig te zetten
@@ -69,23 +71,23 @@ Railway bouwt automatisch bij push naar main. Je kunt ook handmatig triggeren:
 1. Push je code: `git push origin main`
 2. Railway bouwt de Docker image (duurt ~2-3 minuten)
 3. Health check op `/health` bevestigt dat de API draait
-4. Je krijgt een Railway URL, bijv. `smartvoice-api-production.up.railway.app`
+4. Je krijgt een Railway URL, bijv. `vitascribe-api-production.up.railway.app`
 
 ## Stap 5 — Frontend Koppelen aan Backend
 
 In het **Vercel** dashboard:
 
-1. Ga naar je SmartVoice frontend project → **Settings** → **Environment Variables**
+1. Ga naar je VitaScribe frontend project → **Settings** → **Environment Variables**
 2. Voeg toe:
    ```
-   NEXT_PUBLIC_API_URL=https://smartvoice-api-production.up.railway.app
+   NEXT_PUBLIC_API_URL=https://vitascribe-api-production.up.railway.app
    ```
    (vervang met je daadwerkelijke Railway URL)
 3. Klik **Redeploy** om de nieuwe env var actief te maken
 
 ## Stap 6 — Testen
 
-1. Ga naar `https://smartvoice-nine.vercel.app`
+1. Ga naar `https://vitascribe.vercel.app` (of, tot de overstap, `https://smartvoice-nine.vercel.app`)
 2. Log in met `arts1` / het wachtwoord dat je hebt ingesteld
 3. Test de health check: `curl https://<railway-url>/health`
 4. Wijzig wachtwoorden na eerste login
@@ -174,7 +176,7 @@ Kies bij Railway een EU-regio voor de service, zodat audio de EU niet verlaat en
 (Chrome kan dat niet vanuit het zijpaneel zelf). Na een update van de extensie: ververs het Bricks-tabblad.
 
 **Dicteren zonder zijpaneel:** klik in het Bricks-veld en druk **Alt+Shift+D** (of klik op het
-extensie-icoon en dan "Dicteer in veld"). Een label rechtsonder toont dat SmartVoice luistert; nogmaals
+extensie-icoon en dan "Dicteer in veld"). Een label rechtsonder toont dat VitaScribe luistert; nogmaals
 Alt+Shift+D of "Stop" beëindigt het. Lukt invoegen niet, dan staat het dictaat op het klembord.
 Met het zijpaneel open bedient dezelfde sneltoets het paneel.
 

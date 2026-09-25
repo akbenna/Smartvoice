@@ -1,5 +1,5 @@
 /**
- * SmartVoice - Offscreen Audio Recorder
+ * VitaScribe - Offscreen Audio Recorder
  *
  * Runs in an offscreen document to persist audio recording even when the
  * popup is closed. Uses MediaRecorder API with noise suppression.

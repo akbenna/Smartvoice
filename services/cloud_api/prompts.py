@@ -1,5 +1,5 @@
 """
-SmartVoice Cloud API - Dutch Medical Prompt Templates
+VitaScribe Cloud API - Dutch Medical Prompt Templates
 
 All prompts in Dutch for huisartsgeneeskunde (general practice).
 Temperature should always be 0.1 for medical output.

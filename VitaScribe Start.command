@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# SmartVoice — Start Alles (dubbelklik om te starten)
+# VitaScribe — Start Alles (dubbelklik om te starten)
 # =============================================================================
 clear
 GREEN='\033[0;32m'
@@ -8,11 +8,11 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-PROJECT_DIR="$HOME/Documents/GitHub/Smartvoice"
+PROJECT_DIR="$HOME/Documents/GitHub/VitaScribe"
 cd "$PROJECT_DIR" || { echo "Project niet gevonden op $PROJECT_DIR"; exit 1; }
 
 echo "========================================"
-echo -e " ${GREEN}SmartVoice AI-Consultassistent${NC}"
+echo -e " ${GREEN}VitaScribe AI-Consultassistent${NC}"
 echo " Alles wordt gestart..."
 echo "========================================"
 echo ""
@@ -64,7 +64,7 @@ else
     source venv/bin/activate 2>/dev/null
     echo -e "${YELLOW}starten...${NC}"
     # Start in achtergrond, log naar bestand
-    nohup bash -c "cd $PROJECT_DIR && source venv/bin/activate && uvicorn services.api.main:app --port 8001 2>&1" > /tmp/smartvoice-api.log 2>&1 &
+    nohup bash -c "cd $PROJECT_DIR && source venv/bin/activate && uvicorn services.api.main:app --port 8001 2>&1" > /tmp/vitascribe-api.log 2>&1 &
     API_PID=$!
     # Wacht tot API klaar is
     for i in {1..30}; do
@@ -82,7 +82,7 @@ if curl -s http://localhost:3000 >/dev/null 2>&1; then
     echo -e "${GREEN}draait al${NC}"
 else
     echo -e "${YELLOW}starten...${NC}"
-    nohup bash -c "cd $PROJECT_DIR/frontend/review-app && NEXT_PUBLIC_API_URL=http://localhost:8001 npx next dev 2>&1" > /tmp/smartvoice-frontend.log 2>&1 &
+    nohup bash -c "cd $PROJECT_DIR/frontend/review-app && NEXT_PUBLIC_API_URL=http://localhost:8001 npx next dev 2>&1" > /tmp/vitascribe-frontend.log 2>&1 &
     FE_PID=$!
     for i in {1..20}; do
         if curl -s http://localhost:3000 >/dev/null 2>&1; then
@@ -95,7 +95,7 @@ fi
 
 echo ""
 echo "========================================"
-echo -e " ${GREEN}SmartVoice is klaar!${NC}"
+echo -e " ${GREEN}VitaScribe is klaar!${NC}"
 echo "========================================"
 echo ""
 echo " Frontend:  http://localhost:3000"
@@ -105,8 +105,8 @@ echo ""
 echo " Login: arts1 / arts123"
 echo ""
 echo " Logs:"
-echo "   API:      tail -f /tmp/smartvoice-api.log"
-echo "   Frontend: tail -f /tmp/smartvoice-frontend.log"
+echo "   API:      tail -f /tmp/vitascribe-api.log"
+echo "   Frontend: tail -f /tmp/vitascribe-frontend.log"
 echo ""
 
 # Open browser

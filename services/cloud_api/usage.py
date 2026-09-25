@@ -1,5 +1,5 @@
 """
-SmartVoice Cloud API - Gebruiksregel vanuit de extensie
+VitaScribe Cloud API - Gebruiksregel vanuit de extensie
 
 Een handeling die volledig in de browser gebeurt, komt nergens in het
 gebruikslog terecht. Het opzoeken van een Thuisarts-pagina is zo'n handeling:

@@ -1,5 +1,5 @@
 """
-SmartVoice Cloud API - Processing Pipeline
+VitaScribe Cloud API - Processing Pipeline
 
 Orchestrates the full flow: Audio → STT → SOEP → Decisief Regel → Detection
 Single entry point for the Chrome extension.

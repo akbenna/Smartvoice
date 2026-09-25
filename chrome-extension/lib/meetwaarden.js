@@ -1,5 +1,5 @@
 /**
- * SmartVoice - Meetwaarden uit dictaat (lokaal, zonder AI)
+ * VitaScribe - Meetwaarden uit dictaat (lokaal, zonder AI)
  *
  * Herkent gangbare metingen in gedicteerde tekst zodat ze los in de
  * meetwaardenvelden van Bricks gezet kunnen worden. Alleen wat er letterlijk

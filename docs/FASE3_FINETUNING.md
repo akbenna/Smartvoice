@@ -1,7 +1,7 @@
 # Fase 3 — Forced-alignment & model-fine-tuning (runbook)
 
 Dit is de zwaarste laag: preciezere timestamps en getrainde modellen. Het draait
-**niet** in de standaard SmartVoice-omgeving maar op een aparte GPU-machine, en
+**niet** in de standaard VitaScribe-omgeving maar op een aparte GPU-machine, en
 het is pas zinvol als je voldoende artsfeedback hebt verzameld. Dit document is
 het runbook: vereisten, datadrempels, procedure en — cruciaal — evaluatie en
 rollback via de meetlat.

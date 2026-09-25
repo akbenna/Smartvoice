@@ -1,5 +1,5 @@
 /**
- * SmartVoice - Popup Controller
+ * VitaScribe - Popup Controller
  *
  * Standalone recorder that works everywhere (not just Bricks).
  * Records audio → sends to Cloud API → shows SOEP results.

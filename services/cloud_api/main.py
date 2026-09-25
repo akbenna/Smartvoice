@@ -1,5 +1,5 @@
 """
-SmartVoice Cloud API - Main Application
+VitaScribe Cloud API - Main Application
 
 Lightweight FastAPI service for the Chrome extension.
 Processes consultation audio -> SOEP + decisief regel.
@@ -59,7 +59,7 @@ from .prompts import (
 logger = structlog.get_logger()
 
 app = FastAPI(
-    title="SmartVoice Cloud API",
+    title="VitaScribe Cloud API",
     description="Consult audio → SOEP + decisief regel voor Bricks Huisarts",
     version="1.0.0",
 )
@@ -108,7 +108,7 @@ async def health():
     """Health check endpoint."""
     return {
         "status": "healthy",
-        "service": "smartvoice-cloud-api",
+        "service": "vitascribe-cloud-api",
         "version": "1.0.0",
         "stt_provider": config.stt.default_provider,
         "llm_provider": config.llm.default_provider,
@@ -128,11 +128,22 @@ async def extension_update_manifest():
         return Response(content=f.read(), media_type="application/xml")
 
 
+# The package was called smartvoice.crx before the rename to VitaScribe. Every
+# workstation that was installed earlier holds an update.xml whose codebase
+# points at the old path, and it keeps asking there until a new update.xml has
+# been packed and published. Both paths therefore serve the same package, and
+# either file name on disk is accepted, so the rename never strands a practice
+# on an old version. The old path can go once every update.xml in use is new.
+_CRX_NAMES = ("vitascribe.crx", "smartvoice.crx")
+
+
+@app.get("/extension/vitascribe.crx")
 @app.get("/extension/smartvoice.crx")
 async def extension_package():
     dist = os.getenv("EXTENSION_DIST_DIR", "")
-    path = os.path.join(dist, "smartvoice.crx") if dist else ""
-    if not path or not os.path.isfile(path):
+    path = next((os.path.join(dist, n) for n in _CRX_NAMES
+                 if dist and os.path.isfile(os.path.join(dist, n))), "")
+    if not path:
         raise HTTPException(status_code=404, detail="Geen extensiepakket gepubliceerd.")
     with open(path, "rb") as f:
         return Response(content=f.read(), media_type="application/x-chrome-extension")

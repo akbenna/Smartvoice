@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# SmartVoice — End-to-End Test
+# VitaScribe — End-to-End Test
 # =============================================================================
 # Test de volledige pipeline: upload audio → transcriptie → SOEP
 #
@@ -17,7 +17,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 echo "========================================"
-echo " SmartVoice E2E Test"
+echo " VitaScribe E2E Test"
 echo " API: ${API_URL}"
 echo "========================================"
 echo ""
@@ -68,7 +68,7 @@ echo ""
 
 # --- Stap 3: Maak test audio ---
 echo -n "[4/7] Test audio genereren... "
-TEST_AUDIO="/tmp/smartvoice_test.wav"
+TEST_AUDIO="/tmp/vitascribe_test.wav"
 # Genereer 3 seconden stilte als WAV (voor pipeline test)
 python3 -c "
 import struct, wave

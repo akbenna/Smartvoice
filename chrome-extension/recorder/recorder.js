@@ -1,5 +1,5 @@
 /**
- * SmartVoice - Recorder Page Controller
+ * VitaScribe - Recorder Page Controller
  * Handles microphone recording, waveform visualization, and sending audio to the service worker.
  */
 
@@ -133,7 +133,7 @@ btnStart.addEventListener('click', async function() {
   } catch (err) {
     var errMsg = err.message || '';
     if (errMsg.toLowerCase().includes('dismiss')) {
-      showError('Microfoontoegang geweigerd (dismissed). In cloud-omgevingen: ga naar SmartVoice Instellingen en klik "Test microfoon" om toestemming te verlenen.');
+      showError('Microfoontoegang geweigerd (dismissed). In cloud-omgevingen: ga naar VitaScribe Instellingen en klik "Test microfoon" om toestemming te verlenen.');
     } else {
       showError('Microfoon niet beschikbaar: ' + errMsg);
     }

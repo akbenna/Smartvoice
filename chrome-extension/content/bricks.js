@@ -1,5 +1,5 @@
 /**
- * SmartVoice - Bricks HIS Content Script
+ * VitaScribe - Bricks HIS Content Script
  *
  * Full recording + SOEP workflow as a floating widget on the Bricks page.
  * No separate tabs, no popups — everything happens here.
@@ -134,7 +134,7 @@ function updateTimer() {
 
 // After the extension is updated or reloaded, scripts already running in an
 // open page lose their connection to it until the page is refreshed.
-var STALE_PAGE_MESSAGE = 'SmartVoice is bijgewerkt. Ververs deze pagina (F5) en probeer opnieuw.';
+var STALE_PAGE_MESSAGE = 'VitaScribe is bijgewerkt. Ververs deze pagina (F5) en probeer opnieuw.';
 
 function extensionAlive() {
   try { return !!(chrome.runtime && chrome.runtime.id); } catch (e) { return false; }
@@ -264,11 +264,11 @@ async function sendAudioToAPI(blob, mimeType) {
 
     if (errorMsg === 'Failed to fetch') {
       errorMsg = 'Kan de API niet bereiken op: ' + apiUrl +
-        '. Controleer de API URL in SmartVoice Instellingen.';
+        '. Controleer de API URL in VitaScribe Instellingen.';
     } else if (errorMsg.includes('Extension context invalidated')) {
       errorMsg = STALE_PAGE_MESSAGE;
     } else if (errorMsg.indexOf('API fout (403)') === 0) {
-      errorMsg = 'API-sleutel klopt niet. Controleer de sleutel in SmartVoice Instellingen ' +
+      errorMsg = 'API-sleutel klopt niet. Controleer de sleutel in VitaScribe Instellingen ' +
         '(klik Opslaan) en ververs daarna deze pagina (F5).';
     }
 
@@ -281,7 +281,7 @@ async function sendAudioToAPI(blob, mimeType) {
 
 function createWidget() {
   var widget = document.createElement('div');
-  widget.id = 'smartvoice-widget';
+  widget.id = 'vitascribe-widget';
 
   widget.innerHTML =
     // Toggle button
@@ -297,7 +297,7 @@ function createWidget() {
       // Header
       '<div class="sv-header">' +
         '<span class="sv-logo">SV</span>' +
-        '<span class="sv-title">SmartVoice</span>' +
+        '<span class="sv-title">VitaScribe</span>' +
         '<button id="sv-close" class="sv-close-btn">&times;</button>' +
       '</div>' +
 

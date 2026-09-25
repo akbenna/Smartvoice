@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-SmartVoice - Trainingsdata-export (Fase 3)
+VitaScribe - Trainingsdata-export (Fase 3)
 ==========================================
 
 Exporteert uit consultation_feedback:
@@ -51,7 +51,7 @@ async def _run(args) -> int:
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description="SmartVoice trainingsdata-export")
+    ap = argparse.ArgumentParser(description="VitaScribe trainingsdata-export")
     ap.add_argument("--only", choices=["asr", "dpo"], default=None,
                     help="Exporteer alleen deze dataset (default: beide)")
     ap.add_argument("--asr-out", default=None, help="Pad voor ASR SFT-dataset")

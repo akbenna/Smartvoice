@@ -1,5 +1,5 @@
 /**
- * SmartVoice - Privacy filter for letters (from BriefAssistent)
+ * VitaScribe - Privacy filter for letters (from BriefAssistent)
  *
  * Runs in the side panel before anything leaves the browser; the preview
  * shows exactly the filtered text. The server applies a second safety net.

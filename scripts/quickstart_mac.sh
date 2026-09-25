@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# SmartVoice — Quickstart voor macOS (Development)
+# VitaScribe — Quickstart voor macOS (Development)
 # =============================================================================
 # Dit script:
 #   1. Checkt of Ollama geïnstalleerd is
@@ -24,7 +24,7 @@ NC='\033[0m'
 
 cd "$(dirname "$0")/.."
 echo "========================================"
-echo " SmartVoice — macOS Quickstart"
+echo " VitaScribe — macOS Quickstart"
 echo " $(pwd)"
 echo "========================================"
 echo ""

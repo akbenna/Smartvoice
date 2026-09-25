@@ -1,5 +1,5 @@
 """
-SmartVoice Cloud API - LLM Service
+VitaScribe Cloud API - LLM Service
 
 Pluggable LLM with support for:
   - Mistral Small (EU-based, AVG-friendly, default)

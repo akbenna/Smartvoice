@@ -18,7 +18,7 @@ Gebruik:
         --base-model google/mt5-small \
         --output-dir /models/asr_corrector
 
-Dit script draait NIET in de standaard SmartVoice-omgeving (geen torch); het is
+Dit script draait NIET in de standaard VitaScribe-omgeving (geen torch); het is
 bedoeld voor een aparte trainingsmachine. Evalueer het resultaat altijd tegen de
 meetlat (shared/evaluation.py) vóór je het in productie neemt.
 """

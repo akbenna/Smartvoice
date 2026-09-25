@@ -1,5 +1,5 @@
 /**
- * SmartVoice - Service Worker
+ * VitaScribe - Service Worker
  *
  * Handles:
  * 1. PROCESS_AUDIO — receives base64 audio from popup/recorder, calls Cloud API,

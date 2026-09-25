@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# SmartVoice — Systeemcheck vóór Opstarten
+# VitaScribe — Systeemcheck vóór Opstarten
 # =============================================================================
 # Controleert of alle vereisten aanwezig zijn voor lokale deployment.
 # Draai dit VOOR docker compose up.
@@ -15,7 +15,7 @@ NC='\033[0m'
 ERRORS=0
 
 echo "========================================"
-echo " SmartVoice Systeemcheck"
+echo " VitaScribe Systeemcheck"
 echo "========================================"
 echo ""
 

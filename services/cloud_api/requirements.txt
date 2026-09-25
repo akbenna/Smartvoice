@@ -1,4 +1,4 @@
-# SmartVoice Cloud API - Dependencies
+# VitaScribe Cloud API - Dependencies
 # Lightweight: no ML models, uses cloud APIs for STT and LLM
 
 # Web framework

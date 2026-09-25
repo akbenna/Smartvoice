@@ -1,5 +1,5 @@
 /**
- * SmartVoice - Manage snelteksten and correcties.
+ * VitaScribe - Manage snelteksten and correcties.
  * Every edit is saved immediately to chrome.storage.local.
  */
 
@@ -95,7 +95,7 @@ document.getElementById('export').addEventListener('click', function () {
   var blob = new Blob([JSON.stringify(SVTextRules.normalize(rules), null, 2)], { type: 'application/json' });
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'smartvoice-snelteksten.json';
+  a.download = 'vitascribe-snelteksten.json';
   a.click();
   URL.revokeObjectURL(a.href);
 });

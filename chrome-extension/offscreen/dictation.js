@@ -1,5 +1,5 @@
 /**
- * SmartVoice - Dictation without the side panel (offscreen document)
+ * VitaScribe - Dictation without the side panel (offscreen document)
  *
  * Captures the microphone and streams it to the Cloud API, like the side
  * panel does, but invisibly. Transcript events go to the service worker,

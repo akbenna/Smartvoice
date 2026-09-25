@@ -1,5 +1,5 @@
 """
-SmartVoice Cloud API - Patiëntinstructie (B1 en vertaling)
+VitaScribe Cloud API - Patiëntinstructie (B1 en vertaling)
 
 Turns the doctor's E and P lines into a short explanation for the patient in
 plain Dutch (B1) and, optionally, a translation. Only what the doctor wrote

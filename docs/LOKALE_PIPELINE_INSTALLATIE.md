@@ -1,4 +1,4 @@
-# SmartVoice — Lokale pipeline installeren (on-premise)
+# VitaScribe — Lokale pipeline installeren (on-premise)
 
 Dit is het installatie-runbook voor de **privacy-first lokale pipeline**: Whisper
 (spraak→tekst) + PyAnnote (sprekerscheiding) + Ollama (lokaal LLM voor SOEP) +
@@ -37,8 +37,8 @@ maak een account op huggingface.co, accepteer de voorwaarden van
 ## 1. Code ophalen
 
 ```bash
-git clone https://github.com/akbenna/Smartvoice.git
-cd Smartvoice
+git clone https://github.com/akbenna/VitaScribe.git
+cd VitaScribe
 ```
 
 ## 2. Geheimen genereren

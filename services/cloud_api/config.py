@@ -1,5 +1,5 @@
 """
-SmartVoice Cloud API - Configuration
+VitaScribe Cloud API - Configuration
 
 All settings via environment variables. Supports multiple STT and LLM providers
 with Deepgram + Mistral as defaults.
@@ -76,7 +76,7 @@ class AppConfig:
     cors_origins: str = "*"
     api_keys: str = ""
     max_audio_size_mb: int = 50
-    temp_dir: str = "/tmp/smartvoice"
+    temp_dir: str = "/tmp/vitascribe"
 
     stt: STTConfig = field(default_factory=STTConfig)
     llm: LLMConfig = field(default_factory=LLMConfig)
@@ -93,7 +93,7 @@ def get_config() -> AppConfig:
         cors_origins=os.getenv("CORS_ORIGINS", "*"),
         api_keys=os.getenv("API_KEYS", ""),
         max_audio_size_mb=int(os.getenv("MAX_AUDIO_MB", "50")),
-        temp_dir=os.getenv("TEMP_DIR", "/tmp/smartvoice"),
+        temp_dir=os.getenv("TEMP_DIR", "/tmp/vitascribe"),
         stt=STTConfig(
             default_provider=os.getenv("STT_PROVIDER", "deepgram"),
             groq_api_key=os.getenv("GROQ_API_KEY", ""),

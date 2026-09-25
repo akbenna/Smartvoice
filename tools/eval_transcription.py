@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-SmartVoice - Evaluatie-CLI
+VitaScribe - Evaluatie-CLI
 ==========================
 
 Reken transcriptie- en SOEP-kwaliteit door op een vaste testset, zodat elke
@@ -90,7 +90,7 @@ def eval_soep(cases: list) -> dict:
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description="SmartVoice evaluatie-meetlat")
+    ap = argparse.ArgumentParser(description="VitaScribe evaluatie-meetlat")
     ap.add_argument("cases", help="Pad naar JSON-bestand met testcases")
     ap.add_argument("--mode", choices=["transcription", "soep"], default="transcription")
     args = ap.parse_args(argv)

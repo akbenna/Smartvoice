@@ -1,10 +1,10 @@
 /**
- * SmartVoice - Brieven (informatiebrief en verwijsbrief)
+ * VitaScribe - Brieven (informatiebrief en verwijsbrief)
  *
  * Voorheen de losse extensie BriefAssistent. Het dossier komt uit Bricks,
  * een schermafdruk of een PDF; de arts kiest per onderdeel wat meegaat en
  * ziet precies wat er verstuurd wordt (namen, BSN, geboortedatum, adres en
- * contactgegevens eruit). De brief schrijft de SmartVoice-server; er staat
+ * contactgegevens eruit). De brief schrijft de VitaScribe-server; er staat
  * geen AI-sleutel in de browser.
  *
  * Uses from sidepanel.js: getConfig(), insertOrCopy(), els.text

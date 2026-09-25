@@ -1,5 +1,5 @@
 """
-SmartVoice Cloud API - Speech-to-Text Service
+VitaScribe Cloud API - Speech-to-Text Service
 
 Pluggable STT with support for:
   - Groq Whisper (free tier, fast)
