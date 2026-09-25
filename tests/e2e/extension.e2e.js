@@ -1,5 +1,5 @@
 /**
- * End-to-end tests of the SmartVoice extension in Chromium, against a
+ * End-to-end tests of the VitaScribe extension in Chromium, against a
  * simulated Bricks page and a mocked server (no API keys, no patient data).
  *
  *   npm i -D playwright && npx playwright install chromium

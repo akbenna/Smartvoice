@@ -40,8 +40,8 @@ def test_initial_prompt_compact_and_contextual():
 
 
 def test_initial_prompt_accepts_extra_terms():
-    prompt = get_initial_prompt(extra_terms=["smartvoiceterm"])
-    assert "smartvoiceterm" in prompt
+    prompt = get_initial_prompt(extra_terms=["vitascribeterm"])
+    assert "vitascribeterm" in prompt
 
 
 def test_hotwords_nonempty_and_deduplicated():

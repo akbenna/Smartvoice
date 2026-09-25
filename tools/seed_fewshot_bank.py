@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-SmartVoice - Few-shot koude start (seed)
+VitaScribe - Few-shot koude start (seed)
 ========================================
 
 Laadt gecureerde, synthetische SOEP-voorbeelden in de few-shot-bank, zodat de
@@ -29,7 +29,7 @@ from services.learning.fewshot_seed import DEFAULT_SEED_PATH, seed_bank  # noqa:
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description="SmartVoice few-shot seed (koude start)")
+    ap = argparse.ArgumentParser(description="VitaScribe few-shot seed (koude start)")
     ap.add_argument("--bank", default=None,
                     help="Pad naar de few-shot-bank (default: FEWSHOT_BANK_PATH of config)")
     ap.add_argument("--seed", default=DEFAULT_SEED_PATH,

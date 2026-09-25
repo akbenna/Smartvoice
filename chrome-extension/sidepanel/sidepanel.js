@@ -1,5 +1,5 @@
 /**
- * SmartVoice - Dictation side panel
+ * VitaScribe - Dictation side panel
  *
  * Streams microphone audio to the Cloud API (which relays to Deepgram) and
  * shows the transcript while the doctor speaks. Text goes into the Bricks
@@ -125,7 +125,7 @@ chrome.storage.onChanged.addListener(function (changes, area) {
 async function sendToTarget(text) {
   var r = await chrome.storage.session.get('svTarget');
   var target = r.svTarget;
-  if (!target) throw new Error('SmartVoice heeft geen klik in een tekstveld gezien. Klik in Bricks in het veld ' +
+  if (!target) throw new Error('VitaScribe heeft geen klik in een tekstveld gezien. Klik in Bricks in het veld ' +
     '(bijv. de S-regel) en probeer opnieuw. Lukt dat niet: klik onderaan op "Diagnose".');
   var res;
   try {
@@ -573,10 +573,10 @@ async function runDiagnose() {
 
   var stored = await chrome.storage.session.get('svTarget');
   var lines = [
-    'SmartVoice ' + chrome.runtime.getManifest().version + ' — diagnose',
+    'VitaScribe ' + chrome.runtime.getManifest().version + ' — diagnose',
     'Tabblad: ' + (tab.url || '').split('?')[0],
     'Doelveld bekend: ' + (stored.svTarget ? stored.svTarget.label + ' (tab ' + (stored.svTarget.tabId === tab.id ? 'dit' : 'ander') + ')' : 'nee'),
-    'Frames met SmartVoice-script: ' + reports.length,
+    'Frames met VitaScribe-script: ' + reports.length,
   ];
   reports.forEach(function (r, i) {
     lines.push('');

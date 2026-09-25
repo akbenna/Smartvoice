@@ -1,5 +1,5 @@
 """
-SmartVoice Cloud API - Live Dictation
+VitaScribe Cloud API - Live Dictation
 
 Relays microphone audio from the side panel to Deepgram's streaming API and
 sends transcript text back while the doctor is still speaking.

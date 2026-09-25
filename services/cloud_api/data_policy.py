@@ -1,5 +1,5 @@
 """
-SmartVoice Cloud API - Data policy (AVG)
+VitaScribe Cloud API - Data policy (AVG)
 
 Which external service may process which kind of data. Decided with the
 practice (24-09-2026):

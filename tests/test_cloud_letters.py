@@ -1,4 +1,4 @@
-"""Brieven (informatiebrief / verwijsbrief) via de SmartVoice-server."""
+"""Brieven (informatiebrief / verwijsbrief) via de VitaScribe-server."""
 
 from unittest.mock import patch
 

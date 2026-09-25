@@ -1,5 +1,5 @@
 """
-SmartVoice Cloud API - Usage log (NEN 7513)
+VitaScribe Cloud API - Usage log (NEN 7513)
 
 Records WHO used WHICH function WHEN, and with which outcome; never the
 content (no audio, text, names or dossier data). One JSON line per event on

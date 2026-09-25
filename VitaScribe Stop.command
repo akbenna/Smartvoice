@@ -1,17 +1,17 @@
 #!/bin/bash
 # =============================================================================
-# SmartVoice — Stop Alles (dubbelklik om te stoppen)
+# VitaScribe — Stop Alles (dubbelklik om te stoppen)
 # =============================================================================
 clear
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m'
 
-PROJECT_DIR="$HOME/Documents/GitHub/Smartvoice"
+PROJECT_DIR="$HOME/Documents/GitHub/VitaScribe"
 cd "$PROJECT_DIR" || exit 1
 
 echo "========================================"
-echo -e " ${RED}SmartVoice stoppen...${NC}"
+echo -e " ${RED}VitaScribe stoppen...${NC}"
 echo "========================================"
 echo ""
 
@@ -29,7 +29,7 @@ docker compose -f docker-compose.dev.yml stop 2>/dev/null && echo -e "${GREEN}ge
 
 echo ""
 echo "========================================"
-echo -e " ${GREEN}SmartVoice is gestopt.${NC}"
+echo -e " ${GREEN}VitaScribe is gestopt.${NC}"
 echo "========================================"
 echo ""
 echo "Druk op een toets om te sluiten..."

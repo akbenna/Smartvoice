@@ -20,7 +20,7 @@ Gebruik:
         --output-dir /models/soep_dpo_adapter
 
 Evalueer het resultaat tegen de meetlat (SOEP edit-distance) vóór productie.
-Draait NIET in de standaard SmartVoice-omgeving.
+Draait NIET in de standaard VitaScribe-omgeving.
 """
 
 from __future__ import annotations

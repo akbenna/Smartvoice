@@ -1,5 +1,5 @@
 /**
- * SmartVoice - Dictation target (runs in every frame of every page)
+ * VitaScribe - Dictation target (runs in every frame of every page)
  *
  * Remembers the text field the doctor last clicked and inserts dictated text
  * at the cursor there. The side panel / service worker decides WHICH frame to
@@ -582,11 +582,11 @@
     pill.__host.style.display = '';
     pill.className = 'p' + ({ error: ' err', listening: '', calibrate: ' cal', info: ' ok' }[state] || ' busy');
     pillLabel.textContent = {
-      connecting: 'SmartVoice verbindt…',
-      listening: 'SmartVoice luistert',
+      connecting: 'VitaScribe verbindt…',
+      listening: 'VitaScribe luistert',
       stopping: 'Afronden…',
       calibrate: 'Velden koppelen',
-    }[state] || 'SmartVoice';
+    }[state] || 'VitaScribe';
     pillText.textContent = text || '';
     pillButton.textContent = (button && button.label) || 'Stop';
     pillButton.dataset.action = (button && button.action) || 'SV_QUICK_TOGGLE';

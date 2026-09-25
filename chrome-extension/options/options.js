@@ -1,5 +1,5 @@
 /**
- * SmartVoice - Options Page Controller
+ * VitaScribe - Options Page Controller
  * Manages extension settings stored in chrome.storage.sync.
  */
 

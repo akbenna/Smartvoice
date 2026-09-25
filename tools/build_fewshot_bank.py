@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-SmartVoice - Few-shot-bank builder (Fase 2, niveau 2)
+VitaScribe - Few-shot-bank builder (Fase 2, niveau 2)
 =====================================================
 
 Vult de few-shot-bank met door de arts goedgekeurde SOEP's uit
@@ -43,7 +43,7 @@ async def _run(path: str | None, max_examples: int | None) -> int:
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description="SmartVoice few-shot-bank builder")
+    ap = argparse.ArgumentParser(description="VitaScribe few-shot-bank builder")
     ap.add_argument("--path", default=None, help="Doelbestand voor de bank (override)")
     ap.add_argument("--max-examples", type=int, default=None, help="Maximale bankgrootte")
     args = ap.parse_args(argv)

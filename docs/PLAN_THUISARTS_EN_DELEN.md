@@ -161,7 +161,7 @@ anders welke aandoening er op papier gaat.
 `scripts/check_thuisarts_links.py` loopt de tabel na en meldt 404's en
 doorverwijzingen; hij volgt een doorverwijzing niet, want of de nieuwe pagina
 nog over dezelfde aandoening gaat is geen machineoordeel. Draait wekelijks via
-`deploy/cron/smartvoice-thuisarts.cron`, vanaf de server en niet vanuit de
+`deploy/cron/vitascribe-thuisarts.cron`, vanaf de server en niet vanuit de
 browser van de arts.
 
 Het script schrijft niets in de tabel. `gecontroleerd_op` betekent "met het oog
@@ -186,7 +186,7 @@ over een kanaal dat al beveiligd is. De meeste waarde, het kleinste risico.
 **3. Mailen.** Gebouwd, standaard uit, aan te zetten onder Instellingen →
 Informatie delen met de patiënt:
 
-- SmartVoice verstuurt zelf nooit mail; de server zou anders verwerker worden
+- VitaScribe verstuurt zelf nooit mail; de server zou anders verwerker worden
   van een nieuwe gegevensstroom, met een eigen DPIA-paragraaf.
 - De knop opent de mailclient van de praktijk via `mailto:`, met onderwerp en
   tekst ingevuld en **zonder ontvanger**. Het adres uit Bricks halen zou een

@@ -1,4 +1,4 @@
-# SmartVoice — Upgradeonderzoek: transcriptie, SOEP-samenvatting en de zelflerende laag
+# VitaScribe — Upgradeonderzoek: transcriptie, SOEP-samenvatting en de zelflerende laag
 
 *Onderzoeksrapport en gefaseerd implementatieplan — juni 2026*
 
@@ -6,7 +6,7 @@
 
 ## 1. Kernconclusie vooraf
 
-SmartVoice staat technisch op een gezonde basis: Faster-Whisper `large-v3-turbo` voor spraak-naar-tekst, PyAnnote 3.1 voor diarisatie, een lokaal Ollama-model (`llama3.1:8b`) voor extractie en SOEP-generatie, en — in de cloud-API-tak — een handgeschreven medische woordenlijst die transcriptfouten naberekent. De architectuur is doordacht, maar de drie onderdelen die de *ervaren* kwaliteit bepalen, draaien op dit moment grotendeels **open loop**: ze leren niet van wat de arts elke dag corrigeert.
+VitaScribe staat technisch op een gezonde basis: Faster-Whisper `large-v3-turbo` voor spraak-naar-tekst, PyAnnote 3.1 voor diarisatie, een lokaal Ollama-model (`llama3.1:8b`) voor extractie en SOEP-generatie, en — in de cloud-API-tak — een handgeschreven medische woordenlijst die transcriptfouten naberekent. De architectuur is doordacht, maar de drie onderdelen die de *ervaren* kwaliteit bepalen, draaien op dit moment grotendeels **open loop**: ze leren niet van wat de arts elke dag corrigeert.
 
 De grootste winst zit daarom niet in het inruilen van modellen, maar in het sluiten van de lus. Drie observaties dragen dit rapport:
 
@@ -64,10 +64,10 @@ De prompts in `shared/prompts/templates.py` zijn van hoge kwaliteit: strikte ant
 
 De goedkoopste, veiligste en best onderbouwde ingreep is het meegeven van domeincontext. Twee mechanismen, met een belangrijk verschil:
 
-- **`initial_prompt`** biast de decoder richting een stijl en algemene domeinwoordenschat. Whisper consumeert alleen de laatste ~224 tokens, dus de prompt moet compact zijn en de meest waardevolle termen achteraan plaatsen. Voor SmartVoice: een korte zin die de setting zet ("Transcript van een Nederlandstalig huisartsconsult. Termen o.a.: …") gevolgd door de meest voorkomende medicatie- en ICPC-termen.
+- **`initial_prompt`** biast de decoder richting een stijl en algemene domeinwoordenschat. Whisper consumeert alleen de laatste ~224 tokens, dus de prompt moet compact zijn en de meest waardevolle termen achteraan plaatsen. Voor VitaScribe: een korte zin die de setting zet ("Transcript van een Nederlandstalig huisartsconsult. Termen o.a.: …") gevolgd door de meest voorkomende medicatie- en ICPC-termen.
 - **`hotwords`** (ondersteund door Faster-Whisper) is bedoeld voor specifieke, zeldzame termen die het model anders mist. De vuistregel uit de praktijk: gebruik `initial_prompt` voor algemene jargon, en voeg `hotwords` toe voor de echt zeldzame namen.
 
-De winst is reëel: geprompte Whisper haalde in onderzoek een **19% lagere WER** op medische audio met de top-200 medische termen. Cruciaal is dat SmartVoice deze lijst al heeft (`medical_vocabulary.get_hotwords()`), maar die alleen in de cloud-tak en alleen "voor toekomstig gebruik" inzet. Stap één is simpelweg: deze lijst ook in de lokale `transcribe()` injecteren.
+De winst is reëel: geprompte Whisper haalde in onderzoek een **19% lagere WER** op medische audio met de top-200 medische termen. Cruciaal is dat VitaScribe deze lijst al heeft (`medical_vocabulary.get_hotwords()`), maar die alleen in de cloud-tak en alleen "voor toekomstig gebruik" inzet. Stap één is simpelweg: deze lijst ook in de lokale `transcribe()` injecteren.
 
 Let op één bekend risico: een te lange of te generieke `initial_prompt` kan hallucinatie en herhaling juist vergroten. De prompt moet kort, specifiek en periodiek gevalideerd zijn op de testset (zie §6).
 
@@ -100,13 +100,13 @@ Twee context-feiten wegen mee. Voor algemeen Nederlands presteerde Google Chirp 
 
 ### 4.1 Dwing de structuur af met een JSON-schema
 
-De overstap van `format: "json"` naar een **expliciet JSON-schema** in de Ollama-aanroep is laaghangend fruit. Ollama compileert het schema naar een grammatica en beperkt de tokensampler tot geldige voortzettingen; in metingen leverde dat niet alleen gegarandeerd valide JSON maar ook tot ~6× snellere generatie op. Voor SmartVoice betekent dit: geen kapotte JSON meer die de pipeline laat struikelen, en hardere garanties dat elk SOEP-veld en de ICPC-code aanwezig zijn. De schema's staan al in `shared/schemas/`; ze worden nu alleen ná generatie ter validatie gebruikt, niet vooraf ter sturing.
+De overstap van `format: "json"` naar een **expliciet JSON-schema** in de Ollama-aanroep is laaghangend fruit. Ollama compileert het schema naar een grammatica en beperkt de tokensampler tot geldige voortzettingen; in metingen leverde dat niet alleen gegarandeerd valide JSON maar ook tot ~6× snellere generatie op. Voor VitaScribe betekent dit: geen kapotte JSON meer die de pipeline laat struikelen, en hardere garanties dat elk SOEP-veld en de ICPC-code aanwezig zijn. De schema's staan al in `shared/schemas/`; ze worden nu alleen ná generatie ter validatie gebruikt, niet vooraf ter sturing.
 
 ### 4.2 Hallucinatie blijft de kernrisico — bouw er een vangnet omheen
 
-De literatuur over ambient scribes is eensluidend: AI-notities zijn vollediger en beter geordend dan menselijke, maar minder bondig en hallucinatiegevoeliger — het model "gokt de meest waarschijnlijke reden" en schrijft die als feit op, en juist die fouten zijn voor de controlerende arts moeilijk te spotten. SmartVoice doet hier al goed aan met strikte anti-hallucinatie-instructies en een telegramstijl-eis. Twee versterkingen liggen voor de hand. Een **grounding-controle**: een verificatiestap die elke bewering in de SOEP terugkoppelt naar een fragment in het transcript en het anders markeert (de codebase heeft al een `[?]`-conventie en een detectiestadium — dit is de natuurlijke plek). En een **bondigheidsrem**: een expliciete lengtebegrenzing per veld, omdat juist de breedsprakigheid van scribes de hallucinatie binnensluipt.
+De literatuur over ambient scribes is eensluidend: AI-notities zijn vollediger en beter geordend dan menselijke, maar minder bondig en hallucinatiegevoeliger — het model "gokt de meest waarschijnlijke reden" en schrijft die als feit op, en juist die fouten zijn voor de controlerende arts moeilijk te spotten. VitaScribe doet hier al goed aan met strikte anti-hallucinatie-instructies en een telegramstijl-eis. Twee versterkingen liggen voor de hand. Een **grounding-controle**: een verificatiestap die elke bewering in de SOEP terugkoppelt naar een fragment in het transcript en het anders markeert (de codebase heeft al een `[?]`-conventie en een detectiestadium — dit is de natuurlijke plek). En een **bondigheidsrem**: een expliciete lengtebegrenzing per veld, omdat juist de breedsprakigheid van scribes de hallucinatie binnensluipt.
 
-Een nuchtere bevinding uit recent vergelijkend onderzoek relativeert de modeljacht: een "naïeve" oplossing op een basismodel (zonder medische fine-tuning) scoorde vergelijkbaar met commerciële koplopers. De meerwaarde van domeinspecifieke training in scribes blijkt beperkt zodra het basismodel sterk genoeg is. Voor SmartVoice betekent dat: investeer eerder in prompts, grounding en few-shot dan in een medisch fine-getuned model.
+Een nuchtere bevinding uit recent vergelijkend onderzoek relativeert de modeljacht: een "naïeve" oplossing op een basismodel (zonder medische fine-tuning) scoorde vergelijkbaar met commerciële koplopers. De meerwaarde van domeinspecifieke training in scribes blijkt beperkt zodra het basismodel sterk genoeg is. Voor VitaScribe betekent dat: investeer eerder in prompts, grounding en few-shot dan in een medisch fine-getuned model.
 
 ### 4.3 Modelkeuze voor extractie en SOEP
 
@@ -120,7 +120,7 @@ De sterkste SOEP-verbetering is tegelijk de brug naar Deel C: voeg aan de SOEP-p
 
 ## 5. Deel C — De zelflerende laag (prioriteit)
 
-Dit is waar SmartVoice zich onderscheidt van een generieke scribe: een systeem dat elke dag een beetje beter wordt op de taal, de patiëntenpopulatie en de stijl van déze praktijk. De infrastructuur ligt klaar; de lus moet worden gesloten. Ik onderscheid drie niveaus, oplopend in kracht en risico.
+Dit is waar VitaScribe zich onderscheidt van een generieke scribe: een systeem dat elke dag een beetje beter wordt op de taal, de patiëntenpopulatie en de stijl van déze praktijk. De infrastructuur ligt klaar; de lus moet worden gesloten. Ik onderscheid drie niveaus, oplopend in kracht en risico.
 
 ### 5.1 Niveau 1 — Vocabulaire die meegroeit (deterministisch, veilig)
 

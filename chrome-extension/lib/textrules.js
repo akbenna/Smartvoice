@@ -1,5 +1,5 @@
 /**
- * SmartVoice - Text rules for dictation
+ * VitaScribe - Text rules for dictation
  *
  * Snelteksten: a spoken trigger ("normaal longen") becomes a fixed text.
  * Correcties: a word the recognizer keeps getting wrong is replaced.

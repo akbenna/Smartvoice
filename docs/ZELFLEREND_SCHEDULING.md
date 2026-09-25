@@ -63,17 +63,17 @@ laadt `.env`, kiest de juiste Python (venv heeft voorkeur) en logt naar
 
 ```bash
 # 1. Kopieer de units (pas WorkingDirectory/User in de .service aan je install aan)
-sudo cp deploy/systemd/smartvoice-learning.service /etc/systemd/system/
-sudo cp deploy/systemd/smartvoice-learning.timer   /etc/systemd/system/
+sudo cp deploy/systemd/vitascribe-learning.service /etc/systemd/system/
+sudo cp deploy/systemd/vitascribe-learning.timer   /etc/systemd/system/
 
 # 2. Herlaad systemd en zet de timer aan
 sudo systemctl daemon-reload
-sudo systemctl enable --now smartvoice-learning.timer
+sudo systemctl enable --now vitascribe-learning.timer
 
 # 3. Controleer
-systemctl list-timers smartvoice-learning.timer
-sudo systemctl start smartvoice-learning.service   # handmatige testrun
-journalctl -u smartvoice-learning.service -n 50    # logs bekijken
+systemctl list-timers vitascribe-learning.timer
+sudo systemctl start vitascribe-learning.service   # handmatige testrun
+journalctl -u vitascribe-learning.service -n 50    # logs bekijken
 ```
 
 Standaard draait de timer **elke maandag om 03:00** (`OnCalendar` in de
@@ -83,7 +83,7 @@ Standaard draait de timer **elke maandag om 03:00** (`OnCalendar` in de
 
 ```bash
 # Systeembrede cron (met gebruikersveld):
-sudo cp deploy/cron/smartvoice-learning.cron /etc/cron.d/smartvoice-learning
+sudo cp deploy/cron/vitascribe-learning.cron /etc/cron.d/vitascribe-learning
 # Pas pad en gebruiker in het bestand aan je installatie aan.
 ```
 

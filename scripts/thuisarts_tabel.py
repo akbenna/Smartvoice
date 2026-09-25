@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-SmartVoice - Koppeltabel ICPC -> Thuisarts.nl klaarzetten en nakijken
+VitaScribe - Koppeltabel ICPC -> Thuisarts.nl klaarzetten en nakijken
 
 De tabel in `chrome-extension/lib/thuisarts-icpc.json` hoort dezelfde codes te
 dekken als de voorbeeldbank waar de SOEP-herkenning op steunt. Loopt dat uit

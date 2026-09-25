@@ -1,5 +1,5 @@
 """
-SmartVoice - Medisch Nederlands Vocabulaire (canoniek, gedeeld)
+VitaScribe - Medisch Nederlands Vocabulaire (canoniek, gedeeld)
 ================================================================
 
 Canonieke woordenlijst voor de LOKALE pipeline (services/transcription,

@@ -204,7 +204,7 @@ const doc = new Document({
         heading1("1. Managementsamenvatting"),
         bodyText(
           "Dit document onderbouwt de investering in een eigen AI-server voor de huisartsenpraktijk. " +
-          "De server bedient meerdere producten \u2014 SmartVoice (consultdocumentatie), ProVita Care (telehealth/leefstijl), " +
+          "De server bedient meerdere producten \u2014 VitaScribe (consultdocumentatie), ProVita Care (telehealth/leefstijl), " +
           "website-AI en toekomstige toepassingen \u2014 vanuit \u00e9\u00e9n lokale machine. De kernvoordelen zijn: " +
           "volledige privacygarantie (geen pati\u00ebntdata verlaat het gebouw), onafhankelijkheid van externe leveranciers " +
           "en abonnementen, en structureel lagere kosten na de initi\u00eble investering."
@@ -219,9 +219,9 @@ const doc = new Document({
         // ===== 2. PRODUCTOVERZICHT =====
         heading1("2. Producten op de server"),
 
-        heading2("2.1 SmartVoice \u2014 AI-Consultassistent"),
+        heading2("2.1 VitaScribe \u2014 AI-Consultassistent"),
         bodyText(
-          "SmartVoice neemt consultaudio op via een Chrome-extensie, transcribeert de spraak met Faster-Whisper " +
+          "VitaScribe neemt consultaudio op via een Chrome-extensie, transcribeert de spraak met Faster-Whisper " +
           "(Large v3 Turbo), en genereert SOEP-documentatie via een lokaal LLM (Ollama/Llama 3.3 8B). " +
           "De output wordt direct in Bricks HIS ge\u00efnjecteerd. De pipeline omvat spraakherkenning (STT), " +
           "sprekerdiarisatie (PyAnnote), medische extractie, SOEP-generatie, en rode-vlaggendetectie."
@@ -249,7 +249,7 @@ const doc = new Document({
           "op de website aangeroepen."
         ),
         boldBodyText("GPU-belasting: ", "Minimaal. Korte prompts, korte antwoorden. Een 8B-model genereert een antwoord in <2 seconden. " +
-          "Concurrent gebruik met SmartVoice is mogelijk omdat de website-chatbot kleine batches verwerkt."),
+          "Concurrent gebruik met VitaScribe is mogelijk omdat de website-chatbot kleine batches verwerkt."),
 
         heading2("2.4 Toekomstige toepassingen"),
         bodyText(
@@ -374,14 +374,14 @@ const doc = new Document({
         spacer(200),
 
         boldBodyText("Aanbeveling: ", "De middelste configuratie (RTX 4070 Ti Super, \u20ac2.500) biedt de beste " +
-          "balans voor een gemiddelde huisartsenpraktijk. Ze draait SmartVoice en ProVita Care gelijktijdig, " +
+          "balans voor een gemiddelde huisartsenpraktijk. Ze draait VitaScribe en ProVita Care gelijktijdig, " +
           "ondersteunt modellen tot 32B parameters, en is stil genoeg voor een serverkast."),
 
         // ===== 4. GECOMBINEERDE WORKLOAD =====
         heading1("4. Gecombineerde workload-analyse"),
 
         bodyText(
-          "De producten belasten de GPU niet gelijktijdig. SmartVoice verwerkt in bursts " +
+          "De producten belasten de GPU niet gelijktijdig. VitaScribe verwerkt in bursts " +
           "(30\u201390 seconden per consult, daarna idle). ProVita Care genereert behandelplannen op verzoek " +
           "(niet tijdkritisch). De website-chatbot verwerkt korte interacties. Redis Streams fungeert als " +
           "wachtrij: als twee verzoeken tegelijk binnenkomen, wordt het tweede in de queue geplaatst."
@@ -389,7 +389,7 @@ const doc = new Document({
 
         bodyText(
           "In de praktijk ziet een typische ochtend er zo uit: de arts draait 15 consulten tussen 8:00 en 12:00. " +
-          "Na elk consult kost de SmartVoice-verwerking ~60 seconden GPU-tijd. Dat is 15 minuten GPU-belasting " +
+          "Na elk consult kost de VitaScribe-verwerking ~60 seconden GPU-tijd. Dat is 15 minuten GPU-belasting " +
           "over 4 uur \u2014 6% bezettingsgraad. De overige 94% van de tijd staat de GPU beschikbaar voor " +
           "ProVita Care, de chatbot, of andere taken. Zelfs in een groepspraktijk met 3 artsen die tegelijk " +
           "afronden, is de wachttijd beperkt tot 2\u20133 minuten."
@@ -531,7 +531,7 @@ const doc = new Document({
         heading2("7.1 Interne toegang"),
         bodyText(
           "De FastAPI-backend draait op een vast intern IP-adres (bijv. 192.168.1.100:8000). " +
-          "De Chrome-extensie van SmartVoice wordt geconfigureerd met dit adres als API URL. " +
+          "De Chrome-extensie van VitaScribe wordt geconfigureerd met dit adres als API URL. " +
           "ProVita Care communiceert via dezelfde API. De website-chatbot wordt via een reverse proxy " +
           "(Nginx/Caddy) ontsloten, zodat alleen de chatbot-endpoint extern bereikbaar is \u2014 " +
           "de rest van de API blijft intern."
@@ -779,7 +779,7 @@ const doc = new Document({
               children: [
                 cell("Multi-product platform", 2500, { bold: true }),
                 cell("Nee (alleen SOEP)", 3263),
-                cell("Ja (SmartVoice + ProVita + chatbot + meer)", 3263),
+                cell("Ja (VitaScribe + ProVita + chatbot + meer)", 3263),
               ],
             }),
           ],
@@ -800,7 +800,7 @@ const doc = new Document({
           numbering: { reference: "numbers", level: 0 },
           spacing: { after: 100, line: 300 },
           children: [
-            new TextRun({ text: "Maand 1\u20132 \u2014 SmartVoice migreren naar lokale server. ", bold: true, font: "Arial", size: 21 }),
+            new TextRun({ text: "Maand 1\u20132 \u2014 VitaScribe migreren naar lokale server. ", bold: true, font: "Arial", size: 21 }),
             new TextRun({ text: "Docker Compose stack deployen. Extensie configureren op intern IP. Testen met eigen consulten.", font: "Arial", size: 21 }),
           ],
         }),

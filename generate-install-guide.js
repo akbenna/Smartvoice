@@ -62,7 +62,7 @@ const doc = new Document({
         new Paragraph({
           alignment: AlignmentType.CENTER,
           spacing: { after: 200 },
-          children: [new TextRun({ text: "SmartVoice", font: "Arial", size: 56, bold: true, color: "059669" })]
+          children: [new TextRun({ text: "VitaScribe", font: "Arial", size: 56, bold: true, color: "059669" })]
         }),
         new Paragraph({
           alignment: AlignmentType.CENTER,
@@ -109,7 +109,7 @@ const doc = new Document({
         default: new Header({
           children: [new Paragraph({
             border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: "059669", space: 4 } },
-            children: [new TextRun({ text: "SmartVoice \u2014 Installatiehandleiding", font: "Arial", size: 16, color: "9CA3AF" })]
+            children: [new TextRun({ text: "VitaScribe \u2014 Installatiehandleiding", font: "Arial", size: 16, color: "9CA3AF" })]
           })]
         })
       },
@@ -126,12 +126,12 @@ const doc = new Document({
       },
       children: [
 
-        // ── Wat is SmartVoice ──
-        new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun("Wat is SmartVoice?")] }),
+        // ── Wat is VitaScribe ──
+        new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun("Wat is VitaScribe?")] }),
         new Paragraph({
           spacing: { after: 200 },
           children: [new TextRun({
-            text: "SmartVoice is een AI-consultassistent voor de huisartsenpraktijk. Het neemt het gesprek tussen arts en pati\u00EBnt op via de microfoon, transcribeert de audio met Deepgram, en genereert automatisch een SOEP-notitie met ICPC-code via Mistral AI. De resultaten kunnen met \u00E9\u00E9n klik in Bricks Huisarts worden ingevoegd.",
+            text: "VitaScribe is een AI-consultassistent voor de huisartsenpraktijk. Het neemt het gesprek tussen arts en pati\u00EBnt op via de microfoon, transcribeert de audio met Deepgram, en genereert automatisch een SOEP-notitie met ICPC-code via Mistral AI. De resultaten kunnen met \u00E9\u00E9n klik in Bricks Huisarts worden ingevoegd.",
             font: "Arial", size: 22
           })]
         }),
@@ -190,7 +190,7 @@ const doc = new Document({
           spacing: { after: 200 },
           shading: { fill: "F3F4F6", type: ShadingType.CLEAR },
           indent: { left: 360 },
-          children: [new TextRun({ text: "C:\\SmartVoice\\chrome-extension\\", font: "Consolas", size: 20, color: "059669" })]
+          children: [new TextRun({ text: "C:\\VitaScribe\\chrome-extension\\", font: "Consolas", size: 20, color: "059669" })]
         }),
         new Paragraph({
           spacing: { after: 200 },
@@ -241,7 +241,7 @@ const doc = new Document({
         new Paragraph({
           spacing: { after: 200 },
           children: [new TextRun({
-            text: "SmartVoice verschijnt nu als icoon in je browserbalk.",
+            text: "VitaScribe verschijnt nu als icoon in je browserbalk.",
             font: "Arial", size: 22,
           })]
         }),
@@ -251,7 +251,7 @@ const doc = new Document({
         new Paragraph({
           numbering: { reference: "steps", level: 0 },
           spacing: { after: 120 },
-          children: [new TextRun({ text: "Klik op het SmartVoice-icoon in de browserbalk", font: "Arial", size: 22 })]
+          children: [new TextRun({ text: "Klik op het VitaScribe-icoon in de browserbalk", font: "Arial", size: 22 })]
         }),
         new Paragraph({
           numbering: { reference: "steps", level: 0 },
@@ -267,7 +267,7 @@ const doc = new Document({
           spacing: { after: 120 },
           indent: { left: 720 },
           shading: { fill: "F3F4F6", type: ShadingType.CLEAR },
-          children: [new TextRun({ text: "https://smartvoice-production.up.railway.app", font: "Consolas", size: 20, color: "059669" })]
+          children: [new TextRun({ text: "https://vitascribe-production.up.railway.app", font: "Consolas", size: 20, color: "059669" })]
         }),
         new Paragraph({
           numbering: { reference: "steps", level: 0 },
@@ -293,14 +293,14 @@ const doc = new Document({
         new Paragraph({
           spacing: { after: 200 },
           children: [new TextRun({
-            text: "Wanneer je Bricks opent, verschijnt rechtsonder een groene microfoon-knop. Dit is de SmartVoice-widget.",
+            text: "Wanneer je Bricks opent, verschijnt rechtsonder een groene microfoon-knop. Dit is de VitaScribe-widget.",
             font: "Arial", size: 22,
           })]
         }),
         new Paragraph({
           numbering: { reference: "steps", level: 0 },
           spacing: { after: 120 },
-          children: [new TextRun({ text: "Klik op de groene knop \u2014 het SmartVoice-paneel opent", font: "Arial", size: 22 })]
+          children: [new TextRun({ text: "Klik op de groene knop \u2014 het VitaScribe-paneel opent", font: "Arial", size: 22 })]
         }),
         new Paragraph({
           numbering: { reference: "steps", level: 0 },
@@ -332,7 +332,7 @@ const doc = new Document({
         new Paragraph({
           spacing: { after: 200 },
           children: [new TextRun({
-            text: "Klik op het SmartVoice-icoon in de browserbalk. De popup bevat dezelfde opname- en verwerkingsfunctionaliteit. Handig als je niet op een Bricks-pagina zit. Resultaten worden automatisch beschikbaar in de widget zodra je Bricks opent.",
+            text: "Klik op het VitaScribe-icoon in de browserbalk. De popup bevat dezelfde opname- en verwerkingsfunctionaliteit. Handig als je niet op een Bricks-pagina zit. Resultaten worden automatisch beschikbaar in de widget zodra je Bricks opent.",
             font: "Arial", size: 22,
           })]
         }),
@@ -417,6 +417,6 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("SmartVoice-Installatiehandleiding.docx", buffer);
-  console.log("Klaar: SmartVoice-Installatiehandleiding.docx");
+  fs.writeFileSync("VitaScribe-Installatiehandleiding.docx", buffer);
+  console.log("Klaar: VitaScribe-Installatiehandleiding.docx");
 });

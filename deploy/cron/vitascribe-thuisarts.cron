@@ -1,4 +1,4 @@
-# SmartVoice — wekelijkse controle van de Thuisarts-koppeltabel
+# VitaScribe — wekelijkse controle van de Thuisarts-koppeltabel
 #
 # Links verlopen. Een pagina die is hernoemd of weggehaald stuurt de patiënt
 # naar een 404, en dat hoort niet stil te gebeuren. Deze controle draait vanaf
@@ -7,11 +7,11 @@
 # welke pagina opvraagt.
 #
 # Installeren: crontab -e en onderstaande regel plakken (pas pad/gebruiker aan),
-# of dit bestand in /etc/cron.d/smartvoice-thuisarts zetten (dan met gebruikersveld).
+# of dit bestand in /etc/cron.d/vitascribe-thuisarts zetten (dan met gebruikersveld).
 #
 # Draait elke maandag om 03:30, een half uur na de leerjobs, zodat ze elkaar
 # niet in de weg zitten. Het script eindigt met code 1 zodra er iets te
 # bekijken valt; cron mailt dan de uitvoer naar de beheerder.
 
 # m  h dom mon dow   command
-30 3 * * 1   smartvoice   /opt/smartvoice/scripts/check_thuisarts_links.py >> /opt/smartvoice/logs/thuisarts.log 2>&1
+30 3 * * 1   vitascribe   /opt/vitascribe/scripts/check_thuisarts_links.py >> /opt/vitascribe/logs/thuisarts.log 2>&1

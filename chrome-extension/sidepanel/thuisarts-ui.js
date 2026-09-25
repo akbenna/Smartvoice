@@ -1,5 +1,5 @@
 /**
- * SmartVoice - Thuisarts.nl bij de SOEP-regel
+ * VitaScribe - Thuisarts.nl bij de SOEP-regel
  *
  * Gebruikt uit sidepanel.js: lastSoep, setStatus(). Het opzoeken zelf staat in
  * lib/thuisarts.js en raakt het scherm niet aan; hier staat alleen wat de arts

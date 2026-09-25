@@ -1,5 +1,5 @@
 """
-SmartVoice Cloud API - Medisch Nederlands Vocabulaire
+VitaScribe Cloud API - Medisch Nederlands Vocabulaire
 
 Postprocessing-laag voor transcriptcorrectie.
 Corrigeert veelvoorkomende STT-fouten in medisch-Nederlandse termen.

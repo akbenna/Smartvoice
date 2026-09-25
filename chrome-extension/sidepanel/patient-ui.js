@@ -1,5 +1,5 @@
 /**
- * SmartVoice - Patiëntinstructie (B1 + vertaling) uit de SOEP-regel.
+ * VitaScribe - Patiëntinstructie (B1 + vertaling) uit de SOEP-regel.
  * Uses from sidepanel.js: getConfig(), setStatus(), lastSoep, els.soepRows
  */
 (function () {
@@ -142,7 +142,7 @@
    * aandoening het is. Zulke mail hoort beveiligd te gaan (NEN 7510), en de
    * extensie kan niet zien of dat gebeurt.
    *
-   * Daarom verstuurt de SmartVoice-server nooit zelf mail - dan werd hij
+   * Daarom verstuurt de VitaScribe-server nooit zelf mail - dan werd hij
    * verwerker van een nieuwe gegevensstroom - en vult de extensie geen
    * ontvanger in. Het adres van de patiënt uit Bricks halen zou een nieuwe
    * schraaproute openen, en een verkeerd ingevuld adres is een datalek.

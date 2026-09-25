@@ -1,5 +1,5 @@
 /**
- * SmartVoice - Meetwaarden in het zijpaneel.
+ * VitaScribe - Meetwaarden in het zijpaneel.
  * Uses from sidepanel.js: els.text, insertOrCopy(), setStatus()
  */
 (function () {

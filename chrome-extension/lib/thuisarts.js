@@ -1,5 +1,5 @@
 /**
- * SmartVoice - ICPC naar Thuisarts.nl
+ * VitaScribe - ICPC naar Thuisarts.nl
  *
  * De arts kiest de informatie, de extensie zoekt haar alleen op. Een pagina
  * op Thuisarts hoort bij een diagnose; laat je een taalmodel uit het dictaat

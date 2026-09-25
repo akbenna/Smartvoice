@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-SmartVoice - Linkbewaking voor de Thuisarts-koppeltabel
+VitaScribe - Linkbewaking voor de Thuisarts-koppeltabel
 
 Links verlopen. Een pagina wordt hernoemd, samengevoegd of weggehaald, en dan
 wijst de extensie de patiënt stilletjes naar een 404 of, erger, naar een pagina
@@ -8,7 +8,7 @@ over iets anders. Dit script loopt de tabel na en meldt wat er niet klopt.
 
   python3 scripts/check_thuisarts_links.py
 
-Draait wekelijks vanaf de server (zie deploy/cron/smartvoice-thuisarts.cron) en
+Draait wekelijks vanaf de server (zie deploy/cron/vitascribe-thuisarts.cron) en
 niet vanuit de browser van de arts: dan zou elk spreekuur de hele tabel
 langsgaan, en zou thuisarts.nl kunnen zien hoe vaak een praktijk welke pagina
 opvraagt.
@@ -38,7 +38,7 @@ from pathlib import Path
 WORTEL = Path(__file__).resolve().parent.parent
 TABEL = WORTEL / "chrome-extension" / "lib" / "thuisarts-icpc.json"
 
-AGENT = "SmartVoice-linkcontrole/1.0 (+huisartsenpraktijk; wekelijkse controle van eigen tabel)"
+AGENT = "VitaScribe-linkcontrole/1.0 (+huisartsenpraktijk; wekelijkse controle van eigen tabel)"
 WACHT = 15
 
 

@@ -1,5 +1,5 @@
 """
-SmartVoice - Evaluatie / Meetlat
+VitaScribe - Evaluatie / Meetlat
 ================================
 
 Lichtgewicht, dependency-vrije metrieken om kwaliteitswinst meetbaar te maken.

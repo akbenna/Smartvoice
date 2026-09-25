@@ -1,5 +1,5 @@
 """
-SmartVoice Cloud API - Authentication
+VitaScribe Cloud API - Authentication
 
 API key authentication via the X-API-Key header.
 

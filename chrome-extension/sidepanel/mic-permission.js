@@ -1,5 +1,5 @@
 /**
- * SmartVoice - One-time microphone permission for the side panel.
+ * VitaScribe - One-time microphone permission for the side panel.
  * Permission is granted per extension origin, so granting it here also
  * covers the side panel.
  */

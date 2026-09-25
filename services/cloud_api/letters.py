@@ -1,5 +1,5 @@
 """
-SmartVoice Cloud API - Letters (Brieven)
+VitaScribe Cloud API - Letters (Brieven)
 
 Informatiebrieven aan derden en verwijsbrieven, geschreven door Claude op
 basis van een door de arts gefilterd dossier. Voorheen de losse extensie
