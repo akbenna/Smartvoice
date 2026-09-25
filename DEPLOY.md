@@ -35,7 +35,9 @@ Ga naar je service → **Variables** en stel in:
 APP_ENV=production
 APP_SECRET_KEY=<genereer: openssl rand -hex 32>
 
-# CORS — je Vercel frontend URL
+# CORS — je Vercel frontend URL. Alleen services/api leest deze variabele. De
+# cloud-API die Railway draait (Dockerfile.railway: services.cloud_api) laat elke
+# herkomst toe, omdat de extensie vanaf chrome-extension:// aanroept.
 # Tijdens de overstap staan beide erin: het nieuwe adres en het huidige live adres.
 # Het oude kan eruit zodra de frontend alleen nog op vitascribe.vercel.app draait.
 CORS_ALLOWED_ORIGINS=https://vitascribe.vercel.app,https://smartvoice-nine.vercel.app
@@ -71,7 +73,9 @@ Railway bouwt automatisch bij push naar main. Je kunt ook handmatig triggeren:
 1. Push je code: `git push origin main`
 2. Railway bouwt de Docker image (duurt ~2-3 minuten)
 3. Health check op `/health` bevestigt dat de API draait
-4. Je krijgt een Railway URL, bijv. `vitascribe-api-production.up.railway.app`
+4. Je krijgt een Railway URL. Bij de praktijk is dat `smartvoice-production.up.railway.app`. Dat adres houdt de oude
+   naam met opzet: het staat in de extensie-instellingen op elke werkplek en in het
+   installatiebeleid, en een ander adres betekent op elke pc opnieuw instellen.
 
 ## Stap 5 — Frontend Koppelen aan Backend
 
@@ -80,7 +84,7 @@ In het **Vercel** dashboard:
 1. Ga naar je VitaScribe frontend project → **Settings** → **Environment Variables**
 2. Voeg toe:
    ```
-   NEXT_PUBLIC_API_URL=https://vitascribe-api-production.up.railway.app
+   NEXT_PUBLIC_API_URL=https://smartvoice-production.up.railway.app
    ```
    (vervang met je daadwerkelijke Railway URL)
 3. Klik **Redeploy** om de nieuwe env var actief te maken

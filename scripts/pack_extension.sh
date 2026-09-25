@@ -40,7 +40,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 KEY="${1:?pad naar .pem-sleutel}"
-BASE="${2:?server-URL, bv. https://vitascribe-production.up.railway.app}"
+BASE="${2:?server-URL, bv. https://smartvoice-production.up.railway.app}"
 OUT="${3:-dist/extension}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 

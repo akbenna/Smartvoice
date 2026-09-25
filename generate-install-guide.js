@@ -267,7 +267,7 @@ const doc = new Document({
           spacing: { after: 120 },
           indent: { left: 720 },
           shading: { fill: "F3F4F6", type: ShadingType.CLEAR },
-          children: [new TextRun({ text: "https://vitascribe-production.up.railway.app", font: "Consolas", size: 20, color: "059669" })]
+          children: [new TextRun({ text: "https://smartvoice-production.up.railway.app", font: "Consolas", size: 20, color: "059669" })]
         }),
         new Paragraph({
           numbering: { reference: "steps", level: 0 },
