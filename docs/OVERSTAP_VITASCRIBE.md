@@ -9,11 +9,22 @@ alles gewoon werken: waar de oude naam nog live is, vangt de code hem op.
 
 ## 1. De sleutel van de extensie — eerst, en voorzichtig
 
-`smartvoice.pem` heet voortaan `vitascribe.pem`. Hernoem het bestand, maar maak
-**geen nieuwe sleutel**. De sleutel bepaalt het extensie-ID; een andere sleutel
-geeft een andere extensie, en dan installeert het beleid (ExtensionInstallForcelist)
-op geen enkele werkplek meer de bestaande. Controleer na het inpakken met
-`scripts/pack_extension.sh` dat het getoonde ID gelijk is aan het oude.
+De sleutel staat niet in git, en hoort daar ook niet. Of er al een is, zie je op
+één werkplek op `edge://extensions`:
+
+- Staat de extensie er als uitgepakt, geladen vanuit een map? Dan is er nooit
+  een sleutel geweest en vervalt deze stap. De eerste uitrol maakt hem aan, met
+  `scripts/pack_extension.sh --nieuwe-sleutel vitascribe.pem …`.
+- Staat er "Beheerd door je organisatie"? Dan is hij ooit verpakt, en staat de
+  sleutel op de computer waar dat gebeurde (op een Mac: `mdfind -name
+  smartvoice.pem`). Hernoem hem naar `vitascribe.pem`, maar maak **geen nieuwe**.
+  De sleutel bepaalt het extensie-ID; een andere sleutel geeft een andere
+  extensie, en dan installeert het beleid (ExtensionInstallForcelist) op geen
+  enkele werkplek meer de bestaande.
+
+Het verpakscript maakt niet meer vanzelf een nieuwe sleutel als het pad niet
+klopt, en met `--verwacht-id` controleert het vóór het inpakken of de sleutel
+bij het ID op de werkplekken hoort.
 
 ## 2. GitHub
 
@@ -64,8 +75,10 @@ leest `run_learning_jobs.sh` de oude naam nog.
 
 ## 6. Het extensiepakket
 
-Pak de extensie opnieuw in met de hernoemde sleutel en publiceer
-`vitascribe.crx` en de nieuwe `update.xml`. Werkplekken met een oude
+Pak de extensie opnieuw in met de hernoemde sleutel, met het ID dat op de
+werkplekken staat erbij: `scripts/pack_extension.sh --verwacht-id <ID>
+vitascribe.pem https://<server>`. Publiceer `vitascribe.crx` en de nieuwe
+`update.xml`. Werkplekken met een oude
 `update.xml` vragen nog naar `/extension/smartvoice.crx`; de server geeft op
 beide paden hetzelfde pakket, dus niemand blijft op een oude versie hangen.
 

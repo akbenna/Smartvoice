@@ -20,8 +20,8 @@ De server schrijft per gebruik een regel met wie, wat, wanneer en de uitkomst. E
 
 Stappen:
 
-1. Maak eenmalig een ondertekensleutel: `openssl genrsa -out vitascribe.pem 2048`. Bewaar hem veilig, buiten git. Met dezelfde sleutel blijft het extensie-ID gelijk.
-2. Pak de extensie in: `scripts/pack_extension.sh vitascribe.pem https://<server>`. `vitascribe.pem` is de sleutel die eerder `smartvoice.pem` heette, alleen hernoemd: een nieuwe sleutel geeft een nieuw extensie-ID, en dan pakt het beleid op de werkplekken de extensie niet meer op. Dat maakt `dist/extension/vitascribe.crx` en `update.xml`, en toont het ID en de beleidswaarde.
+1. De allereerste keer: `scripts/pack_extension.sh --nieuwe-sleutel vitascribe.pem https://<server>`. Dat maakt de ondertekensleutel `vitascribe.pem` aan, alleen leesbaar voor jou. Bewaar hem veilig, buiten git, met een kopie op een tweede plek: met dezelfde sleutel blijft het extensie-ID gelijk, en kwijt betekent op elke werkplek opnieuw installeren. Noteer het getoonde extensie-ID.
+2. Elke keer daarna: `scripts/pack_extension.sh --verwacht-id <ID> vitascribe.pem https://<server>`. Het script controleert vóór het inpakken of de sleutel bij dat ID hoort, en weigert als er op het pad geen sleutel staat. Dat is met opzet: het onderliggende gereedschap zou anders stilletjes een nieuwe sleutel maken, met een nieuw ID, en dan pakt het beleid de extensie op geen enkele werkplek meer op. Is er al eens uitgerold met een sleutel die nog `smartvoice.pem` heet, gebruik dan die, hernoemd. Het script maakt `dist/extension/vitascribe.crx` en `update.xml`, en toont het ID en de beleidswaarde.
 3. Zet beide bestanden op een https-adres dat de pc's zonder inloggen bereiken. Dat kan de VitaScribe-server zelf (`/extension/update.xml` en `/extension/vitascribe.crx`, via `EXTENSION_DIST_DIR`) of een andere statische host.
 4. De ICT-leverancier zet in Groepsbeleid (Microsoft Edge → Extensies):
    - `ExtensionInstallForcelist`: `<ID>;https://<server>/extension/update.xml`
