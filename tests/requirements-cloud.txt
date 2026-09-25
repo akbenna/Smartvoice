@@ -3,7 +3,7 @@
 pytest>=8
 pytest-asyncio>=0.23
 httpx>=0.24
-sqlalchemy>=2
+sqlalchemy[asyncio]>=2
 aiosqlite>=0.19
 python-jose[cryptography]>=3.3
 passlib[bcrypt]>=1.7
