@@ -1,16 +1,21 @@
 /**
- * node --test chrome-extension/test/
+ * node --test tests/js/thuisarts.test.js
  *
  * De eerste JavaScript-proef van de extensie. Die had nog geen testopzet; dit
  * is het kleinste begin dat ergens over gaat, en het gaat over de plek waar
  * een fout de patiënt raakt: welke pagina er bij een code hoort.
+ *
+ * De proef staat hier en niet in chrome-extension/, omdat pack_extension.sh die
+ * map in zijn geheel tot CRX maakt: testcode hoort niet mee te reizen naar de
+ * browser van elke werkplek.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const T = require('../lib/thuisarts.js');
+const EXT = path.join(__dirname, '..', '..', 'chrome-extension');
+const T = require(path.join(EXT, 'lib', 'thuisarts.js'));
 
 const TABEL = {
   paginas: [
@@ -84,7 +89,7 @@ test('de verwijzing zegt in de taal van de patiënt dat de site Nederlands is', 
 /* Elke taal die het zijpaneel aanbiedt moet ook een regel hebben. Komt er een
    taal bij, dan valt die anders stil terug op het Nederlands. */
 test('elke taal uit het zijpaneel heeft een eigen regel', () => {
-  const html = fs.readFileSync(path.join(__dirname, '..', 'sidepanel', 'sidepanel.html'), 'utf8');
+  const html = fs.readFileSync(path.join(EXT, 'sidepanel', 'sidepanel.html'), 'utf8');
   const blok = html.slice(html.indexOf('id="pi-taal"'), html.indexOf('</select>', html.indexOf('id="pi-taal"')));
   const talen = [...blok.matchAll(/value="([a-z]{2})"/g)].map((m) => m[1]);
   assert.ok(talen.length >= 8, 'talen gevonden in het zijpaneel');
@@ -94,7 +99,7 @@ test('elke taal uit het zijpaneel heeft een eigen regel', () => {
 /* De meegeleverde tabel moet leesbaar zijn en de vorm hebben die de module
    verwacht, ook nu er nog geen adressen in staan. */
 test('de meegeleverde tabel heeft de juiste vorm', () => {
-  const tabel = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'lib', 'thuisarts-icpc.json'), 'utf8'));
+  const tabel = JSON.parse(fs.readFileSync(path.join(EXT, 'lib', 'thuisarts-icpc.json'), 'utf8'));
   assert.ok(Array.isArray(tabel.paginas) && tabel.paginas.length > 0);
   for (const rij of tabel.paginas) {
     assert.match(rij.icpc, /^[A-Z]\d{2}$/);
@@ -107,7 +112,7 @@ test('de meegeleverde tabel heeft de juiste vorm', () => {
    welke aandoening er op papier gaat. Deze proef bewijst dat de meegeleverde
    bibliotheek dat zonder netwerk kan. */
 test('de meegeleverde QR-bibliotheek maakt lokaal een code', () => {
-  const qrcode = require('../lib/qrcode/qrcode.js');
+  const qrcode = require(path.join(EXT, 'lib', 'qrcode', 'qrcode.js'));
   const qr = qrcode(0, 'M');
   qr.addData('https://www.thuisarts.nl/acute-bronchitis');
   qr.make();

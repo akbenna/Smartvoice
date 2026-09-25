@@ -115,10 +115,10 @@ afdruk en in de vertaling.
 `chrome-extension/lib/thuisarts.js`, met `pagesForIcpc(code, tabel)`: geen DOM,
 geen `chrome.*`, geen fetch. Daardoor te controleren met `node --test`, en dat
 is ook de reden dat het los staat van de schermcode. De proeven staan in
-`chrome-extension/test/thuisarts.test.js`:
+`tests/js/thuisarts.test.js`:
 
 ```
-node --test chrome-extension/test/thuisarts.test.js
+node --test tests/js/thuisarts.test.js
 ```
 
 ### In het zijpaneel
