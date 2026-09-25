@@ -8,8 +8,22 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-PROJECT_DIR="$HOME/Documents/GitHub/VitaScribe"
-cd "$PROJECT_DIR" || { echo "Project niet gevonden op $PROJECT_DIR"; exit 1; }
+# Het project zoeken in plaats van één vaste map aan te nemen. Eerst de map waar
+# dit script zelf staat (ook als je het via een alias of het Dock opent), dan de
+# gebruikelijke plekken onder de nieuwe en de oude naam. Zo blijft dubbelklikken
+# werken, of de map nu VitaScribe of nog Smartvoice heet.
+PROJECT_DIR=""
+for kandidaat in "$(cd "$(dirname "$0")" && pwd)" \
+                 "$HOME/Documents/GitHub/VitaScribe" \
+                 "$HOME/Documents/GitHub/Smartvoice"; do
+  if [ -f "$kandidaat/chrome-extension/manifest.json" ]; then PROJECT_DIR="$kandidaat"; break; fi
+done
+# Een lege PROJECT_DIR moet hier stoppen: `cd ""` slaagt in bash en zou het
+# script in de verkeerde map laten doorgaan.
+if [ -z "$PROJECT_DIR" ] || ! cd "$PROJECT_DIR"; then
+  echo "Project niet gevonden. Zet dit script in de projectmap, of de map op ~/Documents/GitHub/VitaScribe."
+  exit 1
+fi
 
 echo "========================================"
 echo -e " ${GREEN}VitaScribe AI-Consultassistent${NC}"
