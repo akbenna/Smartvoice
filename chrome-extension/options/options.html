@@ -145,6 +145,29 @@
   </div>
 
   <div class="card">
+    <h2>Informatie delen met de patiënt</h2>
+    <p class="hint" style="margin-bottom:10px">
+      Meegeven op papier en kopiëren voor het berichtenveld van Bricks of het portaal kan altijd:
+      die blijven binnen het dossier of gaan mee in de hand. Mailen is een keuze van de praktijk.
+      Een uitleg over een aandoening naast een e-mailadres is een gezondheidsgegeven, en dat geldt
+      ook voor een mail met alleen een Thuisarts-link: die link zegt welke aandoening het is.
+      Zulke mail hoort beveiligd te gaan (NEN 7510).
+    </p>
+    <div class="field">
+      <label for="delenPerMail">Mailknop tonen</label>
+      <select id="delenPerMail">
+        <option value="uit">Uit — niet mailen</option>
+        <option value="aan">Aan — via de beveiligde mail van de praktijk</option>
+      </select>
+    </div>
+    <p class="hint">
+      SmartVoice verstuurt zelf nooit mail. De knop opent je eigen mailprogramma, met de tekst al
+      ingevuld en <strong>zonder ontvanger</strong>: het adres vul je zelf in, in de beveiligde mail
+      van de praktijk. De tekst bevat geen naam, geboortedatum of BSN.
+    </p>
+  </div>
+
+  <div class="card">
     <h2>Bricks Veld Selectors (geavanceerd)</h2>
     <p class="hint" style="margin-bottom: 10px;">
       Optioneel: pas CSS-selectors aan als SmartVoice de Bricks-velden niet automatisch vindt.

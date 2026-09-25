@@ -406,7 +406,11 @@ function renderSoep(soep) {
     row.appendChild(btn);
     els.soepRows.appendChild(row);
   });
-  els.icpc.textContent = soep.icpc_code ? soep.icpc_code + (soep.icpc_titel ? ' · ' + soep.icpc_titel : '') : '';
+  // The code is shown separately and is editable: the Thuisarts lookup hangs
+  // on it, so the doctor must have the last word on which code is there.
+  document.getElementById('icpc-code').textContent = soep.icpc_code || '';
+  document.getElementById('icpc-titel').textContent = soep.icpc_titel ? ' · ' + soep.icpc_titel : '';
+  if (window.SVThuisartsUI) window.SVThuisartsUI.toon();
   // Clinically relevant items the doctor did not dictate: shown, never inserted.
   var points = Array.isArray(soep.aandachtspunten) ? soep.aandachtspunten : [];
   var list = document.getElementById('soep-check-list');

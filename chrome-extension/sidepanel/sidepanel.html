@@ -85,9 +85,11 @@
   <section id="soep" class="soep hidden">
     <div class="soep-head">
       <h2>SOEP</h2>
-      <span id="icpc" class="icpc"></span>
+      <span id="icpc" class="icpc"><span id="icpc-code" class="icpc-code" contenteditable="true" spellcheck="false"
+              role="textbox" aria-label="ICPC-code, aan te passen"></span><span id="icpc-titel"></span></span>
     </div>
     <div class="soep-rows" id="soep-rows"></div>
+    <div id="ta" class="ta hidden"></div>
     <div id="soep-check" class="soep-check hidden">
       <strong>Onvolledig in de verslaglegging</strong>
       <ul id="soep-check-list"></ul>
@@ -118,7 +120,9 @@
       <textarea id="pi-tr" class="pi-text hidden" rows="8" dir="auto"></textarea>
       <div class="lt-row pi-actions hidden">
         <button id="pi-copy" class="btn small">Kopieer</button>
+        <button id="pi-bericht" class="btn small" title="Uitleg plus link, klaar voor het berichtenveld van Bricks of het patiëntportaal">Kopieer voor bericht</button>
         <button id="pi-print" class="btn small">Afdrukken</button>
+        <button id="pi-mail" class="btn small hidden" title="Opent je mailprogramma zonder ontvanger; vul het adres zelf in via de beveiligde mail van de praktijk">Verstuur via beveiligde mail</button>
       </div>
       <p class="note">Concept op basis van jouw E en P; er wordt niets toegevoegd. Een vertaling kun je zelf niet altijd controleren: geef hem mee naast de Nederlandse tekst.</p>
     </div>
@@ -253,10 +257,13 @@
   <script src="../lib/textrules.js"></script>
   <script src="../lib/privacy.js"></script>
   <script src="../lib/pdfjs/pdf.min.js"></script>
+  <script src="../lib/qrcode/qrcode.js"></script>
+  <script src="../lib/thuisarts.js"></script>
   <script src="sidepanel.js"></script>
   <script src="letters.js"></script>
   <script src="../lib/meetwaarden.js"></script>
   <script src="meetwaarden-ui.js"></script>
+  <script src="thuisarts-ui.js"></script>
   <script src="patient-ui.js"></script>
 </body>
 </html>

@@ -102,6 +102,21 @@ ollama pull llama3.1:8b
 docker compose up -d
 ```
 
+## Testen
+
+```bash
+# Python (cloud-API, pipeline, beleid)
+pip install -r tests/requirements-cloud.txt
+pytest -q
+
+# JavaScript in de extensie (koppeltabel Thuisarts, QR)
+node --test chrome-extension/test/thuisarts.test.js
+```
+
+De extensie heeft geen bouwstap en geen npm-afhankelijkheden: de proeven draaien
+op de ingebouwde testloper van Node. Logica die het waard is om te toetsen staat
+daarom in `chrome-extension/lib/`, zonder DOM en zonder `chrome.*`.
+
 ## Configuratie
 
 Alle configuratie via environment variabelen (zie .env.example).

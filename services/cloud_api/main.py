@@ -37,6 +37,7 @@ from .config import get_config
 from .dictation import relay_dictation
 from .letters import router as letters_router
 from .patient_info import router as patient_router
+from .usage import router as usage_router
 from . import audit, data_policy, llm_service
 from .medical_vocabulary import (
     add_custom_correction,
@@ -289,6 +290,7 @@ DICTAAT_MAX_CHARS = 20000
 
 app.include_router(letters_router)
 app.include_router(patient_router)
+app.include_router(usage_router)
 
 
 @app.websocket("/api/v1/dictation/stream")

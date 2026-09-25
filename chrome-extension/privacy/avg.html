@@ -50,6 +50,14 @@
 <h2>Beroepsgeheim bij informatiebrieven</h2>
 <p>Volgens de KNMG-richtlijn Omgaan met medische gegevens verstrekt de behandelend arts alleen feitelijke gegevens, alleen op een gerichte vraag en alleen met uitdrukkelijke toestemming van de patiënt. De arts geeft geen oordeel. De extensie vraagt die bevestiging voor elke informatiebrief, en de brief beperkt zich tot feiten. Een oordeel over beperkingen, arbeidsgeschiktheid of causaliteit laat de brief over aan een onafhankelijk arts.</p>
 
+<h2>Thuisarts.nl bij de SOEP-regel</h2>
+<p>De extensie zoekt bij de ICPC-code die de arts zelf vastlegt een pagina op Thuisarts.nl. Dat gebeurt met een vaste tabel in de extensie, zonder taalmodel: een pagina kiezen op grond van het dictaat zou neerkomen op het voorstellen van een diagnose, en dat doet SmartVoice niet. Er gaat voor dat opzoeken niets het netwerk op; de tabel staat in de extensie zelf. Een QR-code op de afdruk wordt in de browser gemaakt en niet door een QR-dienst, omdat zo'n dienst anders ziet welke aandoening er op het papier van de patiënt komt.</p>
+<p>Een link verschijnt alleen als iemand hem met het oog heeft gecontroleerd; de tabel houdt bij wanneer en door wie. Staat er niets bij een code, dan zegt het scherm dat, met een zoekveld ernaast. De praktijk laat de links wekelijks nalopen vanaf de eigen server, zodat een pagina die verdwijnt opvalt en niet stil kapot gaat.</p>
+
+<h2>Informatie delen met de patiënt</h2>
+<p>Meegeven op papier en kopiëren naar het berichtenveld van het HIS of het patiëntportaal zijn de gewone routes: het bericht blijft in het dossier en loopt over een kanaal dat al beveiligd is.</p>
+<p>Mailen is een aparte keuze van de praktijk en staat standaard uit. Een uitleg over een aandoening naast een e-mailadres is een gezondheidsgegeven, en dat geldt ook voor een mail met alleen een Thuisarts-link: die link zegt welke aandoening het is. Zulke mail hoort beveiligd te gaan (NEN 7510). SmartVoice verstuurt daarom zelf nooit mail — dan zou de server verwerker worden van een nieuwe gegevensstroom — maar opent het mailprogramma van de praktijk, met de tekst ingevuld en zonder ontvanger. Het adres vult de arts zelf in. Het adres uit Bricks halen zou een nieuwe route openen om patiëntgegevens te lezen, en een verkeerd ingevuld adres is een datalek. De tekst bevat geen naam, geboortedatum of BSN.</p>
+
 <p class="foot">De brief is een concept. De huisarts controleert en ondertekent altijd zelf.</p>
 </body>
 </html>
