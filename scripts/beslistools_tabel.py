@@ -28,7 +28,7 @@ from datetime import date
 from pathlib import Path
 
 TABEL = Path(__file__).resolve().parent.parent / "chrome-extension" / "lib" / "beslistools-icpc.json"
-BASIS = "https://provitacare.nl"
+BASIS = "https://www.provita-care.nl"
 INITIALEN = re.compile(r"^[A-Za-z.]{1,8}$")
 
 

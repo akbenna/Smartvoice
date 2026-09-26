@@ -36,8 +36,9 @@ en de instellingen, het zijpaneel en de popup openen zonder fouten.
 
 ## Stap 4: privacyverklaring
 
-Adres na publicatie: **https://hetroosendael.nl/vitascribe-privacy**
-(bron: `src/vitascribe-privacy.html` in de repo roosendaelportaal).
+Adres na publicatie: **https://www.provita-care.nl/vitascribe/privacy**
+(bron: `public/vitascribe/privacy.html` in de repo provita-care; het oude adres op
+hetroosendael.nl stuurt door).
 
 ## Stap 5: de winkelvermelding
 
@@ -92,7 +93,7 @@ uploadscherm noemt ze.
 **Privacy:** privacyverklaring-URL zoals bij stap 4. Op de vraag of de extensie
 persoonsgegevens verwerkt: ja (gezondheidsgegevens, via de server van de praktijk).
 
-**Website en ondersteuning:** https://hetroosendael.nl, Roosendael@ezorg.nl.
+**Website en ondersteuning:** https://www.provita-care.nl, info@provita-care.nl.
 
 **Zichtbaarheid:** Verborgen. De extensie is dan niet vindbaar in de winkel, maar wel
 te installeren via de link die je deelt.
@@ -146,5 +147,5 @@ PERMISSIONS
 DATA
   Audio and text go only to the server configured by the practice, which uses
   EU endpoints for speech and language models. No analytics, no advertising,
-  no remote code. Privacy policy: https://hetroosendael.nl/vitascribe-privacy
+  no remote code. Privacy policy: https://www.provita-care.nl/vitascribe/privacy
 ```

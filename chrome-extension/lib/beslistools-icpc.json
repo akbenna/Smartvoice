@@ -1,7 +1,7 @@
 {
   "toelichting": "Koppeling van de ICPC-code die de arts vastlegt naar het naslagdeel van een tool in ProVita Care, en naar een uitlegfilmpje voor de patiënt. Zelfde regels als de Thuisarts-tabel: een vaste tabel, geen taalmodel, en VitaScribe rekent zelf niets. Alleen naslag (protocollen, doseringstabellen, vergoedingen) en uitleg voor de patiënt; tools die een advies voor één patiënt geven (Smart Adviseur, PCCV-score, Nierschade Tool, CVA-nazorg, rekenhulpen, keuzehulpen) staan er bewust niet in. Een regel telt pas mee als 'gecontroleerd_op' en 'door' allebei gevuld zijn.",
   "invullen": "Open de link, kijk of de inhoud bij de code past, en zet dan je initialen in 'door' en de datum in 'gecontroleerd_op' (JJJJ-MM-DD). Met scripts/beslistools_tabel.py: --toon laat zien wat nog open staat, --controleer <id> --door <initialen> zet een regel aan.",
-  "basis": "https://provitacare.nl",
+  "basis": "https://www.provita-care.nl",
   "versie": "2026-09-26",
   "links": [
     {
