@@ -26,7 +26,7 @@ class STTConfig:
     groq_api_key: str = ""
     groq_model: str = "whisper-large-v3-turbo"
     deepgram_api_key: str = ""
-    deepgram_model: str = "nova-2"
+    deepgram_model: str = "nova-3"
     deepgram_language: str = "nl"
     openai_api_key: str = ""
     openai_model: str = "whisper-1"
@@ -102,7 +102,7 @@ def get_config() -> AppConfig:
             groq_api_key=os.getenv("GROQ_API_KEY", ""),
             groq_model=os.getenv("GROQ_STT_MODEL", "whisper-large-v3-turbo"),
             deepgram_api_key=os.getenv("DEEPGRAM_API_KEY", ""),
-            deepgram_model=os.getenv("DEEPGRAM_MODEL", "nova-2"),
+            deepgram_model=os.getenv("DEEPGRAM_MODEL", "nova-3"),
             deepgram_language=os.getenv("DEEPGRAM_LANGUAGE", "nl"),
             openai_api_key=os.getenv("OPENAI_API_KEY", ""),
             openai_model=os.getenv("OPENAI_STT_MODEL", "whisper-1"),

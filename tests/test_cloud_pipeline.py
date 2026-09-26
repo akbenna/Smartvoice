@@ -106,3 +106,79 @@ async def test_pipeline_merges_decisief_and_detection_into_one_call():
     soep_call, nazorg_call = complete_mock.await_args_list
     assert soep_call.kwargs["max_tokens"] == pipeline.SOEP_MAX_TOKENS
     assert nazorg_call.kwargs["max_tokens"] == pipeline.NAZORG_MAX_TOKENS
+
+
+# ── Sprekers: wie zegt wat ──
+
+from services.cloud_api import stt_service  # noqa: E402
+from services.cloud_api.medical_vocabulary import correct_transcript_full  # noqa: E402
+
+
+def _uiting(spreker, tekst):
+    return stt_service.TranscriptSegment(text=tekst, start=0.0, end=1.0, speaker=spreker)
+
+
+def _gesprek(*uitingen):
+    tekst = " ".join(t for _, t in uitingen)
+    return stt_service.TranscriptResult(
+        raw_text=tekst, segments=[_uiting(s, t) for s, t in uitingen], provider="deepgram")
+
+
+def test_met_sprekers_zet_elke_beurt_op_een_eigen_regel():
+    t = _gesprek(("spreker_0", "Wat kan ik voor u doen?"),
+                 ("spreker_1", "Ik heb al drie dagen keelpijn."),
+                 ("spreker_1", "En koorts."),
+                 ("spreker_0", "Ik kijk even in uw keel."))
+    assert stt_service.met_sprekers(t) == (
+        "Spreker 1: Wat kan ik voor u doen?\n"
+        "Spreker 2: Ik heb al drie dagen keelpijn. En koorts.\n"
+        "Spreker 1: Ik kijk even in uw keel.")
+
+
+def test_met_sprekers_nummert_op_volgorde_van_binnenkomst():
+    """Deepgram kan met spreker 3 beginnen; het model ziet gewoon Spreker 1."""
+    t = _gesprek(("spreker_3", "Goedemorgen."), ("spreker_0", "Goedemorgen dokter."))
+    assert stt_service.met_sprekers(t).startswith("Spreker 1: Goedemorgen.\nSpreker 2:")
+
+
+def test_met_sprekers_laat_een_enkele_stem_ongemoeid():
+    t = _gesprek(("spreker_0", "Pt drie dagen keelpijn."), ("spreker_0", "Geen koorts."))
+    assert stt_service.met_sprekers(t) == t.raw_text
+
+
+def test_met_sprekers_zonder_sprekers_of_segmenten():
+    zonder = stt_service.TranscriptResult(
+        raw_text="tekst", segments=[stt_service.TranscriptSegment(text="tekst", start=0, end=1)])
+    assert stt_service.met_sprekers(zonder) == "tekst"
+    assert stt_service.met_sprekers(stt_service.TranscriptResult(raw_text="los")) == "los"
+
+
+def test_woordcorrectie_laat_de_sprekerlabels_staan():
+    tekst = "Spreker 1: Hoe gaat het?\nSpreker 2: Ik gebruik metformine."
+    uit, _ = correct_transcript_full(tekst)
+    assert uit.splitlines()[0].startswith("Spreker 1:")
+    assert uit.splitlines()[1].startswith("Spreker 2:")
+
+
+@pytest.mark.asyncio
+async def test_pipeline_geeft_het_gesprek_per_spreker_aan_het_taalmodel():
+    soep_json = json.dumps({"s": "3d keelpijn", "o": "", "e": "", "p": "",
+                            "icpc_code": "R74", "icpc_titel": "x"})
+    nazorg_json = json.dumps({"decisief": "x", "rode_vlaggen": [], "ontbrekende_info": []})
+    t = _gesprek(("spreker_0", "Wat kan ik voor u doen?"),
+                 ("spreker_1", "Ik heb al drie dagen keelpijn."))
+    complete_mock = AsyncMock(side_effect=[soep_json, nazorg_json])
+
+    with patch.object(pipeline.stt_service, "transcribe", new=AsyncMock(return_value=t)), \
+         patch.object(pipeline.llm_service, "complete", new=complete_mock):
+        result = await pipeline.process_consultation(Path("/fake/audio.wav"))
+
+    prompt = complete_mock.await_args_list[0].kwargs["user_prompt"]
+    assert "Spreker 1: Wat kan ik voor u doen?\nSpreker 2: Ik heb al drie dagen keelpijn." in prompt
+    assert result.transcript.startswith("Spreker 1:")
+    assert result.transcript_raw == t.raw_text
+
+
+def test_soep_prompt_kent_de_sprekerlabels():
+    assert "Spreker 1" in pipeline.SOEP_SYSTEM_PROMPT
+    assert "heteroanamnese" in pipeline.SOEP_SYSTEM_PROMPT
