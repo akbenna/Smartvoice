@@ -68,8 +68,9 @@ Adres na publicatie: **https://hetroosendael.nl/vitascribe-privacy**
 > VitaScribe stelt geen diagnose en geeft geen behandeladvies. Alles wat het maakt, is
 > een concept dat de arts controleert en ondertekent.
 >
-> Voor gebruik heb je een serveradres en een persoonlijke serversleutel van je praktijk
-> nodig.
+> Voor gebruik heeft je praktijk een licentie nodig. In de testfase is die gratis:
+> meld de praktijk aan via https://smartvoice-production.up.railway.app/aanmelden.
+> Elke gebruiker krijgt daarna een eigen sleutel.
 
 **Zoektermen:** huisarts, Bricks, dicteren, SOEP, spraakherkenning, verwijsbrief,
 consultverslag.
@@ -99,8 +100,10 @@ te installeren via de link die je deelt.
 ## Stap 6: notities voor de keurder
 
 Partner Center heeft een veld *Notes for certification*. De keurders lezen Engels.
-Vul vóór het indienen een testsleutel in die alleen op testgegevens werkt, en trek
-hem in na de keuring.
+Zodra het licentiesysteem (PR #23) live staat: maak in `/beheer` een praktijk
+"Keuring Microsoft" aan, zonder praktijknummer, activeer die als pilot en maak één
+gebruiker. Vul die sleutel hieronder in, en haal de praktijk uit na de keuring. Zonder
+praktijknummer werkt de sleutel op elke pagina, en dat heeft de keurder nodig.
 
 ```text
 VitaScribe is a dictation and documentation assistant for Dutch general
