@@ -9,6 +9,20 @@
  * 4. RECORDER_AUDIO — legacy handler for recorder page
  */
 
+importScripts('../lib/praktijk.js');
+
+// ── Bricks-praktijknummer bijhouden (voor de licentie, zie lib/praktijk.js) ──
+// Alleen Bricks-adressen leveren een nummer op; van andere tabbladen wordt niets bewaard.
+chrome.tabs.onUpdated.addListener(function (_tabId, info, tab) {
+  var url = info.url || (info.status === 'complete' && tab && tab.url);
+  if (url) SVPraktijk.onthoud(url);
+});
+chrome.tabs.onActivated.addListener(function (active) {
+  chrome.tabs.get(active.tabId, function (tab) {
+    if (!chrome.runtime.lastError && tab && tab.url) SVPraktijk.onthoud(tab.url);
+  });
+});
+
 // ── API call (runs in service worker — survives popup close) ──
 
 async function callCloudAPI(base64Audio, mimeType) {
@@ -35,6 +49,7 @@ async function callCloudAPI(base64Audio, mimeType) {
   const headers = {};
   const apiKey = (config.apiKey || '').trim();
   if (apiKey) headers['X-API-Key'] = apiKey;
+  await SVPraktijk.metKop(headers);
 
   // Update state: processing
   await chrome.storage.local.set({
@@ -52,8 +67,11 @@ async function callCloudAPI(base64Audio, mimeType) {
   if (!response.ok) {
     const errText = await response.text();
     if (response.status === 403) {
+      // Bij een licentie zegt de server waarom (verlopen, uitgezet, andere praktijk).
+      const reden = (function () { try { return JSON.parse(errText).detail; } catch (e) { return ''; } })();
+      if (reden && typeof reden === 'string' && reden.indexOf('Ongeldige') === -1) throw new Error(reden);
       throw new Error('API-sleutel klopt niet. Controleer of de sleutel in de ' +
-        'extensie-instellingen exact overeenkomt met die op de server (Railway: API_KEYS).');
+        'extensie-instellingen exact overeenkomt met die op de server.');
     }
     if (response.status === 401) {
       throw new Error('API-sleutel ontbreekt. Vul de sleutel in bij de extensie-instellingen.');

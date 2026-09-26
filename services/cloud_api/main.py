@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 import tempfile
 import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -32,12 +33,16 @@ from fastapi.responses import JSONResponse, Response
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
-from .auth import verify_api_key
+from .auth import huidige_identiteit, verify_api_key
 from .config import get_config
 from .dictation import relay_dictation
 from .letters import router as letters_router
 from .patient_info import router as patient_router
 from .usage import router as usage_router
+from .praktijk_sleutels import kies_spraak, router as licentie_router
+from .beheer import router as beheer_router
+from .aanmelden import router as aanmelden_router
+from . import register
 from . import audit, data_policy, llm_service
 from .medical_vocabulary import (
     add_custom_correction,
@@ -58,10 +63,25 @@ from .prompts import (
 
 logger = structlog.get_logger()
 
+
+@asynccontextmanager
+async def _levensloop(_app):
+    # Het register (als DATABASE_URL staat) meteen verbinden, zodat een
+    # verkeerde database bij het opstarten opvalt en niet bij de eerste arts.
+    if register.actief():
+        try:
+            await register.pool()
+        except Exception as exc:
+            logger.error("register.verbinden_mislukt", error=str(exc))
+    yield
+    await register.sluit()
+
+
 app = FastAPI(
     title="VitaScribe Cloud API",
     description="Consult audio → SOEP + decisief regel voor Bricks Huisarts",
     version="1.0.0",
+    lifespan=_levensloop,
 )
 
 # ── CORS ──
@@ -113,6 +133,7 @@ async def health():
         "stt_provider": config.stt.default_provider,
         "llm_provider": config.llm.default_provider,
         "data_policy": data_policy.summary(),
+        "register": register.actief(),
     }
 
 
@@ -196,7 +217,16 @@ async def health_deep(token: str = ""):
     else:
         checks["anthropic"] = "geen sleutel"
 
+    async def check_register():
+        await register.fetchrow("SELECT 1")
+        return "ok"
+
+    if register.actief():
+        await run("register", check_register())
+
     needed = ["deepgram_eu", data_policy.phi_llm_provider(), data_policy.letters_llm_provider()]
+    if register.actief():
+        needed.append("register")
     ok = all(checks.get(n) == "ok" for n in needed)
     return JSONResponse(status_code=200 if ok else 503,
                         content={"status": "ok" if ok else "storing", "checks": checks})
@@ -210,10 +240,11 @@ async def process_consult(
     stt_provider: str = Form(default=None, description="STT provider override"),
     llm_provider: str = Form(default=None, description="LLM provider override"),
     consent: bool = Form(default=False, description="Patiënt gaf toestemming voor opname"),
-    user: str = Depends(verify_api_key),
+    ident=Depends(huidige_identiteit),
 ):
     """Process a consultation audio recording through the full pipeline."""
     start_time = time.time()
+    user = ident.label
     # KNMG (2026): recording a consultation requires the patient's consent.
     if os.getenv("REQUIRE_RECORDING_CONSENT", "true").lower() == "true" and not consent:
         audit.log_event(user, "consult.refused", status="geen_toestemming")
@@ -271,6 +302,7 @@ async def process_consult(
             audio_path=audio_path,
             stt_provider=stt_provider,
             llm_provider=llm_provider,
+            deepgram_key=await kies_spraak(ident),
         )
 
         processing_time = time.time() - start_time
@@ -302,6 +334,16 @@ DICTAAT_MAX_CHARS = 20000
 app.include_router(letters_router)
 app.include_router(patient_router)
 app.include_router(usage_router)
+app.include_router(licentie_router)
+app.include_router(beheer_router)
+app.include_router(aanmelden_router)
+
+
+@app.get("/vitascribe-logo.svg", include_in_schema=False)
+async def _logo():
+    from fastapi.responses import FileResponse
+    return FileResponse(Path(__file__).parent / "static" / "logo.svg", media_type="image/svg+xml",
+                        headers={"Cache-Control": "public, max-age=86400"})
 
 
 @app.websocket("/api/v1/dictation/stream")

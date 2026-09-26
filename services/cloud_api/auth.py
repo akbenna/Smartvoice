@@ -8,7 +8,8 @@ Keys:
              the name appears in the usage log, so access can be traced and
              one workplace can be switched off without touching the others.
   API_KEYS   "sleutel1,sleutel2"            legacy shared keys (user "gedeeld").
-Dev mode: no keys configured at all = allow all requests (user "dev").
+  register   keys of practices with a licence (DATABASE_URL); see licentie.py.
+Dev mode: no keys configured and no register = allow all requests (user "dev").
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ import hmac
 import os
 from typing import Dict, Optional
 
-from fastapi import HTTPException, Security
+from fastapi import Header, HTTPException, Security
 from fastapi.security import APIKeyHeader
 
 from .config import get_config
@@ -40,9 +41,12 @@ def _key_table() -> Dict[str, str]:
 
 
 def user_for_key(api_key: str) -> Optional[str]:
-    """User name for a key, "dev" in dev mode, None when the key is invalid."""
+    """User name for an environment key, "dev" in dev mode, None otherwise.
+    Register keys are looked up asynchronously in licentie.identificeer."""
+    from . import register
+
     table = _key_table()
-    if not table:
+    if not table and not register.actief():
         return "dev"
     for key, name in table.items():
         if api_key and hmac.compare_digest(key, api_key):
@@ -54,13 +58,23 @@ def is_valid_api_key(api_key: str) -> bool:
     return user_for_key(api_key) is not None
 
 
-async def verify_api_key(api_key: str = Security(api_key_header)) -> str:
+async def huidige_identiteit(
+    api_key: str = Security(api_key_header),
+    praktijk: Optional[str] = Header(default=None, alias="X-Bricks-Praktijk"),
+):
+    """Who is calling, with the licence of their practice. Raises 401/403 with a
+    message the doctor can act on."""
+    from . import licentie
+
+    try:
+        return await licentie.identificeer(api_key, praktijk)
+    except licentie.LicentieFout as fout:
+        raise HTTPException(status_code=fout.status, detail=fout.detail)
+
+
+async def verify_api_key(
+    api_key: str = Security(api_key_header),
+    praktijk: Optional[str] = Header(default=None, alias="X-Bricks-Praktijk"),
+) -> str:
     """Validate the key and return the user name (for the usage log)."""
-    if not _key_table():
-        return "dev"
-    if not api_key:
-        raise HTTPException(status_code=401, detail="API sleutel ontbreekt.")
-    user = user_for_key(api_key)
-    if user is None:
-        raise HTTPException(status_code=403, detail="Ongeldige API sleutel.")
-    return user
+    return (await huidige_identiteit(api_key, praktijk)).label

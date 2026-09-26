@@ -26,7 +26,7 @@
   <tr><th>Rol</th><th>Wie</th></tr>
   <tr><td>Verwerkingsverantwoordelijke</td><td>De huisartsenpraktijk die VitaScribe gebruikt.</td></tr>
   <tr><td>Verwerker</td><td>De beheerder van de VitaScribe-server.</td></tr>
-  <tr><td>Subverwerkers</td><td>Deepgram (spraak, EU-eindpunt, deelname aan modeltraining uitgezet), Mistral (EU; dictaat, SOEP, consultverslag, schermafdrukken, patiëntinstructie) en Anthropic (VS; alleen gepseudonimiseerde brieven).</td></tr>
+  <tr><td>Subverwerkers</td><td>Deepgram (spraak, EU-eindpunt, deelname aan modeltraining uitgezet), Mistral (EU; dictaat, SOEP, consultverslag, schermafdrukken, patiëntinstructie) en Anthropic (VS; alleen gepseudonimiseerde brieven). Stelt de praktijk een eigen sleutel in, dan gaan brieven naar de eigen aanbieder van de praktijk (Anthropic of OpenAI) en spraak naar het eigen Deepgram-account; de overeenkomst met die aanbieder sluit de praktijk zelf.</td></tr>
 </table>
 <p>Met elke (sub)verwerker hoort een verwerkersovereenkomst te bestaan. Bij een aanbieder buiten de EER hoort daar een geldige doorgiftegrondslag bij. Controleer dit voordat de extensie in de praktijk wordt gebruikt.</p>
 
@@ -43,9 +43,12 @@
   <tr><td>Datums</td><td>Consultdatums worden standaard vervangen door [DATUM]; de arts kan ze bewust meesturen. De geboortedatum gaat nooit mee.</td></tr>
   <tr><td>Dataminimalisatie</td><td>De arts kiest per onderdeel (journaal, medicatie, lab…) wat meegaat en ziet precies wat er verstuurd wordt.</td></tr>
   <tr><td>Schermafdrukken</td><td>Een schermafdruk gaat als afbeelding naar de server om te worden gelezen. Het model krijgt de opdracht naam, BSN en adres weg te laten, en de server filtert de tekst daarna. Liever een uitsnede zonder personalia maken.</td></tr>
-  <tr><td>Sleutels en log</td><td>Er staat geen AI-sleutel in de browser. Elke gebruiker heeft een eigen serversleutel; de server logt wie wat wanneer deed, zonder inhoud (NEN 7513).</td></tr>
-  <tr><td>Opslag</td><td>De extensie bewaart geen dossiers of brieven; na sluiten van het zijpaneel is alles weg.</td></tr>
+  <tr><td>Sleutels en log</td><td>Er staat geen AI-sleutel in de browser. Een eigen sleutel van de praktijk gaat één keer naar de server en staat daar versleuteld. Elke gebruiker heeft een eigen serversleutel; de server logt wie wat wanneer deed, zonder inhoud (NEN 7513).</td></tr>
+  <tr><td>Opslag</td><td>De extensie bewaart geen dossiers of brieven; na sluiten van het zijpaneel is een brief weg. Het laatste consultverslag blijft op het apparaat staan tot de arts op "Nieuw consult" klikt.</td></tr>
 </table>
+
+<h2>Licentie en praktijknummer</h2>
+<p>Om te controleren of een praktijk VitaScribe mag gebruiken, stuurt de extensie bij elke aanroep het Bricks-praktijknummer mee dat in de adresbalk staat. Dossier- en consultnummers staan dieper in het adres en gaan niet mee. De server houdt per gebruiker bij wanneer die VitaScribe voor het laatst gebruikte en met welk praktijknummer; verder niets.</p>
 
 <h2>Beroepsgeheim bij informatiebrieven</h2>
 <p>Volgens de KNMG-richtlijn Omgaan met medische gegevens verstrekt de behandelend arts alleen feitelijke gegevens, alleen op een gerichte vraag en alleen met uitdrukkelijke toestemming van de patiënt. De arts geeft geen oordeel. De extensie vraagt die bevestiging voor elke informatiebrief, en de brief beperkt zich tot feiten. Een oordeel over beperkingen, arbeidsgeschiktheid of causaliteit laat de brief over aan een onafhankelijk arts.</p>

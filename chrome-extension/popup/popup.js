@@ -208,6 +208,7 @@ async function sendAudioToAPI(blob, mimeType) {
     var headers = {};
     var apiKey = (config.apiKey || '').trim();
     if (apiKey) headers['X-API-Key'] = apiKey;
+    await SVPraktijk.metKop(headers);
 
     updateProgress(30, 'Audio wordt getranscribeerd...');
 
@@ -220,8 +221,11 @@ async function sendAudioToAPI(blob, mimeType) {
     if (!response.ok) {
       var errText = await response.text();
       if (response.status === 403) {
+        // Bij een licentie zegt de server waarom (verlopen, uitgezet, andere praktijk).
+        var reden = (function () { try { return JSON.parse(errText).detail; } catch (e) { return ''; } })();
+        if (reden && typeof reden === 'string' && reden.indexOf('Ongeldige') === -1) throw new Error(reden);
         throw new Error('API-sleutel klopt niet. Controleer of de sleutel in de ' +
-          'extensie-instellingen exact overeenkomt met die op de server (Railway: API_KEYS).');
+          'extensie-instellingen exact overeenkomt met die op de server.');
       }
       if (response.status === 401) {
         throw new Error('API-sleutel ontbreekt. Vul de sleutel in bij de extensie-instellingen.');

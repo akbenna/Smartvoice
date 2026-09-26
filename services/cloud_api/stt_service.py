@@ -16,7 +16,7 @@ import os
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import httpx
 import structlog
@@ -46,8 +46,11 @@ class TranscriptResult:
     provider: str = ""
 
 
-async def transcribe(audio_path: Path, provider: str = None) -> TranscriptResult:
-    """Transcribe audio file using the specified or default provider."""
+async def transcribe(audio_path: Path, provider: str = None,
+                     deepgram_key: Optional[str] = None) -> TranscriptResult:
+    """Transcribe audio file using the specified or default provider.
+
+    deepgram_key: the practice's own Deepgram key, if it has one."""
     config = get_config()
     provider = provider or config.stt.default_provider
 
@@ -56,7 +59,7 @@ async def transcribe(audio_path: Path, provider: str = None) -> TranscriptResult
     if provider == "groq":
         return await _transcribe_groq(audio_path)
     elif provider == "deepgram":
-        return await _transcribe_deepgram(audio_path)
+        return await _transcribe_deepgram(audio_path, deepgram_key)
     elif provider == "openai":
         return await _transcribe_openai(audio_path)
     else:
@@ -104,10 +107,10 @@ async def _transcribe_groq(audio_path: Path) -> TranscriptResult:
     )
 
 
-async def _transcribe_deepgram(audio_path: Path) -> TranscriptResult:
+async def _transcribe_deepgram(audio_path: Path, api_key: Optional[str] = None) -> TranscriptResult:
     """Transcribe using Deepgram Nova-2 (best Dutch accuracy)."""
     config = get_config()
-    api_key = config.stt.deepgram_api_key
+    api_key = api_key or config.stt.deepgram_api_key
     if not api_key:
         raise ValueError("DEEPGRAM_API_KEY niet geconfigureerd.")
 

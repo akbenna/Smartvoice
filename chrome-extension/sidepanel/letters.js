@@ -92,6 +92,7 @@
     var config = await getConfig();
     var headers = { 'Content-Type': 'application/json' };
     if (config.apiKey) headers['X-API-Key'] = config.apiKey;
+    await SVPraktijk.metKop(headers);
     var resp;
     try {
       resp = await fetch(config.apiUrl + path, { method: 'POST', headers: headers, body: JSON.stringify(body) });

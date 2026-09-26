@@ -25,6 +25,7 @@
       var config = await getConfig();
       var headers = { 'Content-Type': 'application/json' };
       if (config.apiKey) headers['X-API-Key'] = config.apiKey;
+      await SVPraktijk.metKop(headers);
       var resp = await fetch(config.apiUrl + '/api/v1/patient-instructions', {
         method: 'POST', headers: headers, body: JSON.stringify({ e: ep.e, p: ep.p, taal: $('pi-taal').value }),
       });

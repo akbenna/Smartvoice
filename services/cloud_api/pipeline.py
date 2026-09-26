@@ -91,6 +91,7 @@ async def process_consultation(
     audio_path: Path,
     stt_provider: str = None,
     llm_provider: str = None,
+    deepgram_key: str = None,
 ) -> PipelineResult:
     """
     Process a consultation audio file through the full pipeline.
@@ -108,7 +109,7 @@ async def process_consultation(
 
     # ── Step 1: Transcription ──
     logger.info("pipeline.step", step="transcription")
-    transcript = await stt_service.transcribe(audio_path, provider=stt_provider)
+    transcript = await stt_service.transcribe(audio_path, provider=stt_provider, deepgram_key=deepgram_key)
     result.transcript_raw = transcript.raw_text
     result.duration_secs = transcript.duration_secs
     result.stt_provider = transcript.provider

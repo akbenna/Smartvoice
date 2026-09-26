@@ -32,7 +32,7 @@ import structlog
 from fastapi import WebSocket, WebSocketDisconnect
 
 from . import audit
-from .auth import is_valid_api_key, user_for_key
+from . import licentie
 from .config import AppConfig, get_config
 from .medical_vocabulary import MEDICATION_CORRECTIONS, correct_transcript_full
 
@@ -218,18 +218,26 @@ async def _default_connect(url: str, api_key: str):
     )
 
 
-async def _authenticate(ws: WebSocket) -> Optional[Dict[str, Any]]:
-    """Return the auth message if the key is valid, else None."""
+async def _authenticate(ws: WebSocket):
+    """(auth message, identity) if the key and licence are valid; otherwise
+    (None, message for the doctor). A browser cannot set headers on a
+    WebSocket, so the practice numbers come in the auth message."""
+    ongeldig = "Ongeldige of ontbrekende API-sleutel."
     try:
         first = await asyncio.wait_for(ws.receive_text(), timeout=AUTH_TIMEOUT_SECS)
         message = json.loads(first)
     except (asyncio.TimeoutError, ValueError, KeyError, WebSocketDisconnect):
-        return None
+        return None, ongeldig
     if not isinstance(message, dict) or message.get("type") != "auth":
-        return None
-    if not is_valid_api_key(str(message.get("api_key") or "")):
-        return None
-    return message
+        return None, ongeldig
+    praktijk = message.get("praktijk")
+    if isinstance(praktijk, list):
+        praktijk = ",".join(str(p) for p in praktijk[:8])
+    try:
+        ident = await licentie.identificeer(str(message.get("api_key") or ""), praktijk if isinstance(praktijk, str) else None)
+    except licentie.LicentieFout as fout:
+        return None, fout.detail if fout.status == 403 and "Ongeldige" not in fout.detail else ongeldig
+    return message, ident
 
 
 async def _send_json(ws: WebSocket, payload: Dict[str, Any]) -> None:
@@ -247,13 +255,22 @@ async def relay_dictation(
     await ws.accept()
     cfg = get_config()
 
-    auth = await _authenticate(ws)
+    auth, ident = await _authenticate(ws)
     if auth is None:
-        await _send_json(ws, {"type": "error", "message": "Ongeldige of ontbrekende API-sleutel."})
+        await _send_json(ws, {"type": "error", "message": ident})
         await ws.close(code=4401)
         return
 
-    if not cfg.stt.deepgram_api_key:
+    from fastapi import HTTPException
+    from .praktijk_sleutels import kies_spraak
+    try:
+        deepgram_key = await kies_spraak(ident)
+    except HTTPException as exc:
+        await _send_json(ws, {"type": "error", "message": exc.detail})
+        await ws.close(code=4403)
+        return
+
+    if not deepgram_key:
         await _send_json(ws, {"type": "error", "message": "DEEPGRAM_API_KEY niet geconfigureerd op de server."})
         await ws.close(code=4500)
         return
@@ -266,7 +283,7 @@ async def relay_dictation(
     # with a smaller keyterm set and finally without, so dictation still starts.
     for budget in KEYTERM_RETRY_BUDGETS:
         try:
-            upstream = await connect(build_deepgram_url(cfg, user_terms, budget), cfg.stt.deepgram_api_key)
+            upstream = await connect(build_deepgram_url(cfg, user_terms, budget), deepgram_key)
             break
         except Exception as exc:  # handshake rejected, network, bad model/language
             last_exc = exc
@@ -279,7 +296,7 @@ async def relay_dictation(
         return
 
     logger.info("dictation.start", model=cfg.dictation.deepgram_model)
-    audit.log_event(user_for_key(str(auth.get("api_key") or "")) or "onbekend", "dictation.stream")
+    audit.log_event(ident.label, "dictation.stream")
     await _send_json(ws, {"type": "ready"})
 
     async def client_to_upstream() -> None:

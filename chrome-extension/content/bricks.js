@@ -236,6 +236,7 @@ async function sendAudioToAPI(blob, mimeType) {
 
     var headers = {};
     if (config.apiKey) headers['X-API-Key'] = config.apiKey;
+    await SVPraktijk.metKop(headers);
 
     updateProcessingStep('Audio wordt getranscribeerd...');
 
@@ -502,6 +503,15 @@ async function init() {
   await loadSelectors();
   createWidget();
   await checkPendingResults();
+  // Het praktijknummer uit de adresbalk, voor de licentie. Bricks wisselt van
+  // pagina zonder te herladen, dus ook bij een nieuwe URL opnieuw kijken.
+  if (typeof SVPraktijk !== 'undefined') {
+    var laatste = location.href;
+    SVPraktijk.onthoud(laatste);
+    setInterval(function () {
+      if (location.href !== laatste) { laatste = location.href; SVPraktijk.onthoud(laatste); }
+    }, 5000);
+  }
 }
 
 init();

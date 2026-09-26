@@ -27,10 +27,10 @@ DOSSIER = "PATIËNT: J.J.\n== JOURNAAL ==\nLage rugpijn sinds 3 mnd, fysiotherap
 
 
 def fake_stream(pieces, seen=None):
-    async def _stream(provider, system, user, max_tokens, quality=False):
+    async def _stream(provider, system, user, max_tokens, quality=False, api_key=None):
         if seen is not None:
             seen.append({"provider": provider, "system": system, "user": user,
-                         "quality": quality, "max_tokens": max_tokens})
+                         "quality": quality, "max_tokens": max_tokens, "api_key": api_key})
         for p in pieces:
             yield p
     return _stream
@@ -84,7 +84,7 @@ def test_verwijzing_uses_fast_model_and_needs_reason(api):
 
 
 def test_provider_error_before_stream_gives_502(api):
-    async def failing(provider, system, user, max_tokens, quality=False):
+    async def failing(provider, system, user, max_tokens, quality=False, api_key=None):
         raise ValueError("ANTHROPIC_API_KEY niet geconfigureerd.")
         yield ""  # pragma: no cover
     with patch.object(letters.llm_service, "stream_llm", failing):

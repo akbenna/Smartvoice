@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#10b981"/>
+      <stop offset="0.45" stop-color="#0ea5e9"/>
+      <stop offset="1" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <radialGradient id="shine" cx="0.3" cy="0.2" r="0.8">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.35"/>
+      <stop offset="0.6" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="30" fill="url(#bg)"/>
+  <rect x="4" y="4" width="120" height="120" rx="30" fill="url(#shine)"/>
+  <!-- sound waves -->
+  <g fill="none" stroke="#fff" stroke-linecap="round" stroke-width="6" opacity="0.9">
+    <path d="M30 46 Q22 60 30 74"/>
+    <path d="M98 46 Q106 60 98 74"/>
+  </g>
+  <g fill="none" stroke="#fff" stroke-linecap="round" stroke-width="5" opacity="0.55">
+    <path d="M19 38 Q7 60 19 82"/>
+    <path d="M109 38 Q121 60 109 82"/>
+  </g>
+  <!-- microphone -->
+  <rect x="50" y="24" width="28" height="50" rx="14" fill="#fff"/>
+  <path d="M40 62 a24 24 0 0 0 48 0" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+  <path d="M64 86 V100 M52 102 H76" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+  <!-- small medical cross on the mic -->
+  <path d="M64 38 V56 M55 47 H73" stroke="#0ea5e9" stroke-width="5" stroke-linecap="round"/>
+</svg>
