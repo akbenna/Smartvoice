@@ -166,7 +166,10 @@ async def _haal(h: str):
 
 async def _markeer_gezien(gebruiker_id: int, nummer: Optional[str]) -> None:
     nu = time.monotonic()
-    if nu - _gezien.get(gebruiker_id, 0) < GEZIEN_INTERVAL:
+    # Niet vergelijken met 0: de monotone klok telt vanaf het opstarten van de
+    # machine, en in een net gestarte container is die nog geen vijf minuten.
+    vorige = _gezien.get(gebruiker_id)
+    if vorige is not None and nu - vorige < GEZIEN_INTERVAL:
         return
     _gezien[gebruiker_id] = nu
     try:
