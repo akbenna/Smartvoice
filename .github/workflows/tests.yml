@@ -32,8 +32,8 @@ jobs:
         run: for f in chrome-extension/*/*.js; do node --check "$f"; done
       - name: Koppeltabel Thuisarts en QR (node --test)
         run: node --test tests/js/thuisarts.test.js
-      - name: Koppeltabel ProVita Care (node --test)
-        run: node --test tests/js/beslistools.test.js
       - run: npm install --no-save playwright@1.56 && npx playwright install --with-deps chromium
       - name: End-to-end in Chromium (nagebootst Bricks, gesimuleerde server)
         run: node tests/e2e/extension.e2e.js
+      - name: Koppeltabel ProVita Care (node --test)
+        run: node --test tests/js/beslistools.test.js
