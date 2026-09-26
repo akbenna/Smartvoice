@@ -86,6 +86,8 @@ var SVConsultLive = (function () {
     return {
       /** Een stuk geluid van de recorder. */
       stuur: verstuur,
+      /** De patiënt is weg: vanaf deze seconde van de opname spreekt alleen de arts. */
+      nadictaat: function (vanaf) { verstuur(JSON.stringify({ type: 'nadictaat', vanaf: vanaf })); },
       /** Werkt live nog? Zo niet, dan loopt de opname alleen lokaal door. */
       gezond: function () { return !mislukt; },
       /**

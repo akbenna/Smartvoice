@@ -249,3 +249,42 @@ def test_onbereikbare_spraakherkenning_vraagt_om_terugval():
 def test_route_staat_in_de_app():
     from services.cloud_api import main
     assert any(getattr(r, "path", "") == "/api/v1/consult/stream" for r in main.app.routes)
+
+
+# === Nadictaat ===
+
+def test_gesprek_zet_woorden_na_de_klik_in_het_nadictaat():
+    g = consult_live.Gesprek()
+    g.verwerk(_final((0, "Wat", 0.0, 0.2), (1, "Keelpijn.", 1.0, 1.4)))
+    g.start_nadictaat(10.0)
+    g.verwerk(_final((0, "Keel", 12.0, 12.3), (0, "rood.", 12.3, 12.6)))
+    t = g.transcript()
+    assert [(s.speaker, s.text) for s in t.segments][-1] == ("nadictaat", "Keel rood.")
+    assert len(g.sprekers) == 2   # het nadictaat telt niet als extra stem
+
+
+def test_gesprek_negeert_een_onzinnige_nadictaattijd():
+    g = consult_live.Gesprek()
+    g.start_nadictaat("abc")
+    g.start_nadictaat(-3)
+    assert g.nadictaat_vanaf is None
+
+
+def test_live_consult_met_nadictaat():
+    upstream = FakeUpstream([
+        _final((0, "Wat", 0.0, 0.2), (1, "Keelpijn.", 1.0, 1.4)),
+        _final((0, "Keel", 12.0, 12.3), (0, "rood.", 12.3, 12.6)),
+    ])
+    verwerkt = []
+    client = TestClient(_app(upstream, [], verwerkt))
+    with client.websocket_connect("/ws") as ws:
+        ws.send_text(json.dumps(AUTH))
+        assert ws.receive_json() == {"type": "ready"}
+        ws.send_bytes(b"stuk")
+        ws.send_text(json.dumps({"type": "nadictaat", "vanaf": 10.0}))
+        ws.send_text(json.dumps({"type": "stop"}))
+        _tot_gesloten(ws)
+    [transcript] = verwerkt
+    assert transcript.segments[-1].speaker == "nadictaat"
+    from services.cloud_api import stt_service
+    assert stt_service.met_sprekers(transcript).endswith("Nadictaat arts: Keel rood.")

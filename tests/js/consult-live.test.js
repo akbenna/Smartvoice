@@ -122,3 +122,12 @@ test('te lang geen verslag: terugval', async () => {
   assert.deepEqual([uit.ok, uit.terugval], [false, true]);
   assert.equal(ws.readyState, 3);
 });
+
+test('nadictaat gaat als markering mee, ook voor ready', () => {
+  const { live, ws } = start();
+  ws.open();
+  live.nadictaat(312.4);
+  ws.ontvang({ type: 'ready' });
+  const m = JSON.parse(ws.verstuurd.at(-1));
+  assert.deepEqual(m, { type: 'nadictaat', vanaf: 312.4 });
+});

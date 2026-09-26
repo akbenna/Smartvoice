@@ -46,6 +46,26 @@ class TranscriptResult:
     provider: str = ""
 
 
+NADICTAAT = "nadictaat"
+
+
+def markeer_nadictaat(transcript: TranscriptResult, vanaf: Optional[float]) -> TranscriptResult:
+    """Alles vanaf 'vanaf' seconden is het nadictaat van de arts.
+
+    De arts klikt op "Nadicteren" als de patiënt weg is en dicteert dan kort
+    onderzoek en beleid. De extensie stuurt mee op welke seconde van de
+    opname dat was. Een uiting telt als nadictaat als haar midden na dat
+    moment ligt; een zin die net over de grens loopt, valt zo aan de kant
+    waar het meeste ervan staat.
+    """
+    if vanaf is None or vanaf < 0:
+        return transcript
+    for seg in transcript.segments or []:
+        if (seg.start + seg.end) / 2 >= vanaf:
+            seg.speaker = NADICTAAT
+    return transcript
+
+
 def met_sprekers(transcript: TranscriptResult) -> str:
     """Het transcript per spreker, zoals het taalmodel het moet lezen.
 
@@ -57,27 +77,41 @@ def met_sprekers(transcript: TranscriptResult) -> str:
     arts is, leidt het model af uit wat er gezegd wordt, want de
     sprekerherkenning weet dat niet en kan zich vergissen.
 
-    Is er maar een spreker, of geven de segmenten geen spreker (Groq,
-    OpenAI), dan blijft het de gewone tekst.
+    Het nadictaat is wel zeker van de arts: dat komt als laatste blok,
+    "Nadictaat arts: ...".
+
+    Is er maar een spreker en geen nadictaat, of geven de segmenten geen
+    spreker (Groq, OpenAI), dan blijft het de gewone tekst.
     """
     segmenten = getattr(transcript, "segments", None)
     if not isinstance(segmenten, list):
         return transcript.raw_text
-    bruikbaar = [s for s in segmenten if getattr(s, "speaker", "") and (s.text or "").strip()]
-    if len({s.speaker for s in bruikbaar}) < 2:
+    met_tekst = [s for s in segmenten if (s.text or "").strip()]
+    nadictaat = [s.text.strip() for s in met_tekst if s.speaker == NADICTAAT]
+    gesprek = [s for s in met_tekst if s.speaker != NADICTAAT]
+    gelabeld = [s for s in gesprek if getattr(s, "speaker", "")]
+    meerdere = len({s.speaker for s in gelabeld}) >= 2
+    if not nadictaat and not meerdere:
         return transcript.raw_text
 
-    nummers: dict = {}
-    alineas: List[List[str]] = []
-    vorige = None
-    for s in bruikbaar:
-        if s.speaker not in nummers:
-            nummers[s.speaker] = len(nummers) + 1
-        if s.speaker != vorige:
-            alineas.append([f"Spreker {nummers[s.speaker]}:"])
-            vorige = s.speaker
-        alineas[-1].append(s.text.strip())
-    return "\n".join(" ".join(a) for a in alineas)
+    regels: List[str] = []
+    if meerdere:
+        nummers: dict = {}
+        alineas: List[List[str]] = []
+        vorige = None
+        for s in gelabeld:
+            if s.speaker not in nummers:
+                nummers[s.speaker] = len(nummers) + 1
+            if s.speaker != vorige:
+                alineas.append([f"Spreker {nummers[s.speaker]}:"])
+                vorige = s.speaker
+            alineas[-1].append(s.text.strip())
+        regels = [" ".join(a) for a in alineas]
+    elif gesprek:
+        regels = [" ".join(s.text.strip() for s in gesprek)]
+    if nadictaat:
+        regels.append("Nadictaat arts: " + " ".join(nadictaat))
+    return "\n".join(regels)
 
 
 async def transcribe(audio_path: Path, provider: str = None,
