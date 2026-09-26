@@ -81,7 +81,7 @@ hetroosendael.nl stuurt door).
 > Elke gebruiker krijgt daarna een eigen sleutel.
 
 **Zoektermen:** huisarts, Bricks, dicteren, SOEP, spraakherkenning, verwijsbrief,
-consultverslag, consult opnemen.
+consultverslag (maximaal zeven termen).
 
 **Afbeeldingen** (in `docs/edge-winkel/`):
 
