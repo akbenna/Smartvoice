@@ -115,8 +115,10 @@ async def process_consultation(
     result.stt_provider = transcript.provider
 
     # ── Step 1b: Medical vocabulary postprocessing ──
+    # Per spreker, zodat het taalmodel weet wie wat zegt (zie met_sprekers).
+    gesprek = stt_service.met_sprekers(transcript)
     if transcript.raw_text.strip():
-        corrected_text, correction_stats = correct_transcript_full(transcript.raw_text)
+        corrected_text, correction_stats = correct_transcript_full(gesprek)
         result.transcript = corrected_text
         result.transcript_corrections = correction_stats.total_corrections
 

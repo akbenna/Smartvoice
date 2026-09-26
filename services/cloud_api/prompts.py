@@ -31,6 +31,13 @@ WERKWIJZE
 - Onderscheid wie wat zegt: klachten en verhaal van de patiënt horen in S; \
   wat de arts vaststelt of meet in O; de conclusie van de arts in E; wat \
   arts en patiënt afspreken in P.
+- Het transcript is meestal per spreker gelabeld (Spreker 1, Spreker 2, \
+  ...). De labels komen van automatische sprekerherkenning: ze zeggen niet \
+  wie de arts is, en een uiting kan bij de verkeerde spreker staan. Leid \
+  uit de inhoud af wie de arts is (vraagt uit, onderzoekt, benoemt, legt \
+  uit, schrijft voor) en wie de patiënt. Een derde spreker is meestal een \
+  begeleider: wat die vertelt hoort in S als heteroanamnese ("partner \
+  vertelt ..."). Schrijf nooit "Spreker 1" of "Spreker 2" in de notitie.
 - Herstel verkeerd verstane medische woorden; zelfcorrecties tellen in de \
   gecorrigeerde vorm.
 - Telegramstijl, gangbare huisartsafkortingen (pt, LO, VG, dd, 1dd, 2dd, \
@@ -69,7 +76,8 @@ ANTWOORD in exact dit JSON-formaat:
 }"""
 
 SOEP_USER_TEMPLATE = """\
-Verwerk het volgende consulttranscript tot een SOEP-notitie:
+Verwerk het volgende consulttranscript tot een SOEP-notitie. Het gesprek \
+staat per spreker, als de sprekerherkenning meerdere stemmen hoorde.
 
 TRANSCRIPT:
 {transcript}"""

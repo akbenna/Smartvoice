@@ -3,7 +3,7 @@ VitaScribe Cloud API - Speech-to-Text Service
 
 Pluggable STT with support for:
   - Groq Whisper (free tier, fast)
-  - Deepgram Nova-2 (best Dutch accuracy, default)
+  - Deepgram Nova-3 (best Dutch accuracy, default)
   - OpenAI Whisper API
 
 All providers return a unified TranscriptResult.
@@ -44,6 +44,40 @@ class TranscriptResult:
     language: str = "nl"
     duration_secs: float = 0.0
     provider: str = ""
+
+
+def met_sprekers(transcript: TranscriptResult) -> str:
+    """Het transcript per spreker, zoals het taalmodel het moet lezen.
+
+    Deepgram scheidt de stemmen (diarize) en geeft per uiting een spreker.
+    Zonder die labels krijgt het model een lap tekst en moet het raden wie
+    de klacht vertelt en wie onderzoekt; met de labels kan het klachten in S
+    en bevindingen in O zetten. Opeenvolgende uitingen van dezelfde spreker
+    worden een alinea. Er staat bewust "Spreker 1" en niet "arts": wie de
+    arts is, leidt het model af uit wat er gezegd wordt, want de
+    sprekerherkenning weet dat niet en kan zich vergissen.
+
+    Is er maar een spreker, of geven de segmenten geen spreker (Groq,
+    OpenAI), dan blijft het de gewone tekst.
+    """
+    segmenten = getattr(transcript, "segments", None)
+    if not isinstance(segmenten, list):
+        return transcript.raw_text
+    bruikbaar = [s for s in segmenten if getattr(s, "speaker", "") and (s.text or "").strip()]
+    if len({s.speaker for s in bruikbaar}) < 2:
+        return transcript.raw_text
+
+    nummers: dict = {}
+    alineas: List[List[str]] = []
+    vorige = None
+    for s in bruikbaar:
+        if s.speaker not in nummers:
+            nummers[s.speaker] = len(nummers) + 1
+        if s.speaker != vorige:
+            alineas.append([f"Spreker {nummers[s.speaker]}:"])
+            vorige = s.speaker
+        alineas[-1].append(s.text.strip())
+    return "\n".join(" ".join(a) for a in alineas)
 
 
 async def transcribe(audio_path: Path, provider: str = None,
@@ -108,7 +142,7 @@ async def _transcribe_groq(audio_path: Path) -> TranscriptResult:
 
 
 async def _transcribe_deepgram(audio_path: Path, api_key: Optional[str] = None) -> TranscriptResult:
-    """Transcribe using Deepgram Nova-2 (best Dutch accuracy)."""
+    """Transcribe using Deepgram (best Dutch accuracy), with speaker diarization."""
     config = get_config()
     api_key = api_key or config.stt.deepgram_api_key
     if not api_key:
