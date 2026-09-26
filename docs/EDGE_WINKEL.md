@@ -56,15 +56,22 @@ hetroosendael.nl stuurt door).
 > VitaScribe is een consultassistent voor huisartsen die werken met Bricks Huisarts.
 >
 > Je dicteert in het veld waar je klikt, in Bricks of in elk ander tekstveld. Met één
-> klik maak je van het dictaat een SOEP-regel. Een consult neem je alleen op nadat je
-> hebt bevestigd dat de patiënt is geïnformeerd en toestemming geeft; het verslag is
-> een concept dat je zelf controleert. Informatie- en verwijsbrieven schrijf je in het
-> zijpaneel: je kiest per onderdeel wat meegaat, en naam, BSN, adres en geboortedatum
-> worden verwijderd voordat er iets verstuurd wordt.
+> klik maak je van het dictaat een SOEP-regel.
+>
+> Een consult kan VitaScribe live volgen, nadat je hebt bevestigd dat de patiënt is
+> geïnformeerd en toestemming geeft. Het houdt de stemmen van arts en patiënt uit
+> elkaar en maakt na afloop een SOEP-verslag. Onderzoek dat je zwijgend deed, dicteer
+> je na met de knop Nadicteren. Het verslag is een concept dat je zelf controleert.
+>
+> Informatie- en verwijsbrieven schrijf je in het zijpaneel: je kiest per onderdeel
+> wat meegaat, en naam, BSN, adres en geboortedatum worden verwijderd voordat er iets
+> verstuurd wordt.
 >
 > VitaScribe werkt met een VitaScribe-server die je praktijk beheert. Spraak gaat naar
-> een EU-eindpunt, tekst naar een taalmodel in de EU. De extensie bewaart geen
-> dossiers of brieven, toont geen advertenties en gebruikt geen volgdiensten.
+> een EU-eindpunt, dictaten en consultverslagen naar een taalmodel in de EU. Brieven
+> gaan pas na pseudonimisering naar een taalmodel in de VS, of naar de eigen
+> AI-aanbieder van de praktijk. De extensie bewaart geen dossiers of brieven, toont
+> geen advertenties en gebruikt geen volgdiensten.
 >
 > VitaScribe stelt geen diagnose en geeft geen behandeladvies. Alles wat het maakt, is
 > een concept dat de arts controleert en ondertekent.
@@ -74,7 +81,7 @@ hetroosendael.nl stuurt door).
 > Elke gebruiker krijgt daarna een eigen sleutel.
 
 **Zoektermen:** huisarts, Bricks, dicteren, SOEP, spraakherkenning, verwijsbrief,
-consultverslag.
+consultverslag, consult opnemen.
 
 **Afbeeldingen** (in `docs/edge-winkel/`):
 
@@ -101,10 +108,19 @@ te installeren via de link die je deelt.
 ## Stap 6: notities voor de keurder
 
 Partner Center heeft een veld *Notes for certification*. De keurders lezen Engels.
-Zodra het licentiesysteem (PR #23) live staat: maak in `/beheer` een praktijk
-"Keuring Microsoft" aan, zonder praktijknummer, activeer die als pilot en maak één
-gebruiker. Vul die sleutel hieronder in, en haal de praktijk uit na de keuring. Zonder
-praktijknummer werkt de sleutel op elke pagina, en dat heeft de keurder nodig.
+De keurder heeft een eigen sleutel nodig die op elke pagina werkt, niet alleen in
+Bricks. Er zijn twee manieren:
+
+- **Zonder licentieregister** (werkt nu al): maak een sleutel met
+  `openssl rand -hex 24` en zet in Railway bij `API_USERS` een extra gebruiker
+  `keuring-microsoft:<sleutel>` (komma ertussen als er al gebruikers staan).
+  Haal die regel weg zodra de keuring klaar is.
+- **Met het licentieregister** (als `DATABASE_URL`, `ADMIN_KEY` en `SLEUTELKLUIS`
+  in Railway staan): maak in `/beheer` een praktijk "Keuring Microsoft" aan, zonder
+  praktijknummer, activeer die als pilot en maak één gebruiker. Haal de praktijk uit
+  na de keuring. Zonder praktijknummer werkt de sleutel op elke pagina.
+
+Vul de sleutel hieronder in bij `<TESTSLEUTEL>`.
 
 ```text
 VitaScribe is a dictation and documentation assistant for Dutch general
@@ -144,8 +160,17 @@ PERMISSIONS
     "Uit schermafdruk (klembord)" (from screenshot on clipboard) to read an
     image of a referral letter they copied themselves.
 
+CONSULT RECORDING (Bricks pages only)
+  The floating widget on Bricks records a consultation only after the doctor
+  ticks that the patient consents. Audio is streamed in small chunks over a
+  WebSocket to the practice's server, which transcribes it and returns a
+  draft note. It cannot be tested without a Bricks login.
+
 DATA
-  Audio and text go only to the server configured by the practice, which uses
-  EU endpoints for speech and language models. No analytics, no advertising,
+  Audio and text go only to the server configured by the practice. Speech
+  recognition uses an EU endpoint, and dictations and consultation notes use a
+  language model in the EU. Referral letters are pseudonymised first (name,
+  date of birth, BSN, address removed) and then sent to a language model in
+  the US, or to the practice's own AI provider. No analytics, no advertising,
   no remote code. Privacy policy: https://www.provita-care.nl/vitascribe/privacy
 ```
