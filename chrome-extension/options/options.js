@@ -112,6 +112,7 @@ async function testConnection() {
     var apiKey = document.getElementById('apiKey').value.trim();
     var headers = {};
     if (apiKey) headers['X-API-Key'] = apiKey;
+    await SVPraktijk.metKop(headers);
 
     var auth = await fetch(base + '/api/v1/providers', { method: 'GET', headers: headers });
     if (auth.ok) {
@@ -128,7 +129,9 @@ async function testConnection() {
         showToast('Verbinding, API-sleutel en taalmodel OK — opgeslagen.');
       }
     } else if (auth.status === 403) {
-      showToast('Server OK, maar API-sleutel klopt niet (403). Vergelijk met API_KEYS op de server.');
+      // De server zegt waarom: onbekende sleutel, uitgezet, licentie verlopen of andere praktijk.
+      var reden = await auth.json().then(function (b) { return b && b.detail; }).catch(function () { return null; });
+      showToast('Server OK, maar de sleutel wordt geweigerd: ' + (reden || 'onbekende sleutel (403).'), 9000);
     } else if (auth.status === 401) {
       showToast('Server OK, maar API-sleutel ontbreekt (401). Vul de sleutel in.');
     } else {
@@ -137,6 +140,7 @@ async function testConnection() {
   } catch (err) {
     showToast('Verbindingsfout: ' + err.message);
   }
+  await laadLicentie();
 }
 
 // ── Microphone enumeration ──
@@ -227,6 +231,118 @@ async function testMicrophone() {
   }
 }
 
+// ── Licentie en eigen sleutels van de praktijk ──
+
+var AANBIEDER_NAAM = { anthropic: 'Claude (Anthropic)', openai: 'ChatGPT (OpenAI)', deepgram: 'Deepgram' };
+
+async function serverAanroep(pad, opties) {
+  var apiUrl = document.getElementById('apiUrl').value.trim().replace(/\/$/, '');
+  var apiKey = document.getElementById('apiKey').value.trim();
+  if (!apiUrl || !apiKey) return null;
+  var headers = { 'X-API-Key': apiKey };
+  if (opties && opties.body) headers['Content-Type'] = 'application/json';
+  await SVPraktijk.metKop(headers);
+  return fetch(apiUrl + pad, {
+    method: (opties && opties.methode) || 'GET',
+    headers: headers,
+    body: opties && opties.body ? JSON.stringify(opties.body) : undefined,
+  });
+}
+
+function datumNL(iso) {
+  if (!iso) return '';
+  return new Date(iso.length === 10 ? iso + 'T12:00:00' : iso).toLocaleDateString('nl-NL');
+}
+
+function toonEigenSleutels(lic) {
+  var kaart = document.getElementById('eigen-kaart');
+  var mag = lic && lic.bron === 'register' && lic.eigen_sleutels_mogelijk;
+  kaart.hidden = !mag;
+  if (!mag) return;
+  var beheerder = lic.rol === 'praktijkbeheerder';
+  document.getElementById('eigen-alleen-beheerder').hidden = beheerder;
+  ['brieven', 'spraak'].forEach(function (dienst) {
+    var huidig = (lic.eigen_sleutels || {})[dienst];
+    var status = document.getElementById('eigen-status-' + dienst);
+    if (huidig) {
+      status.textContent = 'Eigen sleutel ingesteld: ' + (AANBIEDER_NAAM[huidig.aanbieder] || huidig.aanbieder) +
+        ', eindigend op …' + huidig.hint + ' (sinds ' + datumNL(huidig.ingesteld_op) + ').';
+    } else {
+      status.textContent = lic.eigen_sleutels_verplicht
+        ? 'Geen eigen sleutel. Uw praktijk gebruikt alleen eigen sleutels: zonder sleutel werkt dit niet.'
+        : 'Geen eigen sleutel: ' + dienst + ' loopt via de server.';
+    }
+    var invoer = kaart.querySelectorAll('#eigen-sleutel-' + dienst + ', #eigen-opslaan-' + dienst + ', #eigen-aanbieder-' + dienst);
+    invoer.forEach(function (el) { el.hidden = !beheerder; });
+    document.getElementById('eigen-weg-' + dienst).hidden = !(beheerder && huidig);
+  });
+  var brieven = (lic.eigen_sleutels || {}).brieven;
+  var regel = document.getElementById('policy-brieven');
+  if (regel && brieven) {
+    regel.textContent = 'Brieven, na verwijdering van naam, BSN, adres en datums: ' +
+      (AANBIEDER_NAAM[brieven.aanbieder] || brieven.aanbieder) + ', via de sleutel van uw praktijk';
+  }
+}
+
+async function laadLicentie() {
+  var info = document.getElementById('licentie-info');
+  var r;
+  try { r = await serverAanroep('/api/v1/licentie'); } catch (e) { r = null; }
+  if (!r) return;
+  var body = await r.json().catch(function () { return {}; });
+  if (r.status === 404) { info.textContent = 'Deze server kent nog geen licenties.'; return; }
+  if (!r.ok) {
+    info.textContent = body.detail || ('De licentie kon niet worden opgehaald (' + r.status + ').');
+    toonEigenSleutels(null);
+    return;
+  }
+  if (body.bron === 'register') {
+    var type = { pilot: 'gratis pilot', betaald: 'licentie', intern: 'eigen praktijk', kandidaat: 'kandidaat' }[body.licentietype] || body.licentietype;
+    info.textContent = 'Voor ' + body.praktijk + ' (' + type + ')' +
+      (body.geldig_tot ? ', geldig tot ' + datumNL(body.geldig_tot) : ', onbeperkt geldig') +
+      '. Gebruiker: ' + body.gebruiker + (body.rol === 'praktijkbeheerder' ? ', praktijkbeheerder' : '') + '.';
+  } else if (body.bron === 'omgeving') {
+    info.textContent = 'Sleutel van de server zelf (' + body.gebruiker + '), zonder licentie per praktijk.';
+  } else {
+    info.textContent = 'De server draait zonder sleutels (ontwikkelmodus).';
+  }
+  toonEigenSleutels(body);
+}
+
+async function slaEigenSleutelOp(dienst) {
+  var veld = document.getElementById('eigen-sleutel-' + dienst);
+  var sleutel = veld.value.trim();
+  if (!sleutel) { showToast('Plak eerst de sleutel.'); return; }
+  var aanbieder = dienst === 'brieven' ? document.getElementById('eigen-aanbieder-brieven').value : 'deepgram';
+  var knop = document.getElementById('eigen-opslaan-' + dienst);
+  knop.disabled = true;
+  try {
+    var r = await serverAanroep('/api/v1/praktijk/sleutels/' + dienst, { methode: 'PUT', body: { aanbieder: aanbieder, sleutel: sleutel } });
+    var body = await r.json().catch(function () { return {}; });
+    if (!r.ok) { showToast(body.detail || ('Opslaan lukte niet (' + r.status + ').'), 9000); return; }
+    veld.value = '';
+    showToast('Sleutel gecontroleerd en versleuteld opgeslagen op de server.');
+    await laadLicentie();
+  } catch (e) {
+    showToast('Verbindingsfout: ' + e.message);
+  } finally {
+    veld.value = '';
+    knop.disabled = false;
+  }
+}
+
+async function verwijderEigenSleutel(dienst) {
+  if (!confirm('De eigen sleutel voor ' + dienst + ' verwijderen?')) return;
+  var r = await serverAanroep('/api/v1/praktijk/sleutels/' + dienst, { methode: 'DELETE' });
+  if (r && r.ok) { showToast('Verwijderd.'); await laadLicentie(); }
+  else if (r) { var b = await r.json().catch(function () { return {}; }); showToast(b.detail || 'Verwijderen lukte niet.'); }
+}
+
+['brieven', 'spraak'].forEach(function (dienst) {
+  document.getElementById('eigen-opslaan-' + dienst).addEventListener('click', function () { slaEigenSleutelOp(dienst); });
+  document.getElementById('eigen-weg-' + dienst).addEventListener('click', function () { verwijderEigenSleutel(dienst); });
+});
+
 // ── Event listeners ──
 
 document.getElementById('btn-save').addEventListener('click', saveSettings);
@@ -235,5 +351,5 @@ document.getElementById('btn-refresh-mic').addEventListener('click', loadMicDevi
 document.getElementById('btn-test-mic').addEventListener('click', testMicrophone);
 
 // ── Initialize ──
-loadSettings();
+loadSettings().then(laadLicentie).catch(function () { /* geen verbinding: dan pas bij Test verbinding */ });
 loadMicDevices();

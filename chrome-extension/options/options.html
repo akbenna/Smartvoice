@@ -82,6 +82,10 @@
       transition: opacity 0.3s;
     }
     .toast.show { opacity: 1; }
+    #eigen-kaart > .hint { margin: 0 0 10px; }
+    .eigen-invoer { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .eigen-invoer input { flex: 1; min-width: 200px; }
+    .eigen-invoer select { width: auto; }
   </style>
 </head>
 <body>
@@ -102,13 +106,49 @@
     </div>
   </div>
 
+  <div class="card" id="licentie-kaart">
+    <h2>Licentie</h2>
+    <p class="hint" id="licentie-info">Klik op "Test verbinding" om te zien voor welke praktijk deze sleutel geldt.</p>
+  </div>
+
+  <div class="card" id="eigen-kaart" hidden>
+    <h2>Eigen AI-sleutels van de praktijk</h2>
+    <p class="hint">Uw praktijk kan een eigen sleutel gebruiken bij een AI-dienst. De sleutel gaat één keer naar de VitaScribe-server, wordt daar gecontroleerd en versleuteld bewaard, en blijft niet in deze browser staan.</p>
+    <p class="hint">Een eigen sleutel voor brieven wordt alleen gebruikt voor informatie- en verwijsbrieven, die zonder naam, BSN, adres en datums gaan. Dictaat, SOEP, consultverslag en schermafdrukken blijven bij het EU-model van de server.</p>
+    <p class="hint" id="eigen-alleen-beheerder" hidden>Alleen de praktijkbeheerder kan deze sleutels wijzigen.</p>
+
+    <div class="field">
+      <label>Brieven</label>
+      <p class="hint" id="eigen-status-brieven">Geen eigen sleutel: brieven lopen via de server.</p>
+      <div class="eigen-invoer">
+        <select id="eigen-aanbieder-brieven">
+          <option value="anthropic">Claude (Anthropic)</option>
+          <option value="openai">ChatGPT (OpenAI)</option>
+        </select>
+        <input type="password" id="eigen-sleutel-brieven" placeholder="sk-..." autocomplete="off">
+        <button class="btn" id="eigen-opslaan-brieven" style="background:#f3f4f6;border:1px solid #e5e7eb;">Opslaan op server</button>
+        <button class="btn" id="eigen-weg-brieven" style="background:#fff;border:1px solid #fecaca;color:#b91c1c;" hidden>Verwijderen</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Spraak (Deepgram)</label>
+      <p class="hint" id="eigen-status-spraak">Geen eigen sleutel: spraak loopt via de server.</p>
+      <div class="eigen-invoer">
+        <input type="password" id="eigen-sleutel-spraak" placeholder="Deepgram API key" autocomplete="off">
+        <button class="btn" id="eigen-opslaan-spraak" style="background:#f3f4f6;border:1px solid #e5e7eb;">Opslaan op server</button>
+        <button class="btn" id="eigen-weg-spraak" style="background:#fff;border:1px solid #fecaca;color:#b91c1c;" hidden>Verwijderen</button>
+      </div>
+    </div>
+  </div>
+
   <div class="card">
     <h2>Waar gaan de gegevens heen</h2>
     <p class="hint" id="policy-info">Dit bepaalt de server, niet de extensie (AVG-afspraak van de praktijk). Klik op "Test verbinding" om de actuele instelling te zien.</p>
     <ul class="hint" style="margin:6px 0 0 16px;padding:0">
       <li>Spraak: Deepgram, EU-eindpunt, zonder opslag of training</li>
       <li>Dictaat, SOEP, consultverslag, schermafdrukken, patiëntinstructie: Mistral (EU)</li>
-      <li>Brieven, na verwijdering van naam, BSN, adres en datums: Claude</li>
+      <li id="policy-brieven">Brieven, na verwijdering van naam, BSN, adres en datums: Claude</li>
     </ul>
     <!-- Kept for compatibility; the server ignores these for patient data. -->
     <select id="sttProvider" hidden><option value="deepgram">Deepgram</option></select>
@@ -201,6 +241,7 @@
 
   <div id="toast" class="toast"></div>
 
+  <script src="../lib/praktijk.js"></script>
   <script src="options.js"></script>
 </body>
 </html>

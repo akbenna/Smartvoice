@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aanmelden voor VitaScribe</title>
+<link rel="icon" href="/vitascribe-logo.svg" type="image/svg+xml">
+<style>
+  :root{--groen:#059669;--groen-donker:#047857;--tekst:#111827;--zacht:#4b5563;--rand:#e5e7eb;--achter:#f8fafc;--kaart:#fff;--fout:#b91c1c}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--achter);color:var(--tekst);line-height:1.55}
+  header{display:flex;align-items:center;gap:12px;max-width:720px;margin:0 auto;padding:28px 16px 8px}
+  header img{width:44px;height:44px}
+  header b{font-size:22px}
+  main{max-width:720px;margin:0 auto;padding:8px 16px 48px}
+  .kaart{background:var(--kaart);border:1px solid var(--rand);border-radius:14px;padding:24px;margin-top:16px}
+  h1{font-size:26px;margin:0 0 8px}
+  p{margin:0 0 12px;color:var(--zacht)}
+  label{display:block;font-weight:600;margin:14px 0 4px}
+  .hulp{font-weight:400;color:var(--zacht);font-size:14px}
+  input,textarea{width:100%;padding:10px 12px;border:1px solid var(--rand);border-radius:10px;font:inherit;background:#fff}
+  input:focus,textarea:focus{outline:2px solid #a7f3d0;border-color:var(--groen)}
+  .rij{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+  @media(max-width:560px){.rij{grid-template-columns:1fr}}
+  .akkoord{display:flex;gap:10px;align-items:flex-start;margin-top:18px;font-weight:400}
+  .akkoord input{width:auto;margin-top:4px}
+  button{margin-top:20px;background:var(--groen);color:#fff;border:0;border-radius:10px;padding:12px 22px;font:inherit;font-weight:600;cursor:pointer}
+  button:hover{background:var(--groen-donker)}
+  button:disabled{opacity:.6;cursor:default}
+  .melding{margin-top:16px;padding:12px 14px;border-radius:10px;display:none}
+  .melding.fout{display:block;background:#fef2f2;color:var(--fout)}
+  .melding.goed{display:block;background:#ecfdf5;color:var(--groen-donker)}
+  .verborgen{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+  ol{padding-left:20px;color:var(--zacht);margin:0}
+  ol li{margin-bottom:6px}
+</style>
+</head>
+<body>
+<header><img src="/vitascribe-logo.svg" alt=""><b>VitaScribe</b></header>
+<main>
+  <section class="kaart">
+    <h1>Aanmelden voor de testfase</h1>
+    <p>VitaScribe is een consultassistent voor huisartsen die met Bricks Huisarts werken: dicteren in het dossier, een SOEP-regel met één klik, en informatie- en verwijsbrieven zonder naam, BSN of adres. In de testfase is deelname gratis.</p>
+    <ol>
+      <li>U meldt de praktijk hieronder aan.</li>
+      <li>Wij nemen contact op en sturen een pilotovereenkomst.</li>
+      <li>Daarna krijgt elke gebruiker een eigen sleutel, en installeert u de extensie in Edge of Chrome.</li>
+    </ol>
+  </section>
+
+  <form class="kaart" id="formulier" novalidate>
+    <div class="rij">
+      <div><label for="praktijknaam">Naam van de praktijk</label><input id="praktijknaam" name="praktijknaam" required maxlength="200" autocomplete="organization"></div>
+      <div><label for="plaats">Plaats</label><input id="plaats" name="plaats" required maxlength="100" autocomplete="address-level2"></div>
+    </div>
+    <label for="praktijknummer">Bricks-praktijknummer <span class="hulp">staat in de adresbalk van Bricks, bijvoorbeeld groep06.brickshuisarts.nl/<b>2876</b>/login</span></label>
+    <input id="praktijknummer" name="praktijknummer" inputmode="numeric" maxlength="40" placeholder="2876">
+    <label for="agb">AGB-code praktijk <span class="hulp">(als u die bij de hand heeft)</span></label>
+    <input id="agb" name="agb" inputmode="numeric" maxlength="20">
+    <div class="rij">
+      <div><label for="contact_naam">Contactpersoon</label><input id="contact_naam" name="contact_naam" required maxlength="200" autocomplete="name"></div>
+      <div><label for="email">E-mailadres</label><input id="email" name="email" type="email" required maxlength="200" autocomplete="email"></div>
+    </div>
+    <div class="rij">
+      <div><label for="telefoon">Telefoon</label><input id="telefoon" name="telefoon" type="tel" maxlength="40" autocomplete="tel"></div>
+      <div></div>
+    </div>
+    <div class="rij">
+      <div><label for="fte">Aantal huisarts-FTE</label><input id="fte" name="fte" inputmode="decimal" maxlength="6" placeholder="2,5"></div>
+      <div><label for="werkplekken">Aantal werkplekken met VitaScribe</label><input id="werkplekken" name="werkplekken" type="number" min="0" max="9999" step="1"></div>
+    </div>
+    <label for="opmerking">Opmerking <span class="hulp">(optioneel)</span></label>
+    <textarea id="opmerking" name="opmerking" rows="3" maxlength="2000"></textarea>
+    <div class="verborgen" aria-hidden="true"><label for="website">Website</label><input id="website" name="website" tabindex="-1" autocomplete="off"></div>
+    <label class="akkoord"><input type="checkbox" id="akkoord" name="akkoord"> <span>Ik ga akkoord dat VitaScribe deze gegevens gebruikt om contact op te nemen over de testfase. Er worden hier geen patiëntgegevens gevraagd of opgeslagen.</span></label>
+    <button type="submit" id="verstuur">Aanmelding versturen</button>
+    <div class="melding" id="melding" role="status"></div>
+  </form>
+</main>
+<script src="/aanmelden/aanmelden.js"></script>
+</body>
+</html>

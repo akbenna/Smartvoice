@@ -41,8 +41,9 @@ async function start(config, rules) {
               ready: false, pending: [] };
   var s = session;
 
-  ws.onopen = function () {
-    ws.send(JSON.stringify({ type: 'auth', api_key: config.apiKey, keyterms: SVTextRules.keyterms(rules) }));
+  ws.onopen = async function () {
+    var praktijk = await SVPraktijk.nummers();
+    ws.send(JSON.stringify({ type: 'auth', api_key: config.apiKey, praktijk: praktijk, keyterms: SVTextRules.keyterms(rules) }));
   };
   ws.onmessage = function (msg) {
     var event;

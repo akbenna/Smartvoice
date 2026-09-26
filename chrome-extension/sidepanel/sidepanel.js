@@ -268,8 +268,9 @@ async function startDictation() {
   session = { ws: ws, stream: null, recorder: null, stopTimer: null, ready: false, pending: [] };
   var s = session;
 
-  ws.onopen = function () {
-    ws.send(JSON.stringify({ type: 'auth', api_key: config.apiKey, keyterms: SVTextRules.keyterms(rules) }));
+  ws.onopen = async function () {
+    var praktijk = await SVPraktijk.nummers();
+    ws.send(JSON.stringify({ type: 'auth', api_key: config.apiKey, praktijk: praktijk, keyterms: SVTextRules.keyterms(rules) }));
   };
   ws.onmessage = function (msg) {
     try { handleServerEvent(JSON.parse(msg.data)); } catch (e) { /* ignore malformed */ }
@@ -348,6 +349,7 @@ async function processText(mode) {
   try {
     var headers = { 'Content-Type': 'application/json' };
     if (config.apiKey) headers['X-API-Key'] = config.apiKey;
+    await SVPraktijk.metKop(headers);
     var body = { text: text, mode: mode };
     if (config.llmProvider) body.llm_provider = config.llmProvider;
     var resp = await fetch(config.apiUrl + '/api/v1/dictation/process', {

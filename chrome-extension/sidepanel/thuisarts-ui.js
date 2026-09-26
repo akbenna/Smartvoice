@@ -134,6 +134,7 @@ window.SVThuisartsUI = (function () {
       if (!config.apiUrl) return;
       var headers = { 'Content-Type': 'application/json' };
       if (config.apiKey) headers['X-API-Key'] = config.apiKey;
+      await SVPraktijk.metKop(headers);
       await fetch(config.apiUrl + '/api/v1/usage', {
         method: 'POST', headers: headers,
         body: JSON.stringify({ action: 'patient.thuisarts', kind: icpc }),

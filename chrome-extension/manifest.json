@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "VitaScribe — AI Consultassistent",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "Dicteren, SOEP en brieven (informatie- en verwijsbrief) voor Bricks Huisarts",
   "icons": {
     "16": "icons/icon16.png",
@@ -71,6 +71,7 @@
         "http://localhost:8002/*"
       ],
       "js": [
+        "lib/praktijk.js",
         "content/bricks.js"
       ],
       "css": [

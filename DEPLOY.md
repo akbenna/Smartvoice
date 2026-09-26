@@ -197,3 +197,15 @@ hint mee naar Deepgram. Opgeslagen per computer (Chrome, lokaal); overzetten via
 **Endpoints:**
 - `WS /api/v1/dictation/stream`: audio in, tekst terug (eerste bericht: `{"type":"auth","api_key":"..."}`)
 - `POST /api/v1/dictation/process`: `{"text": "...", "mode": "clean" | "soep"}`
+
+## Praktijkregister en licenties (cloud-API)
+
+Om VitaScribe aan andere praktijken aan te bieden, zet je op de service van de cloud-API drie variabelen:
+
+```
+DATABASE_URL=<koppel de Railway-PostgreSQL>      # zet het register aan
+ADMIN_KEY=<openssl rand -hex 32>                   # opent /beheer
+SLEUTELKLUIS=<Fernet-sleutel, zie hieronder>       # eigen AI-sleutels van praktijken
+```
+
+Maak de kluissleutel met `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Zonder `DATABASE_URL` werkt de server zoals voorheen, met `API_USERS` en `API_KEYS`. Die sleutels blijven ook met het register werken. Hoe het beheer werkt, staat in [docs/LICENTIEBEHEER.md](docs/LICENTIEBEHEER.md).

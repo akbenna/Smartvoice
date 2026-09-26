@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>VitaScribe beheer</title>
+<link rel="icon" href="/vitascribe-logo.svg" type="image/svg+xml">
+<style>
+  :root{--groen:#059669;--groen-donker:#047857;--groen-licht:#ecfdf5;--tekst:#111827;--zacht:#6b7280;--rand:#e5e7eb;--achter:#f8fafc;--kaart:#fff;--rood:#b91c1c;--rood-licht:#fef2f2;--amber:#b45309;--amber-licht:#fffbeb;--blauw:#1d4ed8;--blauw-licht:#eff6ff}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--achter);color:var(--tekst);font-size:15px;line-height:1.45}
+  header{display:flex;align-items:center;gap:10px;padding:14px 20px;background:#fff;border-bottom:1px solid var(--rand);position:sticky;top:0;z-index:5}
+  header img{width:30px;height:30px}
+  header b{font-size:17px}
+  header .ruimte{flex:1}
+  main{max-width:1280px;margin:0 auto;padding:18px 20px 60px}
+  .kaart{background:var(--kaart);border:1px solid var(--rand);border-radius:12px;padding:18px}
+  h2{font-size:17px;margin:0 0 12px}
+  h3{font-size:15px;margin:18px 0 8px}
+  button{font:inherit;border-radius:8px;border:1px solid var(--rand);background:#fff;padding:7px 12px;cursor:pointer}
+  button:hover{border-color:#cbd5e1}
+  button.hoofd{background:var(--groen);border-color:var(--groen);color:#fff;font-weight:600}
+  button.hoofd:hover{background:var(--groen-donker)}
+  button.gevaar{color:var(--rood)}
+  button:disabled{opacity:.5;cursor:default}
+  input,select,textarea{font:inherit;padding:7px 10px;border:1px solid var(--rand);border-radius:8px;background:#fff;width:100%}
+  textarea{resize:vertical}
+  label{display:block;font-size:13px;color:var(--zacht);margin:10px 0 3px}
+  .tegels{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+  .tegel{background:#fff;border:1px solid var(--rand);border-radius:12px;padding:14px}
+  .tegel b{display:block;font-size:24px}
+  .tegel span{color:var(--zacht);font-size:13px}
+  .balk{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+  .chip{border-radius:999px;padding:5px 12px}
+  .chip.aan{background:var(--tekst);color:#fff;border-color:var(--tekst)}
+  .balk input{max-width:260px}
+  .indeling{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px;align-items:start}
+  @media(max-width:980px){.indeling{grid-template-columns:1fr}}
+  table{width:100%;border-collapse:collapse}
+  th{font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--zacht);text-align:left;padding:8px;border-bottom:1px solid var(--rand)}
+  td{padding:9px 8px;border-bottom:1px solid var(--rand);vertical-align:top}
+  tr.rij{cursor:pointer}
+  tr.rij:hover td{background:#f9fafb}
+  tr.rij.gekozen td{background:var(--groen-licht)}
+  .klein{font-size:13px;color:var(--zacht)}
+  .label{display:inline-block;font-size:12px;border-radius:999px;padding:2px 8px;background:#f3f4f6;color:#374151;white-space:nowrap}
+  .label.groen{background:var(--groen-licht);color:var(--groen-donker)}
+  .label.rood{background:var(--rood-licht);color:var(--rood)}
+  .label.amber{background:var(--amber-licht);color:var(--amber)}
+  .label.blauw{background:var(--blauw-licht);color:var(--blauw)}
+  .velden{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+  .velden .breed{grid-column:1/-1}
+  .knoppen{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .aanmelding{background:var(--amber-licht);border-radius:8px;padding:10px 12px;margin:8px 0;white-space:pre-wrap}
+  .leeg{color:var(--zacht);padding:24px;text-align:center}
+  .melding{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--tekst);color:#fff;padding:10px 16px;border-radius:10px;display:none;z-index:20;max-width:90vw}
+  .melding.fout{background:var(--rood)}
+  .scherm{position:fixed;inset:0;background:rgba(17,24,39,.45);display:none;align-items:center;justify-content:center;z-index:30;padding:16px}
+  .scherm .kaart{max-width:640px;width:100%}
+  .sleutel{font-family:ui-monospace,Menlo,Consolas,monospace;background:#f3f4f6;border-radius:8px;padding:10px;word-break:break-all;user-select:all}
+  details summary{cursor:pointer;font-weight:600;margin:6px 0}
+  .inlog{max-width:420px;margin:60px auto}
+  .vink{display:flex;gap:8px;align-items:center;margin-top:12px;font-size:14px;color:var(--tekst)}
+  .vink input{width:auto}
+  pre{white-space:pre-wrap;margin:0}
+</style>
+</head>
+<body>
+<header><img src="/vitascribe-logo.svg" alt=""><b>VitaScribe beheer</b><span class="ruimte"></span><button id="uitloggen" hidden>Uitloggen</button></header>
+<main id="app"></main>
+<div class="melding" id="melding" role="status"></div>
+<div class="scherm" id="scherm"><div class="kaart" id="scherminhoud"></div></div>
+<script src="/beheer/beheer.js"></script>
+</body>
+</html>

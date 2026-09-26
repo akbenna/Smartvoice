@@ -23,7 +23,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from . import audit, data_policy, llm_service
-from .auth import verify_api_key
+from .auth import huidige_identiteit, verify_api_key
+from .praktijk_sleutels import kies_brieven
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/api/v1/letters", tags=["brieven"])
@@ -233,16 +234,22 @@ async def extract_from_image(body: ExtractRequest, user: str = Depends(verify_ap
 
 
 @router.post("/generate")
-async def generate_letter(body: GenerateRequest, user_name: str = Depends(verify_api_key)):
-    """Write the letter; the text streams back as it is written."""
+async def generate_letter(body: GenerateRequest, ident=Depends(huidige_identiteit)):
+    """Write the letter; the text streams back as it is written.
+
+    A practice with its own Anthropic or OpenAI key writes letters on that key.
+    Letters are the only thing that may go there: they are pseudonymised."""
+    user_name = ident.label
     system, user, quality, max_tokens = build_letter_prompts(body)
+    provider, eigen_sleutel = await kies_brieven(ident)
     audit.log_event(user_name, "letters.generate", kind=body.kind,
                     aanvrager=body.aanvrager or "", consent=bool(body.toestemming),
-                    provider=data_policy.letters_llm_provider())
-    logger.info("letters.generate", kind=body.kind, dossier_chars=len(body.dossier))
+                    provider=provider + (":eigen" if eigen_sleutel else ""))
+    logger.info("letters.generate", kind=body.kind, dossier_chars=len(body.dossier), provider=provider,
+                eigen_sleutel=bool(eigen_sleutel))
 
     stream = llm_service.stream_llm(
-        data_policy.letters_llm_provider(), system, user, max_tokens=max_tokens, quality=quality,
+        provider, system, user, max_tokens=max_tokens, quality=quality, api_key=eigen_sleutel,
     )
     # Fail before the 200 is sent when the provider rejects the call outright.
     try:

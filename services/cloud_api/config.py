@@ -50,6 +50,9 @@ class LLMConfig:
     anthropic_effort: str = "medium"
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.0-flash"
+    # OpenAI only runs on a practice's own key, and only for letters.
+    openai_model: str = "gpt-4.1-mini"
+    openai_quality_model: str = "gpt-4.1"
     temperature: float = 0.1
     max_tokens: int = 2048
 
@@ -115,6 +118,8 @@ def get_config() -> AppConfig:
             anthropic_effort=os.getenv("ANTHROPIC_EFFORT", "medium"),
             gemini_api_key=os.getenv("GEMINI_API_KEY", ""),
             gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
+            openai_model=os.getenv("OPENAI_LETTERS_MODEL", "gpt-4.1-mini"),
+            openai_quality_model=os.getenv("OPENAI_LETTERS_QUALITY_MODEL", "gpt-4.1"),
             temperature=float(os.getenv("LLM_TEMPERATURE", "0.1")),
             max_tokens=int(os.getenv("LLM_MAX_TOKENS", "2048")),
         ),

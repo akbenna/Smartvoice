@@ -17,3 +17,10 @@ python-dotenv>=1.0.0
 
 # Live dictation relay to Deepgram
 websockets>=13.0
+
+# Praktijkregister (alleen gebruikt als DATABASE_URL staat) en de kluis voor
+# eigen sleutels van praktijken (alleen gebruikt als SLEUTELKLUIS staat)
+asyncpg>=0.29
+cryptography>=42
+# Tijdzone voor de vervaldatum van een licentie, ook in een kale container
+tzdata>=2024.1

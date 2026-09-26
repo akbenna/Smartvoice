@@ -270,15 +270,17 @@ async def stream_anthropic(
     user_content,
     max_tokens: int,
     quality: bool = False,
+    api_key: Optional[str] = None,
 ):
     """Stream Claude's answer as text deltas (letters: text appears while written).
 
     user_content: a string, or a list of content blocks (text and images).
     quality: the stronger model (letters to third parties, image reading);
     otherwise the fast model (referral letters).
+    api_key: the practice's own key (letters only); otherwise the server's.
     """
     config = get_config()
-    api_key = config.llm.anthropic_api_key
+    api_key = api_key or config.llm.anthropic_api_key
     if not api_key:
         raise ValueError("ANTHROPIC_API_KEY niet geconfigureerd.")
     model = config.llm.anthropic_soep_model if quality else config.llm.anthropic_model
@@ -374,6 +376,59 @@ async def stream_mistral(system_prompt: str, user_content, max_tokens: int, qual
                         yield piece
 
 
+async def stream_openai(system_prompt: str, user_content, max_tokens: int, quality: bool = False,
+                        api_key: Optional[str] = None):
+    """Stream an OpenAI (ChatGPT) answer as text deltas.
+
+    Only for pseudonymised letters, on the practice's own key: there is no
+    server key for OpenAI on purpose. No temperature: newer models reject it,
+    and max_completion_tokens replaces max_tokens on them.
+    """
+    config = get_config()
+    if not api_key:
+        raise ValueError("Geen OpenAI-sleutel van de praktijk ingesteld.")
+    model = config.llm.openai_quality_model if quality else config.llm.openai_model
+    if not isinstance(user_content, str):
+        raise ValueError("Voor OpenAI gaat alleen tekst mee.")
+    body = {
+        "model": model,
+        "max_completion_tokens": max_tokens,
+        "stream": True,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content},
+        ],
+    }
+    logger.info("llm.openai.stream", model=model)
+    import json as _json
+    async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=15.0)) as client:
+        async with client.stream(
+            "POST", "https://api.openai.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json=body,
+        ) as response:
+            if response.status_code >= 400:
+                detail = (await response.aread()).decode("utf-8", "replace")[:300]
+                logger.error("llm.openai.error", status=response.status_code, body=detail)
+                raise ValueError(f"Taalmodel gaf fout {response.status_code}.")
+            async for line in response.aiter_lines():
+                if not line.startswith("data: "):
+                    continue
+                payload = line[6:].strip()
+                if payload == "[DONE]":
+                    break
+                try:
+                    event = _json.loads(payload)
+                except ValueError:
+                    continue
+                for choice in event.get("choices", []):
+                    piece = (choice.get("delta") or {}).get("content")
+                    if isinstance(piece, str) and piece:
+                        yield piece
+                    if choice.get("finish_reason") == "content_filter":
+                        raise ValueError("Het taalmodel weigerde dit verzoek.")
+
+
 def image_part(provider: str, media_type: str, data_b64: str) -> dict:
     """An image content part in the format of the given provider."""
     if provider == "mistral":
@@ -385,10 +440,22 @@ def text_part(provider: str, text: str) -> dict:
     return {"type": "text", "text": text}
 
 
-def stream_llm(provider: str, system_prompt: str, user_content, max_tokens: int, quality: bool = False):
-    """Stream from the chosen provider (mistral | anthropic)."""
+def stream_llm(provider: str, system_prompt: str, user_content, max_tokens: int, quality: bool = False,
+               api_key: Optional[str] = None):
+    """Stream from the chosen provider (mistral | anthropic | openai).
+
+    api_key is the practice's own key and is only accepted for anthropic and
+    openai (letters). Mistral handles identifiable data and always runs on the
+    server's key: a practice key there would be a way around the data policy.
+    """
     if provider == "mistral":
+        if api_key:
+            raise ValueError("Voor het EU-model geldt alleen de sleutel van de server.")
         return stream_mistral(system_prompt, user_content, max_tokens=max_tokens, quality=quality)
     if provider == "anthropic":
-        return stream_anthropic(system_prompt, user_content, max_tokens=max_tokens, quality=quality)
+        return stream_anthropic(system_prompt, user_content, max_tokens=max_tokens, quality=quality,
+                                api_key=api_key)
+    if provider == "openai":
+        return stream_openai(system_prompt, user_content, max_tokens=max_tokens, quality=quality,
+                             api_key=api_key)
     raise ValueError(f"Onbekende LLM provider: {provider}")
