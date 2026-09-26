@@ -1,0 +1,300 @@
+{
+  "toelichting": "Koppeling van de ICPC-code die de arts vastlegt naar het naslagdeel van een tool in ProVita Care, en naar een uitlegfilmpje voor de patiënt. Zelfde regels als de Thuisarts-tabel: een vaste tabel, geen taalmodel, en VitaScribe rekent zelf niets. Alleen naslag (protocollen, doseringstabellen, vergoedingen) en uitleg voor de patiënt; tools die een advies voor één patiënt geven (Smart Adviseur, PCCV-score, Nierschade Tool, CVA-nazorg, rekenhulpen, keuzehulpen) staan er bewust niet in. Een regel telt pas mee als 'gecontroleerd_op' en 'door' allebei gevuld zijn.",
+  "invullen": "Open de link, kijk of de inhoud bij de code past, en zet dan je initialen in 'door' en de datum in 'gecontroleerd_op' (JJJJ-MM-DD). Met scripts/beslistools_tabel.py: --toon laat zien wat nog open staat, --controleer <id> --door <initialen> zet een regel aan.",
+  "basis": "https://provitacare.nl",
+  "versie": "2026-09-26",
+  "links": [
+    {
+      "id": "fw-diabetes",
+      "soort": "naslag",
+      "icpc": [
+        "T90"
+      ],
+      "titel": "Farmacowijzer: diabetes type 2",
+      "pad": "/poh/farmacowijzer?tab=diabetes",
+      "uitleg": "Opbouwprotocol, GLP-1, SGLT2, insuline, ziekedagen (NHG M01)",
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "id": "fw-hartfalen",
+      "soort": "naslag",
+      "icpc": [
+        "K77"
+      ],
+      "titel": "Farmacowijzer: hartfalen",
+      "pad": "/poh/farmacowijzer?tab=hartfalen",
+      "uitleg": "Vier pijlers, optitreren, diuretica (NHG M51)",
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "id": "fw-copd",
+      "soort": "naslag",
+      "icpc": [
+        "R95"
+      ],
+      "titel": "Farmacowijzer: COPD",
+      "pad": "/poh/farmacowijzer?tab=copd",
+      "uitleg": "Stappenplan, inhalatoren, exacerbatie (NHG M26)",
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "id": "fw-astma",
+      "soort": "naslag",
+      "icpc": [
+        "R96"
+      ],
+      "titel": "Farmacowijzer: astma",
+      "pad": "/poh/farmacowijzer?tab=astma",
+      "uitleg": "Stappenplan, ICS-equivalenten (NHG M27)",
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "id": "fw-nierfunctie",
+      "soort": "naslag",
+      "icpc": [
+        "U99.01"
+      ],
+      "titel": "Farmacowijzer: nierfunctie en dosering",
+      "pad": "/poh/farmacowijzer?tab=nierfunctie",
+      "uitleg": "Doseringsaanpassing per eGFR-stadium",
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "id": "fw-groepen",
+      "soort": "naslag",
+      "icpc": [
+        "K86",
+        "K87"
+      ],
+      "titel": "Farmacowijzer: ABCD-groepen antihypertensiva",
+      "pad": "/poh/farmacowijzer?tab=groepen",
+      "uitleg": "Middelengroepen bij hypertensie (NHG M84)",
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "id": "vergoedingen",
+      "soort": "naslag",
+      "icpc": [
+        "T90",
+        "T93",
+        "K77"
+      ],
+      "titel": "Vergoedingen: GLP-1, PCSK9-remmers, sacubitril/valsartan",
+      "pad": "/poh/vergoeding",
+      "uitleg": "Wordt het vergoed en is een machtiging nodig",
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "id": "anim-koolhydraten",
+      "soort": "patient",
+      "icpc": [
+        "T82",
+        "T83"
+      ],
+      "titel": "Koolhydraten begrijpen",
+      "pad": "/animations/vita-animatie-koolhydraten-v2.html",
+      "uitleg": "Animatie voor de patiënt (ProVita Care)",
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "id": "anim-portiecontrole",
+      "soort": "patient",
+      "icpc": [
+        "T82",
+        "T83"
+      ],
+      "titel": "Portiegroottes",
+      "pad": "/animations/vita-animatie-portiecontrole-v2.html",
+      "uitleg": "Animatie voor de patiënt (ProVita Care)",
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "id": "anim-glykemische-index",
+      "soort": "patient",
+      "icpc": [
+        "T82",
+        "T83"
+      ],
+      "titel": "Glykemische index",
+      "pad": "/animations/vita-animatie-glykemische-index-v2.html",
+      "uitleg": "Animatie voor de patiënt (ProVita Care)",
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "id": "anim-beweging-opbouwen",
+      "soort": "patient",
+      "icpc": [
+        "T82",
+        "T83"
+      ],
+      "titel": "Beweging opbouwen",
+      "pad": "/animations/vita-animatie-beweging-opbouwen-v2.html",
+      "uitleg": "Animatie voor de patiënt (ProVita Care)",
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "id": "anim-plateau",
+      "soort": "patient",
+      "icpc": [
+        "T82",
+        "T83"
+      ],
+      "titel": "Gewichtsplateau doorbreken",
+      "pad": "/animations/vita-animatie-plateau-v2.html",
+      "uitleg": "Animatie voor de patiënt (ProVita Care)",
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "id": "anim-stress-cortisol",
+      "soort": "patient",
+      "icpc": [
+        "T82",
+        "T83"
+      ],
+      "titel": "Stress en cortisol",
+      "pad": "/animations/vita-animatie-stress-cortisol-v2.html",
+      "uitleg": "Animatie voor de patiënt (ProVita Care)",
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "id": "anim-craving",
+      "soort": "patient",
+      "icpc": [
+        "T82",
+        "T83"
+      ],
+      "titel": "Trek beheersen",
+      "pad": "/animations/vita-animatie-craving-v2.html",
+      "uitleg": "Animatie voor de patiënt (ProVita Care)",
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "id": "anim-beweging-bloedsuiker",
+      "soort": "patient",
+      "icpc": [
+        "T90"
+      ],
+      "titel": "Beweging en bloedsuiker",
+      "pad": "/animations/vita-animatie-beweging-bloedsuiker-v2.html",
+      "uitleg": "Animatie voor de patiënt (ProVita Care)",
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "id": "anim-ziekedagen",
+      "soort": "patient",
+      "icpc": [
+        "T90"
+      ],
+      "titel": "Ziekedagen en diabetes",
+      "pad": "/animations/vita-animatie-ziekedagen-v2.html",
+      "uitleg": "Animatie voor de patiënt (ProVita Care)",
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "id": "anim-zoutbeperking",
+      "soort": "patient",
+      "icpc": [
+        "K86",
+        "K87"
+      ],
+      "titel": "Zout beperken",
+      "pad": "/animations/vita-animatie-zoutbeperking-v2.html",
+      "uitleg": "Animatie voor de patiënt (ProVita Care)",
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "id": "anim-mediterraan-dieet",
+      "soort": "patient",
+      "icpc": [
+        "T93",
+        "K74",
+        "K75",
+        "K76"
+      ],
+      "titel": "Mediterraan eten",
+      "pad": "/animations/vita-animatie-mediterraan-dieet-v2.html",
+      "uitleg": "Animatie voor de patiënt (ProVita Care)",
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "id": "anim-veilig-bewegen-hart",
+      "soort": "patient",
+      "icpc": [
+        "K74",
+        "K75",
+        "K76"
+      ],
+      "titel": "Veilig bewegen met een hartaandoening",
+      "pad": "/animations/vita-animatie-veilig-bewegen-hart-v2.html",
+      "uitleg": "Animatie voor de patiënt (ProVita Care)",
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "id": "anim-stoppen-roken",
+      "soort": "patient",
+      "icpc": [
+        "P17"
+      ],
+      "titel": "Stoppen met roken",
+      "pad": "/animations/vita-animatie-stoppen-roken-v2.html",
+      "uitleg": "Animatie voor de patiënt (ProVita Care)",
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "id": "anim-nicotinevervanging",
+      "soort": "patient",
+      "icpc": [
+        "P17"
+      ],
+      "titel": "Nicotinevervanging",
+      "pad": "/animations/vita-animatie-nicotinevervanging-v2.html",
+      "uitleg": "Animatie voor de patiënt (ProVita Care)",
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "id": "anim-hormonen-menopauze",
+      "soort": "patient",
+      "icpc": [
+        "X11"
+      ],
+      "titel": "Hormonen en overgang",
+      "pad": "/animations/vita-animatie-hormonen-menopauze-v2.html",
+      "uitleg": "Animatie voor de patiënt (ProVita Care)",
+      "gecontroleerd_op": null,
+      "door": null
+    },
+    {
+      "id": "anim-botgezondheid",
+      "soort": "patient",
+      "icpc": [
+        "L95"
+      ],
+      "titel": "Botgezondheid en osteoporose",
+      "pad": "/animations/vita-animatie-botgezondheid-v2.html",
+      "uitleg": "Animatie voor de patiënt (ProVita Care)",
+      "gecontroleerd_op": null,
+      "door": null
+    }
+  ]
+}

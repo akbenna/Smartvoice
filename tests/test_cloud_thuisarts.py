@@ -194,3 +194,14 @@ def test_usage_rejects_a_kind_that_is_not_icpc(client):
 
 def test_usage_requires_a_key(client):
     assert client.post("/api/v1/usage", json={"action": "patient.thuisarts", "kind": "R78"}).status_code in (401, 403)
+
+
+def test_usage_counts_provita_links_by_rubric(client, tmp_path):
+    """De koppeling naar ProVita Care telt mee zoals Thuisarts: handeling en
+    hoofdrubriek, geen adres."""
+    for actie in ("naslag.provita", "patient.animatie"):
+        resp = client.post("/api/v1/usage", headers={"X-API-Key": "sleutel-a"},
+                           json={"action": actie, "kind": "T90"})
+        assert resp.status_code == 200
+        regel = json.loads((tmp_path / "audit.jsonl").read_text().strip().splitlines()[-1])
+        assert regel["action"] == actie and regel["kind"] == "T90"
