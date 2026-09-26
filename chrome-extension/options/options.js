@@ -5,6 +5,12 @@
 
 // delenPerMail is off by default: mailing is a decision of the practice, not
 // a default of the software.
+// Het adres dat een lege instelling krijgt. In de ontwikkelversie is dat de
+// lokale testserver; scripts/pack_store.sh zet er in het winkelpakket de
+// VitaScribe-server voor in de plaats, zodat een nieuwe praktijk het niet
+// hoeft in te vullen.
+var STANDAARD_SERVER = 'http://localhost:8002';
+
 var FIELDS = ['apiUrl', 'apiKey', 'sttProvider', 'llmProvider', 'micDevice', 'delenPerMail', 'consultLive'];
 
 var SELECTOR_FIELDS = {
@@ -31,6 +37,7 @@ async function loadSettings() {
     var el = document.getElementById(key);
     if (el && stored[key]) el.value = stored[key];
   });
+  if (!stored.apiUrl) document.getElementById('apiUrl').value = STANDAARD_SERVER;
 
   if (stored.bricksSelectors) {
     try {
