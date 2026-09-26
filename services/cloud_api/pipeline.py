@@ -102,14 +102,31 @@ async def process_consultation(
     3. Generate decisief regel (LLM)
     4. Detect red flags (LLM)
     """
-    result = PipelineResult()
     # AVG: the browser cannot pick a non-EU service for patient data.
     stt_provider = data_policy.stt_provider(stt_provider)
-    llm_provider = data_policy.phi_llm_provider(llm_provider)
 
     # ── Step 1: Transcription ──
     logger.info("pipeline.step", step="transcription")
     transcript = await stt_service.transcribe(audio_path, provider=stt_provider, deepgram_key=deepgram_key)
+    try:
+        grootte = f"{audio_path.stat().st_size / 1024:.1f} KB"
+    except OSError:
+        grootte = "onbekend"
+    return await verwerk_transcript(transcript, llm_provider=llm_provider, bestandsgrootte=grootte)
+
+
+async def verwerk_transcript(
+    transcript: "stt_service.TranscriptResult",
+    llm_provider: str = None,
+    bestandsgrootte: str = "",
+) -> PipelineResult:
+    """Van transcript naar SOEP, decisief en aandachtspunten.
+
+    Een opgenomen consult komt hier via process_consultation; een live
+    gevolgd consult (consult_live) brengt zijn transcript zelf mee.
+    """
+    result = PipelineResult()
+    llm_provider = data_policy.phi_llm_provider(llm_provider)
     result.transcript_raw = transcript.raw_text
     result.duration_secs = transcript.duration_secs
     result.stt_provider = transcript.provider
@@ -138,15 +155,14 @@ async def process_consultation(
     if not transcript.raw_text.strip():
         logger.warning(
             "pipeline.empty_transcript",
-            audio_path=str(audio_path),
             duration_secs=transcript.duration_secs,
             provider=transcript.provider,
         )
         result.decisief = (
             f"Geen spraak gedetecteerd. "
             f"Audio duur: {transcript.duration_secs:.1f}s, "
-            f"Provider: {transcript.provider}, "
-            f"Bestandsgrootte: {audio_path.stat().st_size / 1024:.1f} KB"
+            f"Provider: {transcript.provider}"
+            + (f", Bestandsgrootte: {bestandsgrootte}" if bestandsgrootte else "")
         )
         return result
 

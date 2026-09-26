@@ -5,7 +5,7 @@
 
 // delenPerMail is off by default: mailing is a decision of the practice, not
 // a default of the software.
-var FIELDS = ['apiUrl', 'apiKey', 'sttProvider', 'llmProvider', 'micDevice', 'delenPerMail'];
+var FIELDS = ['apiUrl', 'apiKey', 'sttProvider', 'llmProvider', 'micDevice', 'delenPerMail', 'consultLive'];
 
 var SELECTOR_FIELDS = {
   selJournaal: 'journaal',

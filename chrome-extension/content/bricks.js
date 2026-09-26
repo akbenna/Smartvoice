@@ -30,6 +30,13 @@ var audioChunks = [];
 var audioStream = null;
 var timerInterval = null;
 var recStartTime = null;
+var live = null;           // SVConsultLive-verbinding, of null bij opnemen en achteraf versturen
+var liveAfgebroken = null; // melding als de server het consult weigert (licentie)
+
+// Kleine stukjes, zodat het gesprek live naar de server kan. Samen vormen
+// ze ook de reservekopie: dezelfde stukjes achter elkaar zijn een geldig
+// webm-bestand.
+var CONSULT_CHUNK_MS = 250;
 
 /* ── Selector helpers ── */
 
@@ -182,13 +189,19 @@ async function startRecording() {
   }
 
   audioChunks = [];
+  liveAfgebroken = null;
+  live = await startLive();
   var mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
     ? 'audio/webm;codecs=opus' : 'audio/webm';
 
-  mediaRecorder = new MediaRecorder(audioStream, { mimeType: mimeType, audioBitsPerSecond: 128000 });
+  // 64 kbit/s opus is ruim voor spraak en houdt de stukjes klein.
+  mediaRecorder = new MediaRecorder(audioStream, { mimeType: mimeType, audioBitsPerSecond: 64000 });
 
   mediaRecorder.ondataavailable = function(e) {
-    if (e.data && e.data.size > 0) audioChunks.push(e.data);
+    if (e.data && e.data.size > 0) {
+      audioChunks.push(e.data);            // reservekopie, blijft tot het verslag er is
+      if (live) live.stuur(e.data);
+    }
   };
 
   mediaRecorder.onstop = function() {
@@ -196,21 +209,90 @@ async function startRecording() {
     var blob = new Blob(audioChunks, { type: mime });
 
     if (audioStream) { audioStream.getTracks().forEach(function(t) { t.stop(); }); audioStream = null; }
-
-    if (blob.size < 1000) {
-      setWidgetState('idle');
-      showNotification('Opname te kort. Probeer langer op te nemen.');
-      return;
-    }
-
-    setWidgetState('processing');
-    sendAudioToAPI(blob, mime);
+    rondAf(blob, mime);
   };
 
-  mediaRecorder.start();
+  mediaRecorder.start(CONSULT_CHUNK_MS);
   recStartTime = Date.now();
   timerInterval = setInterval(updateTimer, 500);
   setWidgetState('recording');
+  setRecLabel(live ? 'Luistert mee' : 'Opname actief');
+}
+
+/* ── Live consult ── */
+
+function setRecLabel(tekst) {
+  var el = document.querySelector('#vitascribe-widget .sv-rec-label');
+  if (el) el.textContent = tekst;
+}
+
+// Het gesprek gaat live naar de server, die het per spreker volgt. Staat
+// "consultLive" in de instellingen op "uit", dan wordt het consult zoals
+// vroeger eerst opgenomen en na stop in zijn geheel verstuurd.
+async function startLive() {
+  try {
+    var config = await chrome.storage.sync.get(['apiUrl', 'apiKey', 'llmProvider', 'consultLive']);
+    if (config.consultLive === 'uit' || typeof SVConsultLive === 'undefined') return null;
+    var praktijk = await SVPraktijk.nummers();
+    return SVConsultLive.start({
+      apiUrl: (config.apiUrl || 'http://localhost:8002').replace(/\/$/, ''),
+      apiKey: config.apiKey,
+      praktijk: praktijk,
+      llmProvider: config.llmProvider,
+      onVoortgang: function(seconden, sprekers) {
+        setRecLabel(sprekers > 1 ? 'Luistert mee \u00b7 ' + sprekers + ' stemmen' : 'Luistert mee');
+      },
+      onFout: function(melding, terugval) {
+        if (terugval) {
+          // De opname loopt gewoon door; na stop gaat hij in zijn geheel naar de server.
+          setRecLabel('Opname actief (live verbinding weg)');
+        } else {
+          liveAfgebroken = melding;
+          stopRecording();
+        }
+      },
+    });
+  } catch (e) {
+    return null;   // dan gewoon opnemen en achteraf versturen
+  }
+}
+
+async function rondAf(blob, mime) {
+  var verbinding = live;
+  live = null;
+  if (liveAfgebroken) {
+    if (verbinding) verbinding.sluit();
+    setWidgetState('error');
+    document.getElementById('sv-error-msg').textContent = liveAfgebroken;
+    return;
+  }
+  if (blob.size < 1000) {
+    if (verbinding) verbinding.sluit();
+    setWidgetState('idle');
+    showNotification('Opname te kort. Probeer langer op te nemen.');
+    return;
+  }
+
+  setWidgetState('processing');
+  if (verbinding) {
+    updateProcessingStep('Verslag wordt gemaakt...');
+    var uit = await verbinding.stop(90000);
+    if (uit.ok) {
+      audioChunks = [];
+      toonResultaat(uit.data);
+      return;
+    }
+    updateProcessingStep('Live lukte niet; de opname wordt alsnog verwerkt...');
+  }
+  sendAudioToAPI(blob, mime);
+}
+
+function toonResultaat(result) {
+  lastResult = result;
+  // Persist for popup fallback
+  chrome.storage.local.set({ sv_state: 'results', sv_data: result });
+  setWidgetState('results');
+  displayResults(result);
 }
 
 function stopRecording() {
@@ -252,13 +334,8 @@ async function sendAudioToAPI(blob, mimeType) {
     }
 
     var result = await response.json();
-    lastResult = result;
-
-    // Persist for popup fallback
-    chrome.storage.local.set({ sv_state: 'results', sv_data: result });
-
-    setWidgetState('results');
-    displayResults(result);
+    audioChunks = [];
+    toonResultaat(result);
 
   } catch (err) {
     var errorMsg = err.message || 'Onbekende fout';
