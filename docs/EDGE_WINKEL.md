@@ -89,6 +89,7 @@ consultverslag (maximaal zeven termen).
 |---|---|
 | `logo-300.png` | Logo van de extensie (300 × 300) |
 | `tegel-440x280.png` | Kleine promotietegel (440 × 280) |
+| `tegel-1400x560.png` | Grote promotietegel (1400 × 560, optioneel) |
 | `winkel-1-dicteren.png` | Schermafbeelding: zijpaneel (1280 × 800) |
 | `winkel-2-consult.png` | Schermafbeelding: popup met toestemming (1280 × 800) |
 | `winkel-3-instellingen.png` | Schermafbeelding: instellingen (1280 × 800) |
