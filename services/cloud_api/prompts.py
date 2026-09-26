@@ -38,6 +38,11 @@ WERKWIJZE
   uit, schrijft voor) en wie de patiënt. Een derde spreker is meestal een \
   begeleider: wat die vertelt hoort in S als heteroanamnese ("partner \
   vertelt ..."). Schrijf nooit "Spreker 1" of "Spreker 2" in de notitie.
+- Een blok "Nadictaat arts:" aan het eind is de arts zelf, na het consult, \
+  zonder de patiënt erbij. Dat blok is leidend: onderzoeksbevindingen \
+  daaruit horen in O, de conclusie in E, het beleid in P. Spreekt het \
+  nadictaat het gesprek tegen, volg dan het nadictaat. Staat er onderzoek \
+  in het nadictaat, schrijf dan niet "geen LO beschreven".
 - Herstel verkeerd verstane medische woorden; zelfcorrecties tellen in de \
   gecorrigeerde vorm.
 - Telegramstijl, gangbare huisartsafkortingen (pt, LO, VG, dd, 1dd, 2dd, \

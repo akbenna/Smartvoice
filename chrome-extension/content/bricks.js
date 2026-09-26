@@ -32,6 +32,7 @@ var timerInterval = null;
 var recStartTime = null;
 var live = null;           // SVConsultLive-verbinding, of null bij opnemen en achteraf versturen
 var liveAfgebroken = null; // melding als de server het consult weigert (licentie)
+var nadictaatVanaf = null; // seconde van de opname waarop de arts "Nadicteren" koos
 
 // Kleine stukjes, zodat het gesprek live naar de server kan. Samen vormen
 // ze ook de reservekopie: dezelfde stukjes achter elkaar zijn een geldig
@@ -190,6 +191,9 @@ async function startRecording() {
 
   audioChunks = [];
   liveAfgebroken = null;
+  nadictaatVanaf = null;
+  var nadicteerKnop = document.getElementById('sv-btn-nadicteer');
+  if (nadicteerKnop) nadicteerKnop.classList.remove('hidden');
   live = await startLive();
   var mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
     ? 'audio/webm;codecs=opus' : 'audio/webm';
@@ -219,6 +223,20 @@ async function startRecording() {
   setRecLabel(live ? 'Luistert mee' : 'Opname actief');
 }
 
+/* ── Nadicteren ── */
+
+// De patiënt is weg. De arts dicteert nog kort onderzoek en beleid; alles
+// vanaf dit moment is alleen de arts, en het taalmodel laat dat leiden in
+// O, E en P. De opname loopt gewoon door, dus er gaat niets verloren.
+function startNadictaat() {
+  if (!recStartTime || nadictaatVanaf !== null) return;
+  nadictaatVanaf = Math.round((Date.now() - recStartTime) / 100) / 10;
+  if (live) live.nadictaat(nadictaatVanaf);
+  var knop = document.getElementById('sv-btn-nadicteer');
+  if (knop) knop.classList.add('hidden');
+  setRecLabel('Nadicteren: onderzoek en beleid');
+}
+
 /* ── Live consult ── */
 
 function setRecLabel(tekst) {
@@ -240,6 +258,7 @@ async function startLive() {
       praktijk: praktijk,
       llmProvider: config.llmProvider,
       onVoortgang: function(seconden, sprekers) {
+        if (nadictaatVanaf !== null) return;   // het label zegt dan "Nadicteren"
         setRecLabel(sprekers > 1 ? 'Luistert mee \u00b7 ' + sprekers + ' stemmen' : 'Luistert mee');
       },
       onFout: function(melding, terugval) {
@@ -313,6 +332,7 @@ async function sendAudioToAPI(blob, mimeType) {
     var ext = mimeType.includes('webm') ? 'webm' : 'wav';
     formData.append('audio', blob, 'consult.' + ext);
     formData.append('consent', 'true');
+    if (nadictaatVanaf !== null) formData.append('nadictaat_vanaf', String(nadictaatVanaf));
     if (config.sttProvider) formData.append('stt_provider', config.sttProvider);
     if (config.llmProvider) formData.append('llm_provider', config.llmProvider);
 
@@ -396,6 +416,7 @@ function createWidget() {
           '<span class="sv-rec-label">Opname actief</span>' +
         '</div>' +
         '<div id="sv-timer" class="sv-timer">00:00</div>' +
+        '<button id="sv-btn-nadicteer" class="sv-btn sv-btn-secondary" title="De patiënt is weg: dicteer nog kort onderzoek en beleid">Nadicteren</button>' +
         '<button id="sv-btn-stop" class="sv-btn sv-btn-stop">' +
           '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>' +
           ' Stop &amp; verwerk' +
@@ -455,6 +476,10 @@ function createWidget() {
 
   document.getElementById('sv-btn-record').addEventListener('click', function() {
     startRecording();
+  });
+
+  document.getElementById('sv-btn-nadicteer').addEventListener('click', function() {
+    startNadictaat();
   });
 
   document.getElementById('sv-btn-stop').addEventListener('click', function() {

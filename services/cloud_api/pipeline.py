@@ -92,9 +92,12 @@ async def process_consultation(
     stt_provider: str = None,
     llm_provider: str = None,
     deepgram_key: str = None,
+    nadictaat_vanaf: Optional[float] = None,
 ) -> PipelineResult:
     """
     Process a consultation audio file through the full pipeline.
+
+    nadictaat_vanaf: seconde van de opname waarop de arts "Nadicteren" koos.
 
     Steps:
     1. Transcribe audio (STT)
@@ -108,6 +111,7 @@ async def process_consultation(
     # ── Step 1: Transcription ──
     logger.info("pipeline.step", step="transcription")
     transcript = await stt_service.transcribe(audio_path, provider=stt_provider, deepgram_key=deepgram_key)
+    stt_service.markeer_nadictaat(transcript, nadictaat_vanaf)
     try:
         grootte = f"{audio_path.stat().st_size / 1024:.1f} KB"
     except OSError:

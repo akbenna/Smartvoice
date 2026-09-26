@@ -23,6 +23,9 @@ Protocol (WebSocket /api/v1/consult/stream):
   client -> server  {"type": "auth", "api_key": "...", "praktijk": "...",
                      "consent": true, "keyterms": [...], "llm_provider": ...}
   client -> server  <binaire audio, webm/opus>
+  client -> server  {"type": "nadictaat", "vanaf": 312.4}
+                                                          de patiënt is weg; vanaf deze
+                                                          seconde spreekt alleen de arts
   client -> server  {"type": "stop"}
   server -> client  {"type": "ready"}
   server -> client  {"type": "voortgang", "seconden": 12.3, "sprekers": 2}
@@ -58,7 +61,7 @@ from .dictation import (
     build_keyterms,
     sanitize_user_keyterms,
 )
-from .stt_service import TranscriptResult, TranscriptSegment
+from .stt_service import NADICTAAT, TranscriptResult, TranscriptSegment
 
 logger = structlog.get_logger()
 
@@ -99,6 +102,16 @@ class Gesprek:
         self.segmenten: List[TranscriptSegment] = []
         self.sprekers: set = set()
         self.seconden = 0.0
+        self.nadictaat_vanaf: Optional[float] = None
+
+    def start_nadictaat(self, vanaf: Any) -> None:
+        """Vanaf deze seconde van de opname dicteert alleen de arts nog."""
+        try:
+            waarde = float(vanaf)
+        except (TypeError, ValueError):
+            return
+        if waarde >= 0:
+            self.nadictaat_vanaf = waarde
 
     def verwerk(self, raw: Any) -> bool:
         """Neemt een Deepgram-bericht op. True als er tekst bij kwam."""
@@ -120,15 +133,19 @@ class Gesprek:
             tekst = (w.get("punctuated_word") or w.get("word") or "").strip()
             if not tekst:
                 continue
-            spreker = f"spreker_{w.get('speaker', 0)}"
             begin, eind = float(w.get("start") or 0.0), float(w.get("end") or 0.0)
+            if self.nadictaat_vanaf is not None and (begin + eind) / 2 >= self.nadictaat_vanaf:
+                spreker = NADICTAAT
+            else:
+                spreker = f"spreker_{w.get('speaker', 0)}"
             laatste = self.segmenten[-1] if self.segmenten else None
             if laatste is not None and laatste.speaker == spreker:
                 laatste.text += " " + tekst
                 laatste.end = eind
             else:
                 self.segmenten.append(TranscriptSegment(text=tekst, start=begin, end=eind, speaker=spreker))
-            self.sprekers.add(spreker)
+            if spreker != NADICTAAT:
+                self.sprekers.add(spreker)
             self.seconden = max(self.seconden, eind)
             erbij = True
         return erbij
@@ -218,7 +235,9 @@ async def volg_consult(
                         control = json.loads(message["text"])
                     except ValueError:
                         continue
-                    if control.get("type") == "stop":
+                    if control.get("type") == "nadictaat":
+                        gesprek.start_nadictaat(control.get("vanaf"))
+                    elif control.get("type") == "stop":
                         gestopt.set()
                         break
         except WebSocketDisconnect:

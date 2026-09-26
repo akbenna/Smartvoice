@@ -182,3 +182,57 @@ async def test_pipeline_geeft_het_gesprek_per_spreker_aan_het_taalmodel():
 def test_soep_prompt_kent_de_sprekerlabels():
     assert "Spreker 1" in pipeline.SOEP_SYSTEM_PROMPT
     assert "heteroanamnese" in pipeline.SOEP_SYSTEM_PROMPT
+
+
+# ── Nadictaat: de arts dicteert na het consult ──
+
+def _gesprek_met_tijden(*uitingen):
+    segs = [stt_service.TranscriptSegment(text=t, start=b, end=e, speaker=s) for s, t, b, e in uitingen]
+    return stt_service.TranscriptResult(raw_text=" ".join(u[1] for u in uitingen), segments=segs)
+
+
+def test_nadictaat_komt_als_laatste_blok_van_de_arts():
+    t = _gesprek_met_tijden(("spreker_0", "Wat is er?", 0, 2), ("spreker_1", "Keelpijn.", 2, 4),
+                            ("spreker_0", "Keel rood, geen beslag. Beleid expectatief.", 60, 66))
+    stt_service.markeer_nadictaat(t, 55.0)
+    assert stt_service.met_sprekers(t) == (
+        "Spreker 1: Wat is er?\nSpreker 2: Keelpijn.\n"
+        "Nadictaat arts: Keel rood, geen beslag. Beleid expectatief.")
+
+
+def test_nadictaat_telt_op_het_midden_van_een_uiting():
+    t = _gesprek_met_tijden(("spreker_0", "net ervoor", 50, 56), ("spreker_0", "net erna", 54, 62))
+    stt_service.markeer_nadictaat(t, 55.0)
+    assert [s.speaker for s in t.segments] == ["spreker_0", stt_service.NADICTAAT]
+
+
+def test_nadictaat_ook_bij_een_enkele_stem_of_zonder_sprekers():
+    t = _gesprek_met_tijden(("", "pt keelpijn", 0, 3), ("", "LO keel rood", 30, 33))
+    stt_service.markeer_nadictaat(t, 20.0)
+    assert stt_service.met_sprekers(t) == "pt keelpijn\nNadictaat arts: LO keel rood"
+
+
+def test_zonder_nadictaat_verandert_er_niets():
+    t = _gesprek_met_tijden(("spreker_0", "a", 0, 1), ("spreker_1", "b", 1, 2))
+    voor = stt_service.met_sprekers(t)
+    stt_service.markeer_nadictaat(t, None)
+    assert stt_service.met_sprekers(t) == voor
+
+
+def test_soep_prompt_laat_het_nadictaat_leiden():
+    assert "Nadictaat arts" in pipeline.SOEP_SYSTEM_PROMPT
+    assert "volg dan het nadictaat" in pipeline.SOEP_SYSTEM_PROMPT
+
+
+@pytest.mark.asyncio
+async def test_upload_route_markeert_het_nadictaat():
+    t = _gesprek_met_tijden(("spreker_0", "Wat is er?", 0, 2), ("spreker_1", "Keelpijn.", 2, 4),
+                            ("spreker_0", "Keel rood.", 40, 42))
+    soep_json = json.dumps({"s": "", "o": "keel rood", "e": "", "p": "", "icpc_code": "", "icpc_titel": ""})
+    nazorg_json = json.dumps({"decisief": "x", "rode_vlaggen": [], "ontbrekende_info": []})
+    complete_mock = AsyncMock(side_effect=[soep_json, nazorg_json])
+    with patch.object(pipeline.stt_service, "transcribe", new=AsyncMock(return_value=t)), \
+         patch.object(pipeline.llm_service, "complete", new=complete_mock):
+        await pipeline.process_consultation(Path("/fake/audio.wav"), nadictaat_vanaf=30.0)
+    prompt = complete_mock.await_args_list[0].kwargs["user_prompt"]
+    assert "Nadictaat arts: Keel rood." in prompt
