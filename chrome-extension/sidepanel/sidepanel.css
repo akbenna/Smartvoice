@@ -114,6 +114,10 @@ textarea:focus { outline: 2px solid var(--brand); outline-offset: -1px; }
 .ta-chip:hover { background: var(--brand); color: #fff; }
 .ta-pagina { display: inline-flex; gap: 4px; align-items: center; }
 .ta-leeg { font-size: 11px; color: var(--muted); }
+.bt { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.bt-groep { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ta-chip.bt-patient { color: #7c3aed; border-color: #7c3aed; }
+.ta-chip.bt-patient:hover { background: #7c3aed; color: #fff; }
 .ta-zoek {
   font-size: 12px; padding: 2px 8px; border: 1px solid var(--border, #e5e7eb);
   border-radius: 999px; min-width: 150px; flex: 1;
