@@ -39,7 +39,7 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/api/v1", tags=["usage"])
 
 # Actions the extension handles itself but that may still be counted.
-TOEGESTAAN = {"patient.thuisarts"}
+TOEGESTAAN = {"patient.thuisarts", "naslag.provita", "patient.animatie"}
 
 ICPC = re.compile(r"^[A-Z]\d{2}$")
 
