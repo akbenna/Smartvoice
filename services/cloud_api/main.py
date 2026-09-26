@@ -36,6 +36,7 @@ from pydantic import BaseModel, Field
 from .auth import huidige_identiteit, verify_api_key
 from .config import get_config
 from .dictation import relay_dictation
+from .consult_live import volg_consult
 from .letters import router as letters_router
 from .patient_info import router as patient_router
 from .usage import router as usage_router
@@ -321,6 +322,12 @@ async def process_consult(
             audio_path.unlink(missing_ok=True)
         except OSError:
             pass
+
+
+@app.websocket("/api/v1/consult/stream")
+async def consult_stream(ws: WebSocket):
+    """Live consult: het gesprek wordt gevolgd, na stop komt het verslag."""
+    await volg_consult(ws)
 
 
 # ── Live dictation (side panel) ──
