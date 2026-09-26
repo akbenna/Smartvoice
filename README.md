@@ -115,4 +115,4 @@ Laden: `edge://extensions` → Ontwikkelaarsmodus → "Uitgepakte extensie laden
 
 ## Licentie
 
-Proprietary — Huisartsenpraktijk Het Roosendael
+Proprietary, ProVita Care (Roermond)

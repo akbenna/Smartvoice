@@ -18,7 +18,7 @@ var SVBeslistools = (function () {
   'use strict';
 
   var CODE = /^[A-Z]\d{2}(\.\d{1,2})?$/;
-  var BASIS = 'https://provitacare.nl';
+  var BASIS = 'https://www.provita-care.nl';
 
   /** " t90.02 " wordt "T90.02"; iets wat geen ICPC-code is wordt "". */
   function normaliseer(code) {

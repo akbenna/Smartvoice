@@ -3,7 +3,7 @@
  *
  * De koppeling ICPC -> ProVita Care. Wat hier hard moet kloppen:
  * - een regel verschijnt pas als een arts hem heeft nagekeken;
- * - een link gaat altijd naar provitacare.nl, nooit naar een andere site;
+ * - een link gaat altijd naar www.provita-care.nl, nooit naar een andere site;
  * - er staat geen tool in die een advies voor één patiënt maakt.
  */
 const test = require('node:test');
@@ -45,7 +45,7 @@ test('alleen paden binnen ProVita Care', () => {
   ]);
   const uit = B.voorCode('P17', t).patient;
   assert.deepEqual(uit.map((l) => l.id), ['goed']);
-  assert.equal(uit[0].url, 'https://provitacare.nl/animations/vita-animatie-stoppen-roken-v2.html');
+  assert.equal(uit[0].url, 'https://www.provita-care.nl/animations/vita-animatie-stoppen-roken-v2.html');
 });
 
 test('geen code, geen links', () => {
